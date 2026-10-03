@@ -25,7 +25,8 @@ a UI tick (8 ms square blip at 2 kHz), a glassy shimmer (high sines with vibrato
 Built-ins `impact whoosh pop tick click riser shimmer glitch` cover most beats — combine them before inventing.
 
 ## Another voice provider (OpenAI TTS, Google, Azure, PlayHT, a local model…)
-The terminal has internet access. If the student gives you another TTS API (and its key):
+The terminal has internet access. If the student gives you another TTS API (and its key) — not ElevenLabs: an
+ElevenLabs key belongs in Settings → Voice, where the voice tools use it:
 1. Store the key in the project's `.env` (gitignored) — never in a committed file, never echo it back in chat.
    Read it in commands with `set -a; . ./.env; set +a`.
 2. Call the API with `curl` (or a small node script you write in `scripts/`), saving e.g. `voice-raw.mp3`.
