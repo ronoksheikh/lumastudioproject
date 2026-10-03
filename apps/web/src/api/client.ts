@@ -1,6 +1,6 @@
 import type { RunEvent } from '@luma/shared';
 import type {
-  CommitDetail, CommitSummary, ProjectFile, ConversationMessage, ModelConfig, Project, RenderRecord, RunInfo, TestResult, TreeEntry, UploadRecord, User, VoicePrefs, VoiceSettings,
+  CommitDetail, CommitSummary, ProjectFile, TerminalEntry, ConversationMessage, ModelConfig, Project, RenderRecord, RunInfo, TestResult, TreeEntry, UploadRecord, User, VoicePrefs, VoiceSettings,
 } from './types';
 
 export class ApiError extends Error {
@@ -82,6 +82,7 @@ export const api = {
   runEvents: (id: string, runId: string, after = 0) => get<{ run: RunInfo; events: RunEvent[] }>(`/api/projects/${id}/runs/${runId}/events.json${qs({ after })}`),
   stopRun: (id: string, runId: string) => post<{ ok: boolean }>(`/api/projects/${id}/runs/${runId}/stop`),
   answer: (id: string, runId: string, answer: string) => post<{ ok: true }>(`/api/projects/${id}/runs/${runId}/answer`, { answer }),
+  terminal: (id: string) => get<{ entries: TerminalEntry[] }>(`/api/projects/${id}/terminal`),
   captureFrame: (id: string, t: number) => post<{ url: string }>(`/api/projects/${id}/capture`, { t }),
 
   // ---- uploads ----

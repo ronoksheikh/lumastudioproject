@@ -166,7 +166,7 @@ export function ProjectPage() {
               <Tabs.Panel id="files" className="min-h-0 flex-1">{tab === 'files' && <FilesPane projectId={id} tick={tick} />}</Tabs.Panel>
               <Tabs.Panel id="renders" className="min-h-0 flex-1">{tab === 'renders' && <RendersPane projectId={id} tick={tick} />}</Tabs.Panel>
               <Tabs.Panel id="history" className="min-h-0 flex-1">{tab === 'history' && <HistoryPane projectId={id} tick={tick} running={running} onRestored={reload} />}</Tabs.Panel>
-              <Tabs.Panel id="terminal" className="min-h-0 flex-1"><Suspense fallback={<Skeleton className="m-3 h-40 rounded-lg" />}><TerminalPane turns={live.turns} order={order} /></Suspense></Tabs.Panel>
+              <Tabs.Panel id="terminal" className="min-h-0 flex-1"><Suspense fallback={<Skeleton className="m-3 h-40 rounded-lg" />}><TerminalPane projectId={id} turns={live.turns} order={order} tick={tick} /></Suspense></Tabs.Panel>
             </Tabs>
           </section>
         </div>

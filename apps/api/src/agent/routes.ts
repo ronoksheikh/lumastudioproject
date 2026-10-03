@@ -12,6 +12,7 @@ import { parse } from '../http/validate.js';
 import { assertDiskAvailable } from '../quota/service.js';
 import { getOwnedProject, toRef } from '../projects/service.js';
 import { loadEvents } from './events.js';
+import { terminalHistory } from './terminal.js';
 import { FRAMES_DIR } from './tools/frames.js';
 
 export async function agentRoutes(app: FastifyInstance, ctx: AppContext) {
@@ -69,6 +70,13 @@ export async function agentRoutes(app: FastifyInstance, ctx: AppContext) {
         })
 ,
     };
+  });
+
+  /** The Terminal tab: every command-like tool call in this project with its output (all runs, survives reloads). */
+  app.get('/projects/:id/terminal', auth, async (req) => {
+    const { id } = req.params as { id: string };
+    getOwnedProject(db, authUser(req).id, id);
+    return { entries: terminalHistory(ctx.sqlite, id) };
   });
 
   const ownedRun = (req: import('fastify').FastifyRequest) => {

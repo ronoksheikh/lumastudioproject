@@ -146,6 +146,11 @@ async function main() {
     await page.waitForSelector('[data-testid="preview-empty"]', { timeout: 20_000 });
     await text(page, 'Nothing here yet');
     await shot(page, 'preview-empty');
+    await clickText(page, '[role="tab"]', 'Terminal');
+    await page.waitForSelector('[data-testid="terminal-empty"]', { timeout: 10_000 });
+    await text(page, 'No commands yet');
+    await shot(page, 'terminal-empty');
+    await clickText(page, '[role="tab"]', 'Preview');
 
     const previewFrame = async () => {
       for (let i = 0; i < 60; i++) {
@@ -261,6 +266,7 @@ async function main() {
     await clickText(page, '[role="tab"]', 'Terminal');
     await page.waitForSelector('[data-testid="terminal"] .xterm-rows', { timeout: 10_000 });
     await page.waitForFunction(() => document.querySelector('[data-testid="terminal"] .xterm-rows')?.textContent?.includes('npm run check'), { timeout: 10_000 });
+    await page.waitForFunction(() => document.querySelector('[data-testid="terminal"] .xterm-rows')?.textContent?.includes('generate voice (placeholder'), { timeout: 10_000 });
     await shot(page, 'terminal');
 
     log('renders tab');
@@ -274,6 +280,11 @@ async function main() {
     await text(page, 'All set');
     await text(page, 'Read the engine guide');
     await shot(page, 'reloaded');
+    // the terminal is rebuilt from the stored run events, not lost on reload
+    await clickText(page, '[role="tab"]', 'Terminal');
+    await page.waitForFunction(() => document.querySelector('[data-testid="terminal"] .xterm-rows')?.textContent?.includes('npm run check'), { timeout: 10_000 }).catch(async () => { await shot(page, 'FAIL-terminal-after-reload'); fail('terminal history lost after reload'); });
+    await shot(page, 'terminal-after-reload');
+    await clickText(page, '[role="tab"]', 'Preview');
 
     // ---------- stop a long command ----------
     log('stop');

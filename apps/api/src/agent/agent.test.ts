@@ -109,6 +109,21 @@ describe('agent loop', () => {
     expect(JSON.parse(fs.readFileSync(path.join(dir(), '.luma/plan.json'), 'utf8'))).toHaveLength(2);
   });
 
+  it('keeps a terminal history rebuilt from the stored events', async () => {
+    const r = await c.get(`/api/projects/${projectId}/terminal`);
+    expect(r.status).toBe(200);
+    const bash = r.json.entries.filter((e: any) => e.name === 'bash');
+    expect(bash.length).toBeGreaterThan(0);
+    const last = bash.at(-1);
+    expect(last.args.command).toContain('echo hello');
+    expect(last.output).toContain('hello');
+    expect(last.ok).toBe(true);
+    expect(r.json.entries.some((e: any) => e.name === 'write_file')).toBe(false); // file edits live in the chat, not the terminal
+    const other = new Client(t.app);
+    await other.signup('eve@example.com');
+    expect((await other.get(`/api/projects/${projectId}/terminal`)).status).toBe(404);
+  });
+
   it('sends the system prompt, project facts, tool schemas and previous turns to the model', async () => {
     turns = [{ content: 'Sure.' }];
     await runToEnd('Second request');

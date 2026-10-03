@@ -123,3 +123,14 @@ export interface RenderRecord {
   url: string;
   contactSheetUrl: string | null;
 }
+
+export interface TerminalEntry {
+  runId: string;
+  callId: string;
+  name: string;
+  args: unknown;
+  output: string;
+  ok: boolean | null;
+  summary: string | null;
+  ts: number;
+}
