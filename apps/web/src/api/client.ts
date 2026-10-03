@@ -1,6 +1,6 @@
 import type { RunEvent } from '@luma/shared';
 import type {
-  CommitDetail, CommitSummary, ConversationMessage, ModelConfig, Project, RenderRecord, RunInfo, TestResult, TreeEntry, UploadRecord, User, VoicePrefs, VoiceSettings,
+  CommitDetail, CommitSummary, ProjectFile, ConversationMessage, ModelConfig, Project, RenderRecord, RunInfo, TestResult, TreeEntry, UploadRecord, User, VoicePrefs, VoiceSettings,
 } from './types';
 
 export class ApiError extends Error {
@@ -64,7 +64,9 @@ export const api = {
   previewToken: (id: string) => post<{ url: string; expiresAt: number }>(`/api/projects/${id}/preview-token`),
   tree: (id: string, path = '.', depth = 4) => get<{ entries: TreeEntry[] }>(`/api/projects/${id}/tree${qs({ path, depth })}`),
   file: (id: string, path: string) =>
-    get<{ path: string; kind: 'text' | 'binary' | 'image'; content?: string; truncated?: boolean; bytes?: number }>(`/api/projects/${id}/file${qs({ path })}`),
+    get<ProjectFile>(`/api/projects/${id}/file${qs({ path })}`),
+  /** Bytes of a project file (previews, downloads). `v` busts the cache when the agent changed things. */
+  rawUrl: (id: string, path: string, v = 0, download = false) => `/api/projects/${id}/raw${qs({ path, v: v || undefined, download: download ? '1' : undefined })}`,
 
   // ---- history ----
   gitLog: (id: string, limit = 50, skip = 0) => get<{ commits: CommitSummary[] }>(`/api/projects/${id}/git/log${qs({ limit, skip })}`),

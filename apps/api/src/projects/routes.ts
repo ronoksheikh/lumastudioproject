@@ -17,8 +17,12 @@ import { loadSecrets } from '../security/secrets.js';
 import { assertSha, gitFileAt, gitLog, gitRestore, gitShow } from './git.js';
 import { capturePng } from './capture.js';
 import { assertDiskAvailable, forgetUsage, usageFor } from '../quota/service.js';
-import { sendExportFile } from '../render/serve.js';
+import { sendExportFile, sendProjectFile } from '../render/serve.js';
+import { mediaKind, rawContentType } from './file-kinds.js';
 import { createProject, getOwnedProject, listProjects, publicProject, softDeleteProject, toRef, touchProject, updateProject } from './service.js';
+
+/** Lines of text the Files tab shows before it truncates. */
+const TEXT_LINES = 20_000;
 
 const title = z.string().trim().min(1, 'Give the project a title').max(120);
 
@@ -73,18 +77,52 @@ export async function projectRoutes(app: FastifyInstance, ctx: AppContext) {
     }
   });
 
+  /** What the Files tab shows: text (up to a size, with a truncation notice), or what kind of media it is. */
   app.get('/projects/:id/file', auth, async (req) => {
     const { id } = req.params as { id: string };
     const q = parse(z.object({ path: z.string().min(1).max(400) }), req.query);
     const p = getOwnedProject(db, authUser(req).id, id);
+    const ref = toRef(p);
+    let abs: string;
     try {
-      const r = readProjectFile(toRef(p), q.path, { limit: 100_000, numbered: false }); // raw text for the viewer
-      if (r.kind === 'text') return { path: r.path, kind: 'text', content: r.text, truncated: r.truncated };
-      return { path: r.path, kind: r.kind, bytes: r.bytes };
+      abs = resolveInProject(ref.dir, q.path);
+    } catch (e) {
+      throw badRequest((e as Error).message);
+    }
+    let st: fs.Stats;
+    try {
+      st = fs.lstatSync(abs);
+    } catch {
+      throw notFound('File not found');
+    }
+    if (!st.isFile()) throw badRequest('Not a regular file');
+    const rel = path.relative(fs.realpathSync(ref.dir), abs);
+    const media = mediaKind(abs);
+    if (media && media.kind !== 'svg') return { path: rel, kind: media.kind, mime: media.mime, bytes: st.size };
+    try {
+      const r = readProjectFile(ref, q.path, { limit: TEXT_LINES, numbered: false }); // raw text for the viewer
+      if (r.kind === 'text') {
+        return { path: r.path, kind: media?.kind ?? 'text', mime: media?.mime ?? 'text/plain', content: r.text, truncated: r.truncated, bytes: st.size, totalLines: r.totalLines };
+      }
+      return { path: r.path, kind: 'binary', mime: 'application/octet-stream', bytes: st.size };
     } catch (e) {
       if (e instanceof ToolError) throw badRequest(e.message);
       throw e;
     }
+  });
+
+  /** The file's bytes (previews: images, audio, video, PDF; downloads). Owner only, Range support, never executed on the app origin. */
+  app.get('/projects/:id/raw', auth, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const q = parse(z.object({ path: z.string().min(1).max(400), download: z.string().optional() }), req.query);
+    const p = getOwnedProject(db, authUser(req).id, id);
+    const isText = !mediaKind(q.path) && /\.(html?|css|m?js|json|md|txt|csv|xml|ya?ml)$/i.test(q.path);
+    return sendProjectFile(req, reply, toRef(p).dir, q.path, {
+      contentType: rawContentType(q.path, isText),
+      download: q.download ? path.basename(q.path) : undefined,
+      // an SVG opened directly must not run script on this origin; PDFs keep the browser's viewer
+      headers: q.path.toLowerCase().endsWith('.pdf') ? {} : { 'Content-Security-Policy': "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; media-src 'self'; sandbox" },
+    });
   });
 
   // ---- history ----

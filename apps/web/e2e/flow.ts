@@ -164,7 +164,7 @@ async function main() {
       { reasoning: 'The project is empty. I will plan, write the script, make a placeholder voice and build one scene.', content: 'Great idea — let me plan this.', toolCalls: [
         { name: 'update_plan', args: { items: [{ text: 'Read the engine guide', status: 'doing' }, { text: 'Write the script + voice', status: 'todo' }, { text: 'Build the scenes', status: 'todo' }, { text: 'Check the frames', status: 'todo' }] } },
         { name: 'read_guide', args: { topic: 'engine' } },
-        { name: 'bash', args: { command: 'ls -a && echo "warning: demo stderr" 1>&2' } },
+        { name: 'bash', args: { command: 'ls -a && cp "$LUMA_ENGINE/public/index.html" public/ && mkdir -p assets && cp "$LUMA_ENGINE/assets/Lumademy_Icon_Blue.svg" assets/logo.svg && echo "warning: demo stderr" 1>&2' } },
       ] },
       { toolCalls: [{ name: 'write_file', args: { path: 'script.json', content: JSON.stringify({ voice: { voice_id: 'v1', model_id: 'eleven_multilingual_v2', language_code: 'en', voice_settings: {} }, segments: [{ id: 'hook', text: 'Every video starts with one idea.' }, { id: 'cta', text: 'Make yours today with Luma.' }] }, null, 2) } }] },
       { toolCalls: [{ name: 'generate_voice', args: { placeholder: true } }] },
@@ -236,6 +236,19 @@ async function main() {
     await page.waitForSelector('[data-testid="code-viewer"] .monaco-editor', { timeout: 20_000 });
     await page.waitForFunction(() => document.querySelector('[data-testid="code-viewer"]')?.textContent?.includes('E2E'), { timeout: 10_000 });
     await shot(page, 'files');
+    // every kind of file opens: html (was blank before), audio, svg preview + code
+    await clickText(page, '[role="treeitem"]', 'index.html');
+    await page.waitForFunction(() => document.querySelector('[data-testid="code-viewer"] .view-lines')?.textContent?.includes('id="stage"'), { timeout: 15_000 });
+    await shot(page, 'files-index-html');
+    await clickText(page, '[role="treeitem"]', 'audio');
+    await clickText(page, '[role="treeitem"]', 'voiceover.mp3');
+    await page.waitForSelector('audio[data-testid="file-preview"]', { timeout: 10_000 });
+    await clickText(page, '[role="treeitem"]', 'assets');
+    await clickText(page, '[role="treeitem"]', 'logo.svg');
+    await page.waitForFunction(() => { const i = document.querySelector<HTMLImageElement>('img[data-testid="file-preview"]'); return !!i && i.complete && i.naturalWidth > 0; }, { timeout: 10_000 });
+    await shot(page, 'files-svg');
+    await clickText(page, '[role="tab"]', 'Code');
+    await page.waitForFunction(() => document.querySelector('[data-testid="code-viewer"] .view-lines')?.textContent?.includes('<svg'), { timeout: 10_000 });
 
     log('history tab');
     await clickText(page, '[role="tab"]', 'History');

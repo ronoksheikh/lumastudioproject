@@ -1,5 +1,6 @@
-// Serving finished renders. The export/ folder is writable by the project's own unix user, so a file
-// there could have been swapped for a symlink: open with O_NOFOLLOW and check the resolved location.
+// Serving files out of a project folder (finished renders, and the Files tab's raw previews/downloads).
+// Project folders are writable by the project's own unix user, so a file could have been swapped for a
+// symlink: open with O_NOFOLLOW and check the resolved location.
 import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -8,7 +9,7 @@ import { PathError, resolveInProject } from '../runner/paths.js';
 
 const TYPES: Record<string, string> = { '.mp4': 'video/mp4', '.jpg': 'image/jpeg' };
 
-function openRegular(projectDir: string, rel: string): { fd: number; size: number } {
+function openRegular(projectDir: string, rel: string, subdir: string | null): { fd: number; size: number } {
   let abs: string;
   try {
     abs = resolveInProject(projectDir, rel);
@@ -16,7 +17,9 @@ function openRegular(projectDir: string, rel: string): { fd: number; size: numbe
     if (e instanceof PathError) throw notFound();
     throw e;
   }
-  if (!abs.startsWith(fs.realpathSync(projectDir) + path.sep + 'export' + path.sep)) throw notFound();
+  const root = fs.realpathSync(projectDir);
+  if (!abs.startsWith(root + path.sep + (subdir ? subdir + path.sep : ''))) throw notFound();
+  if (/^\.(git|home)(\/|$)/.test(path.relative(root, abs))) throw notFound(); // never git internals or the shell home
   let fd: number;
   try {
     fd = fs.openSync(abs, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
@@ -31,11 +34,23 @@ function openRegular(projectDir: string, rel: string): { fd: number; size: numbe
   return { fd, size: st.size };
 }
 
-/** Streams `rel` (relative to the project dir) with HTTP Range support. */
+/** Streams a render (under export/) with HTTP Range support. */
 export function sendExportFile(req: FastifyRequest, reply: FastifyReply, projectDir: string, rel: string, opts: { download?: string } = {}) {
-  const { fd, size } = openRegular(projectDir, rel);
-  const type = TYPES[path.extname(rel)] ?? 'application/octet-stream';
+  return sendProjectFile(req, reply, projectDir, rel, { ...opts, subdir: 'export', contentType: TYPES[path.extname(rel)] });
+}
+
+/** Streams any regular file of the project (relative path) with HTTP Range support. */
+export function sendProjectFile(
+  req: FastifyRequest,
+  reply: FastifyReply,
+  projectDir: string,
+  rel: string,
+  opts: { download?: string; subdir?: string; contentType?: string; headers?: Record<string, string> } = {},
+) {
+  const { fd, size } = openRegular(projectDir, rel, opts.subdir ?? null);
+  const type = opts.contentType ?? 'application/octet-stream';
   reply.header('Content-Type', type).header('Accept-Ranges', 'bytes').header('Cache-Control', 'private, max-age=3600').header('X-Content-Type-Options', 'nosniff');
+  for (const [k, v] of Object.entries(opts.headers ?? {})) reply.header(k, v);
   if (opts.download) reply.header('Content-Disposition', `attachment; filename="${opts.download.replace(/[^\w.-]/g, '_')}"`);
 
   let start = 0;

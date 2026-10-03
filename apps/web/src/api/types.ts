@@ -57,6 +57,16 @@ export interface VoiceSettings {
   prefs: VoicePrefs;
 }
 
+export interface ProjectFile {
+  path: string;
+  kind: 'text' | 'svg' | 'image' | 'audio' | 'video' | 'pdf' | 'binary';
+  mime?: string;
+  content?: string;
+  truncated?: boolean;
+  bytes?: number;
+  totalLines?: number;
+}
+
 export interface TreeEntry {
   path: string;
   type: 'file' | 'dir';

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from '@heroui/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api/client';
 import type { TreeEntry } from '../api/types';
 import { formatBytes, useInvalidateOn } from '../lib/hooks';
@@ -47,34 +47,92 @@ function Row({ n, depth, open, toggle, selected, onSelect }: { n: Node; depth: n
   );
 }
 
-function Viewer({ projectId, path }: { projectId: string; path: string }) {
+function CodeView({ value, path }: { value: string; path: string }) {
   const host = useRef<HTMLDivElement>(null);
   const viewer = useRef<{ show(v: string, p: string): void; dispose(): void } | null>(null);
-  const { base, reloadKey } = usePreview();
-  const file = useQuery({ queryKey: ['file', projectId, path, reloadKey], queryFn: () => api.file(projectId, path) });
-  const isImage = file.data?.kind === 'image';
-  const imgSrc = base && isImage ? `${base}${path.replace(/^public\//, '')}?v=${reloadKey}` : null;
-
   useEffect(() => {
     let alive = true;
-    if (file.data?.kind !== 'text' || !host.current) return;
     void import('../monaco/viewer').then((m) => {
       if (!alive || !host.current) return;
       viewer.current ??= m.createViewer(host.current);
-      viewer.current.show(file.data!.content ?? '', path);
+      viewer.current.show(value, path);
     });
     return () => { alive = false; };
-  }, [file.data, path]);
+  }, [value, path]);
   useEffect(() => () => { viewer.current?.dispose(); viewer.current = null; }, []);
+  return <div ref={host} className="min-h-0 flex-1" data-testid="code-viewer" />;
+}
+
+const checker = 'bg-[length:16px_16px] bg-[linear-gradient(45deg,#eef3fc_25%,transparent_25%,transparent_75%,#eef3fc_75%),linear-gradient(45deg,#eef3fc_25%,transparent_25%,transparent_75%,#eef3fc_75%)] bg-[position:0_0,8px_8px]';
+
+function Viewer({ projectId, path }: { projectId: string; path: string }) {
+  const { reloadKey } = usePreview();
+  const file = useQuery({ queryKey: ['file', projectId, path, reloadKey], queryFn: () => api.file(projectId, path) });
+  const [svgMode, setSvgMode] = useState<'preview' | 'code'>('preview');
+  const raw = api.rawUrl(projectId, path, reloadKey);
+  const download = api.rawUrl(projectId, path, reloadKey, true);
+  const name = path.split('/').pop() ?? path;
 
   if (file.isLoading) return <Skeleton className="m-3 h-40 rounded-lg" />;
-  if (file.error) return <p className="p-4 text-sm text-[#b42318]">Couldn’t open this file.</p>;
-  if (file.data?.kind === 'binary') return <p className="p-4 text-sm text-[#5b6b8f]">Binary file ({formatBytes(file.data.bytes ?? 0)}) — nothing to show as text.</p>;
-  if (isImage) return <div className="grid h-full place-items-center bg-[#eff5ff] p-4">{imgSrc ? <img src={imgSrc} alt={path} className="max-h-full max-w-full rounded-lg bg-white shadow" /> : <p className="text-sm text-[#5b6b8f]">Image ({formatBytes(file.data?.bytes ?? 0)})</p>}</div>;
+  if (file.error || !file.data) return <p className="p-4 text-sm text-[#b42318]">Couldn’t open this file{file.error instanceof Error ? `: ${file.error.message}` : '.'}</p>;
+  const f = file.data;
+
+  let body: ReactNode;
+  switch (f.kind) {
+    case 'text':
+      body = <CodeView value={f.content ?? ''} path={path} />;
+      break;
+    case 'svg':
+      body = svgMode === 'code'
+        ? <CodeView value={f.content ?? ''} path={path} />
+        : <div className={`grid min-h-0 flex-1 place-items-center overflow-auto p-6 ${checker}`}><img src={raw} alt={name} className="max-h-full max-w-full" data-testid="file-preview" /></div>;
+      break;
+    case 'image':
+      body = <div className={`grid min-h-0 flex-1 place-items-center overflow-auto p-6 ${checker}`}><img src={raw} alt={name} className="max-h-full max-w-full rounded-lg shadow" data-testid="file-preview" /></div>;
+      break;
+    case 'audio':
+      body = <div className="grid min-h-0 flex-1 place-items-center bg-[#eff5ff] p-6"><audio controls preload="metadata" src={raw} className="w-full max-w-md" data-testid="file-preview" /></div>;
+      break;
+    case 'video':
+      body = <div className="grid min-h-0 flex-1 place-items-center bg-[#eff5ff] p-4"><video controls preload="metadata" src={raw} className="max-h-full max-w-full rounded-lg shadow" data-testid="file-preview" /></div>;
+      break;
+    case 'pdf':
+      body = <iframe src={raw} title={name} className="min-h-0 w-full flex-1 border-0 bg-[#eff5ff]" data-testid="file-preview" />;
+      break;
+    default:
+      body = (
+        <div className="grid min-h-0 flex-1 place-items-center p-6">
+          <div className="max-w-xs rounded-2xl border border-[var(--border)] bg-[#fafcff] p-6 text-center" data-testid="file-preview">
+            <Icon name="file" size={26} className="mx-auto mb-2 text-[#2970ec]" />
+            <p className="text-sm font-semibold">Can’t preview this file</p>
+            <p className="mt-1 text-xs text-[#5b6b8f]">{name} · {formatBytes(f.bytes ?? 0)}</p>
+            <a href={download} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#2970ec] px-3 py-1.5 text-sm font-medium text-white"><Icon name="download" size={14} /> Download</a>
+          </div>
+        </div>
+      );
+  }
+
   return (
-    <div className="flex h-full flex-col">
-      {file.data?.truncated && <p className="bg-[#fff7e6] px-3 py-1 text-xs text-[#7a4a00]">Showing the first part of this large file.</p>}
-      <div ref={host} className="min-h-0 flex-1" data-testid="code-viewer" />
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex flex-none items-center gap-2 border-b border-[var(--separator)] px-3 py-1.5">
+        <span className="mono min-w-0 flex-1 truncate text-xs text-[#5b6b8f]" title={path}>{path}</span>
+        {f.bytes != null && <span className="flex-none text-[11px] text-[#8a97b5]">{formatBytes(f.bytes)}</span>}
+        {f.kind === 'svg' && (
+          <div className="flex flex-none rounded-md bg-[#eff5ff] p-0.5 text-[11px] font-medium" role="tablist" aria-label="SVG view">
+            {(['preview', 'code'] as const).map((m) => (
+              <button key={m} role="tab" aria-selected={svgMode === m} onClick={() => setSvgMode(m)} className={`rounded px-2 py-0.5 ${svgMode === m ? 'bg-white text-[#2970ec] shadow-sm' : 'text-[#5b6b8f]'}`}>{m === 'preview' ? 'Preview' : 'Code'}</button>
+            ))}
+          </div>
+        )}
+        {f.kind === 'pdf' && <a href={raw} target="_blank" rel="noreferrer" className="flex-none text-xs font-medium text-[#2970ec]">Open</a>}
+        <a href={download} aria-label={`Download ${name}`} title="Download" className="grid h-6 w-6 flex-none place-items-center rounded-md text-[#5b6b8f] hover:bg-[#eff5ff] hover:text-[#2970ec]"><Icon name="download" size={14} /></a>
+      </div>
+      {f.truncated && (
+        <p className="flex-none bg-[#fff7e6] px-3 py-1 text-xs text-[#7a4a00]" role="status">
+          Large file — showing part of it{f.totalLines ? ` (${f.totalLines.toLocaleString()} lines)` : ''}. <a href={download} className="font-semibold underline">Download</a> to see everything.
+        </p>
+      )}
+      {body}
     </div>
   );
 }

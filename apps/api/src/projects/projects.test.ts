@@ -87,6 +87,53 @@ describe('projects', () => {
     expect((await ada.get(`/api/projects/${projectId}/file`, { path: '../../etc/passwd' })).status).toBe(400);
     expect((await ada.get(`/api/projects/${projectId}/file`, { path: '/etc/passwd' })).status).toBe(400);
   });
+
+  it('describes every kind of file for the Files tab (html, svg, media, pdf, binary, large text)', async () => {
+    const dir = ref().dir;
+    const put = (rel: string, data: string | Buffer) => {
+      fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+      fs.writeFileSync(path.join(dir, rel), data);
+    };
+    put('public/index.html', '<!doctype html>\n<html><body><div id="stage"></div></body></html>\n');
+    put('assets/logo.svg', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><script>alert(1)</script><rect width="10" height="10"/></svg>');
+    put('assets/pic.png', Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex'));
+    put('public/audio/voiceover.mp3', Buffer.alloc(4000, 7));
+    put('export/a.mp4', Buffer.alloc(100, 1));
+    put('assets/brief.pdf', '%PDF-1.1\n%%EOF\n');
+    put('assets/font.woff2', Buffer.from([0x77, 0x4f, 0x46, 0x32, 0, 0, 1, 0]));
+    put('big.txt', Array.from({ length: 30_000 }, (_, i) => `line ${i}`).join('\n'));
+    const f = async (p: string) => (await ada.get(`/api/projects/${projectId}/file`, { path: p })).json;
+
+    const html = await f('public/index.html');
+    expect(html).toMatchObject({ kind: 'text', truncated: false });
+    expect(html.content).toContain('<div id="stage">');
+    const svg = await f('assets/logo.svg');
+    expect(svg).toMatchObject({ kind: 'svg', mime: 'image/svg+xml' });
+    expect(svg.content).toContain('<rect');
+    expect(await f('assets/pic.png')).toMatchObject({ kind: 'image', mime: 'image/png' });
+    expect(await f('public/audio/voiceover.mp3')).toMatchObject({ kind: 'audio', bytes: 4000 });
+    expect(await f('export/a.mp4')).toMatchObject({ kind: 'video' });
+    expect(await f('assets/brief.pdf')).toMatchObject({ kind: 'pdf' });
+    expect(await f('assets/font.woff2')).toMatchObject({ kind: 'binary' });
+    const big = await f('big.txt');
+    expect(big).toMatchObject({ kind: 'text', truncated: true, totalLines: 30_000 });
+
+    // raw bytes: right type, ranges for media, never script on the app origin, downloads
+    const raw = (p: string, headers: Record<string, string> = {}) => ada.request('GET', `/api/projects/${projectId}/raw`, { query: { path: p }, headers });
+    const svgRaw = await raw('assets/logo.svg');
+    expect(svgRaw.headers['content-type']).toBe('image/svg+xml');
+    expect(svgRaw.headers['content-security-policy']).toContain('sandbox');
+    expect((await raw('public/index.html')).headers['content-type']).toContain('text/plain');
+    const part = await raw('public/audio/voiceover.mp3', { range: 'bytes=0-9' });
+    expect(part.status).toBe(206);
+    expect(part.headers['content-range']).toBe('bytes 0-9/4000');
+    expect((await raw('assets/brief.pdf')).headers['content-type']).toBe('application/pdf');
+    const dl = await ada.request('GET', `/api/projects/${projectId}/raw`, { query: { path: 'assets/font.woff2', download: '1' } });
+    expect(dl.headers['content-disposition']).toBe('attachment; filename="font.woff2"');
+    expect((await raw('.git/config')).status).toBe(404);
+    expect((await raw('../../etc/passwd')).status).toBe(404);
+    expect((await bob.request('GET', `/api/projects/${projectId}/raw`, { query: { path: 'assets/pic.png' } })).status).toBe(404);
+  });
 });
 
 describe('history', () => {
