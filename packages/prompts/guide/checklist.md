@@ -7,7 +7,7 @@ These mirror how the videos are scored (evals/rubric.md).
    starts (catches transitions), plus t = 0.3 and the last second. ≤ 8 times per call — use several calls.
 3. **Zero reported problems** in your last `preview_frames` round. Every "Problems found" line is a bug: overlapping
    text, text off the stage, tiny text, empty frames, words still hidden after they were spoken. Fix and re-check, or
-   explain in one line why one is intentional.
+   explain in one line why one is intentional. ("No readable text" before the first spoken word is fine.)
 4. **Hook:** something moves and a sound plays on frame 0; the first visual change happens by the first word.
 5. **Beats on words:** ≥ 2 timings per scene come from `w()` / `wEnd()` / `range()`; no hard-coded seconds for content.
 6. **Brand:** only palette colours in scenes.css and scene files; blue or white stage; one accent per moment.

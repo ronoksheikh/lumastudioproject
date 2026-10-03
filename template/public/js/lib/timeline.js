@@ -53,9 +53,17 @@ export function makeContext({ timing, world, scenesRoot, fxRoot, project, brand,
   /** Make a scene (or any node) visible from `from` until `to`. Only toggles `visibility`, so you can still tween the node's opacity. */
   const show = (node, from, to) => {
     tl.set(node, { visibility: 'visible' }, from);
-    if (to != null) tl.set(node, { visibility: 'hidden' }, to);
+    // a scene that runs to the end stays on the very last frame (hiding it AT END left the final frame blank)
+    if (to != null && to < END - 1e-6) tl.set(node, { visibility: 'hidden' }, to);
   };
   const add = (html) => scenesRoot.appendChild(el(html));
+  const vignette = fxRoot.querySelector('.vignette');
+  /** Switch the stage background at time t: 'white' (white stage, no vignette) or 'blue' (the brand gradient). */
+  const setStage = (t, mode = 'white', dur = 0.5) => {
+    const white = mode === 'white';
+    tl.to(world.bg.uWhite, { value: white ? 1 : 0, duration: dur, ease: 'power2.inOut' }, t);
+    if (vignette) tl.to(vignette, { opacity: white ? 0 : 1, duration: dur, ease: 'power2.inOut' }, t);
+  };
 
   // masked word reveal; opacity keeps Bengali matras from peeking out early
   const wordIn = (wd, t, d = 0.42) => tl.fromTo(wd, { yPercent: 130, opacity: 0 }, { yPercent: 0, opacity: 1, duration: d }, t - 0.03);
@@ -68,13 +76,14 @@ export function makeContext({ timing, world, scenesRoot, fxRoot, project, brand,
     world, st: world.state, P: world.particles, BG: world.bg,
     project, brand, size, W: size.W, H: size.H,
     scenesRoot, fxRoot,
-    w, wEnd, seg, range, cue, onFrame, flash, shake, show, add, q, qa, el, wordIn, reveal, wordsOut,
+    w, wEnd, seg, range, cue, onFrame, flash, shake, show, add, setStage, q, qa, el, wordIn, reveal, wordsOut,
     /** Build-time memory shared by recipes (e.g. which particle target is currently active). */
     memo: { particleTarget: 'scatter' },
     /** Set the world's starting state at t=0. Call once from scenes/index.js. */
     initWorld({ night = 0, jitter = 0.35, particles = 0.14, particlesFade = 1 } = {}) {
       const { tl: T, BG, P } = ctx;
       T.set(BG.uNight, { value: night }, 0);
+      T.set(BG.uWhite, { value: 0 }, 0); // setStage() tweens from here
       T.set([P.wSphere, P.wLogo, P.wRing, P.wText], { value: 0 }, 0);
       T.set(P.wScatter, { value: 1 }, 0);
       T.set(P.uJitter, { value: jitter }, 0);

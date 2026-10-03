@@ -4,7 +4,7 @@
 // and spends the model's tokens (and ElevenLabs credits unless the account has no voice key → placeholder).
 //
 //   node evals/run.mjs --url http://localhost:8080 --email me@x.com --password '…' [--model "My Model"]
-//        [--prompts map-only,chart-only] [--render draft|final|none] [--timeout 45] [--out evals/results/<name>]
+//        [--prompts map-only,chart-only] [--render draft|final|none] [--timeout 45] [--out evals/results/<name>] [--label "new prompt"]
 //
 // → evals/results/<stamp>-<model>/{report.md,results.json}
 
@@ -97,7 +97,7 @@ for (const id of wanted) {
   for (const c of score.checks.filter((x) => !x.ok)) console.log(`   ✗ ${c.id}: ${c.detail}`);
 }
 
-fs.writeFileSync(path.join(outDir, 'results.json'), JSON.stringify({ model: model.name, modelId: model.model, results }, null, 2));
+fs.writeFileSync(path.join(outDir, 'results.json'), JSON.stringify({ model: model.name, modelId: model.model, label: args.label ?? null, results }, null, 2));
 const md = [`# Eval report — ${model.name} (${model.model})`, '', `Run ${stamp}. Automatic checks below; fill the "by hand" columns using rubric.md.`, '', '| Prompt | Auto | Hook (0-3) | Beats on words (0-3) | Polish (0-3) | Notes |', '|---|---|---|---|---|---|'];
 for (const r of results) md.push(`| ${r.title} | ${r.passed}/${r.total} | | | | project ${r.projectId} |`);
 for (const r of results) {

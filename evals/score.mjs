@@ -77,6 +77,15 @@ export function scoreRun({ events, files, targetSeconds, renderRequested, segmen
   const lastCheck = checkCalls.at(-1);
   add('npm_check_clean', lastCheck && results.get(lastCheck.data.callId)?.ok === true, lastCheck ? `last "npm run check": ${results.get(lastCheck.data.callId)?.ok ? 'passed' : 'failed'}` : 'never ran npm run check');
 
+  // the workflow the prompt asks for: read the engine guide before building, verify after the last edit
+  const sceneEdits = calls.filter((c) => ['write_file', 'edit_file'].includes(c.data.name) && /public\/js\/scenes\//.test(String(c.data.args?.path ?? '')));
+  const firstGuide = events.indexOf(calls.find((c) => c.data.name === 'read_guide'));
+  const firstEdit = events.indexOf(sceneEdits[0]);
+  add('guide_before_build', sceneEdits.length > 0 && firstGuide >= 0 && firstGuide < firstEdit, sceneEdits.length ? (firstGuide >= 0 && firstGuide < firstEdit ? 'read the guide before the first scene' : 'wrote scenes without reading the engine guide first') : 'no scene files written');
+  const lastEdit = events.lastIndexOf(sceneEdits.at(-1));
+  const lastPreview = events.findLastIndex((e) => e.type === 'preview.frames');
+  add('verified_after_last_edit', lastEdit >= 0 && lastPreview > lastEdit, lastEdit < 0 ? 'no scene edits' : lastPreview > lastEdit ? 'previewed after the last scene edit' : 'edited scenes after the last preview (unverified changes)');
+
   const frames = of('preview.frames');
   const previewed = new Set(frames.flatMap((e) => e.data.frames.map((f) => Math.round(f.t))));
   add('previewed_scenes', previewed.size >= Math.max(2, segments), `${previewed.size} distinct moments previewed for ${segments} segment(s)`);
@@ -84,6 +93,8 @@ export function scoreRun({ events, files, targetSeconds, renderRequested, segmen
   add('layout_clean', lastFrames && lastFrames.data.issues.length === 0, lastFrames ? (lastFrames.data.issues.length ? `last preview still reports: ${lastFrames.data.issues.slice(0, 3).join(' | ')}` : 'last preview reported no problems') : 'no preview_frames call');
 
   const voice = lastWhere(events, (e) => e.type === 'voice.ready');
+  const listed = calls.some((c) => c.data.name === 'list_voices');
+  add('voice_chosen', listed || voice?.data.placeholder === true, listed ? 'chose the voice with list_voices' : voice?.data.placeholder ? 'placeholder voice (no key)' : 'generated a voice without checking which voices the account can use');
   add('voice_generated', voice && !voice.data.placeholder, voice ? (voice.data.placeholder ? 'placeholder voice only' : `${voice.data.duration.toFixed(1)}s of voice`) : 'no voice generated');
 
   const done = lastWhere(events, (e) => e.type === 'render.done');

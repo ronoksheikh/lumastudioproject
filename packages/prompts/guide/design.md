@@ -3,7 +3,7 @@
 These are the rules the student's course teaches. Apply them by default; the student's explicit wishes win.
 
 ## Stage, colour, contrast
-- Stage = Lumademy-blue gradient (default world background) or white (`tl.to(ctx.BG.uWhite, {value: 1}, t)`).
+- Stage = Lumademy-blue gradient (default world background) or white (`ctx.setStage(t, 'white')`, back with `'blue'`).
   Never navy/near-black stages or black text; deep blue only as the gradient's dark end.
 - Palette: blue `#2970EC`, sky `#5DAEFF`, royal `#1557D1`, deep `#07358F`, off-white `#EFF5FF`, ice `#BFE2FF`,
   white. Use the CSS vars (`var(--blue)` …). **One accent per moment** (e.g. one word in sky, everything else white).

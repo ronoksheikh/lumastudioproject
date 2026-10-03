@@ -20,6 +20,9 @@ agent tools, and for every model you recommend to students. The script scores th
 | `brand_colors_only` | scene code only uses the brand palette hex values |
 | `deterministic` | no `setTimeout`, `Math.random`, wall-clock time or CSS animation in scenes |
 | `beats_on_words` | at least two timings per segment come from `w()/wEnd()/range()` |
+| `guide_before_build` | the agent read the engine guide (`read_guide`) before writing its first scene |
+| `verified_after_last_edit` | the last `preview_frames` came after the last scene edit (no unverified changes) |
+| `voice_chosen` | the voice was chosen with `list_voices` (or the placeholder was used because there is no key) |
 
 ## By hand
 
@@ -40,5 +43,5 @@ the by-hand total of a prompt drops by 2 or more.
 
 ## Recommending a model
 
-A model goes on the Settings "recommended" list only if, over all six prompts, it passes ≥ 9 of 11 automatic
+A model goes on the Settings "recommended" list only if, over all six prompts, it passes ≥ 11 of 14 automatic
 checks on average, never ends a run in `error`, and averages ≥ 2 on hook, beats and overlap.

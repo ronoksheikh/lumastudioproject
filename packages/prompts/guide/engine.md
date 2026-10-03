@@ -114,7 +114,8 @@ the last word. Optional `features: { particles, logo3d, bloom }` (all default tr
 | `flash(t, peak=0.85, dur=0.45)`, `shake(t, amount=1, dur=0.45)` | white flash; camera + scene shake |
 | `cue(t, type, gain)` | sound effect: `impact whoosh pop tick click riser shimmer glitch`; gain 0–1 (keep under the voice) |
 | `onFrame(fn(t))` | per-frame hook — deterministic code only |
-| `BG.uWhite`, `BG.uNight`, `BG.uWarm` | background uniforms: `tl.to(ctx.BG.uWhite, { value: 1, duration: .5 }, t)` = white stage |
+| `setStage(t, 'white'\|'blue', dur=0.5)` | switch the stage at `t`: white (and no vignette) or the brand-blue gradient |
+| `BG.uNight`, `BG.uWarm` | other background uniforms (deep-blue night, brighter glow) — tween with `tl.to(ctx.BG.uWarm, { value: 1 }, t)` |
 | `P` / `st` | particle uniforms / camera+logo state (use the particles + logo3d recipes) |
 | `brand`, `project` | parsed brand.json / project.json (`brand.logo.lockup`, `brand.logo.icon`) |
 | `initWorld(opts)` | once, in index.js: starting world state |

@@ -32,6 +32,7 @@ const imagePart = (file: string, mime: string): Part | null => {
 export function buildUserContent(db: DB, project: ProjectRef, text: string, attachmentIds: string[], supportsVision: boolean): UserContent {
   const chosen = attachmentIds.length
     ? db.select().from(uploads).where(and(eq(uploads.projectId, project.id), inArray(uploads.id, attachmentIds))).all()
+      .sort((x, y) => attachmentIds.indexOf(x.id) - attachmentIds.indexOf(y.id)) // the student's order, not the database's
     : [];
   // a PDF brings its extracted text and page images along
   const all = chosen.some((u) => u.mime === 'application/pdf') ? db.select().from(uploads).where(eq(uploads.projectId, project.id)).all() : [];

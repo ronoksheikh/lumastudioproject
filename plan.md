@@ -638,6 +638,16 @@ Changes made after the product owner ran Phases 0–8 locally with a real model.
    attachments (thumbnails for images). Deleting project files happens in the Files tab (confirmation, saved as a
    history step) or by the agent.
 
+9. **System prompt rewrite** (`packages/prompts/system.md`, ~1.2k words): role and Studio, a strict 8-step workflow
+   (understand → plan → read the guide → script → voice → build → verify → report), compact design rules with
+   numbers (type scale, safe areas, easing/durations, pacing per video type), the engine contract and one minimal
+   scene. Long material lives in `guide/*.md` (engine, recipes with usage, design, voice, pitfalls, vertical, assets,
+   checklist, and examples.md with two tested worked examples: a 16:9 hook → word-synced counter → white end card,
+   and a 9:16 Bengali numbered reel). Engine additions found while writing them: `ctx.setStage(t, 'white'|'blue')`
+   (white stage without the grey vignette) and `show()` no longer hides a scene on the very last frame. Evals gained
+   `guide_before_build`, `verified_after_last_edit`, `voice_chosen`, a `--label` and `evals/compare.mjs`; the
+   real-model before/after comparison is in `evals/README.md`.
+
 ## Open questions (defaults assumed)
 
 | # | Question | Default used in this plan |

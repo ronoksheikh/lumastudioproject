@@ -23,6 +23,9 @@ const ev = (type, data, ts = 0) => ({ type, data, ts });
 test('scores a clean run and a broken one', () => {
   const good = [
     ev('run.started', {}, 0),
+    ev('tool.call', { callId: 'g', name: 'read_guide', args: { topic: 'engine' } }),
+    ev('tool.call', { callId: 'v', name: 'list_voices', args: {} }),
+    ev('tool.call', { callId: 'w', name: 'write_file', args: { path: 'public/js/scenes/00-a.js', content: '' } }),
     ev('tool.call', { callId: 'a', name: 'bash', args: { command: 'npm run check' } }),
     ev('tool.result', { callId: 'a', ok: true }),
     ev('voice.ready', { duration: 20, placeholder: false }),
@@ -37,5 +40,21 @@ test('scores a clean run and a broken one', () => {
 
   const bad = scoreRun({ events: [ev('run.error', { message: 'boom' }), ev('run.finished', { usage: { input: 0, output: 0 }, stopReason: 'error' })], files: {}, targetSeconds: [15, 30], renderRequested: true, segments: 3 });
   const failed = bad.checks.filter((c) => !c.ok).map((c) => c.id);
-  for (const id of ['run_completed', 'no_run_errors', 'npm_check_clean', 'previewed_scenes', 'layout_clean', 'voice_generated', 'render_ok', 'duration_in_range', 'beats_on_words']) assert.ok(failed.includes(id), id);
+  for (const id of ['run_completed', 'no_run_errors', 'npm_check_clean', 'previewed_scenes', 'layout_clean', 'voice_generated', 'render_ok', 'duration_in_range', 'beats_on_words', 'guide_before_build', 'verified_after_last_edit']) assert.ok(failed.includes(id), id);
+});
+
+test('flags scenes written before reading the guide and edits after the last preview', () => {
+  const events = [
+    ev('tool.call', { callId: 'w', name: 'write_file', args: { path: 'public/js/scenes/00-a.js' } }),
+    ev('tool.call', { callId: 'g', name: 'read_guide', args: {} }),
+    ev('preview.frames', { frames: [{ t: 1 }], issues: [] }),
+    ev('tool.call', { callId: 'e', name: 'edit_file', args: { path: 'public/js/scenes/00-a.js' } }),
+    ev('voice.ready', { duration: 20, placeholder: false }),
+    ev('run.finished', { usage: { input: 0, output: 0 }, stopReason: 'completed' }),
+  ];
+  const r = scoreRun({ events, files: {}, targetSeconds: [15, 30], renderRequested: false, segments: 1 });
+  const by = Object.fromEntries(r.checks.map((c) => [c.id, c.ok]));
+  assert.equal(by.guide_before_build, false);
+  assert.equal(by.verified_after_last_edit, false);
+  assert.equal(by.voice_chosen, false);
 });
