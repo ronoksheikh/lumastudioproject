@@ -1,0 +1,13 @@
+{
+  "name": "luma-runtime-deps",
+  "private": true,
+  "description": "Shared base packages for every Luma project (/opt/luma/node_modules). Keep in sync with template/package.json.",
+  "dependencies": {
+    "d3-geo": "^3.1.1",
+    "gsap": "^3.15.0",
+    "puppeteer-core": "^25.12.0",
+    "three": "^0.186.1",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
+  }
+}

@@ -1,0 +1,19 @@
+# One service, one container. Set CPUS to ~0.9 x host cores and MEM_LIMIT to most of the host RAM.
+services:
+  luma-studio:
+    build: .
+    image: luma-studio:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      DB_PATH: /data/luma.db
+    ports:
+      - "8080:8080"
+    volumes:
+      - data:/data
+    cpus: ${CPUS:-3.5}
+    mem_limit: ${MEM_LIMIT:-12g}
+    shm_size: "1gb" # Chromium needs a roomy /dev/shm
+volumes:
+  data:

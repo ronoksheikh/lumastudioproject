@@ -4,13 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Planning + reference material for **Luma Studio**, an AI motion-graphics studio for Lumademy's AI Motion Graphics Crash Course students. The Luma Studio app itself (Fastify + SQLite + React/HeroUI, agent runtime, render queue) is **not built yet**: `plan.md` is the phased build plan (Phase 0–8, plus appendices for the agent system prompt, tool definitions, event protocol, DB schema and known pitfalls). Read `plan.md` before building anything; it is the source of truth for product decisions and its "Open questions" table lists the defaults assumed.
+**Luma Studio**: an AI motion-graphics studio for Lumademy's AI Motion Graphics Crash Course students (Fastify + SQLite + React, agent runtime, render queue, one Docker container). `plan.md` is the phased build plan (Phase 0–8, plus appendices for the agent system prompt, tool definitions, event protocol, DB schema and known pitfalls) and the source of truth for product decisions; its "Open questions" table lists the defaults assumed. The app is being built phase by phase, one commit per phase.
 
-What exists today:
+Layout:
 
+- `apps/api` — Fastify app (config, SQLite/Drizzle in `src/db`, routes). `apps/web` — Vite + React SPA. `packages/shared` — constants/zod schemas shared by both (TypeScript source, bundled into the api by tsup). `packages/prompts` — versioned agent prompts. `template/` — the video template copied into every project. `docker/runtime-deps` — the shared `/opt/luma/node_modules` package list.
 - `plan.md` — the build plan.
 - `reference-ads/` — three finished, standalone ad projects. Per `plan.md` §2 they are the ground truth for how a "Lumademy-quality" video is made, and Phase 1 extracts them into one reusable template (use `lumademy-explainer-ad` as the base: newest and cleanest).
 - `Lumademy_Brand_Kit/` — logos (SVG/PNG), social assets, and `03_Colors_and_Guidelines/Brand_Guidelines.md`.
+
+## Luma Studio: commands
+
+pnpm workspace (Node 22). From the repo root:
+
+```
+pnpm install
+pnpm dev                              # api (tsx watch, :8080) + web (vite, :5180, proxies /api)
+pnpm build && pnpm start              # production build; api serves apps/web/dist
+pnpm typecheck
+pnpm test                             # vitest (api)
+pnpm --filter @luma/api exec vitest run src/app.test.ts   # single test file
+pnpm db:generate                      # after editing apps/api/src/db/schema.ts -> new SQL in apps/api/drizzle (committed; applied on start)
+```
+
+Configuration is via env (see `.env.example`, parsed in `apps/api/src/config.ts`). `docker compose up` builds the single `luma-studio` image (Dockerfile at the root).
 
 ## Reference ads: commands
 

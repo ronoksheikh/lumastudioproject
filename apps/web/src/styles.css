@@ -1,0 +1,8 @@
+:root { --blue: #2970ec; --sky: #5daeff; --royal: #1557d1; --deep: #07358f; }
+body { margin: 0; font-family: Inter, system-ui, sans-serif; }
+.hero {
+  min-height: 100vh; display: grid; place-content: center; gap: 12px; text-align: center; color: #fff;
+  background: linear-gradient(135deg, var(--sky) 0%, var(--blue) 37%, var(--royal) 72%, var(--deep) 100%);
+}
+.hero h1 { margin: 0; font-size: 56px; }
+.chip { justify-self: center; padding: 4px 14px; border-radius: 999px; background: rgba(255,255,255,.2); font-size: 14px; }

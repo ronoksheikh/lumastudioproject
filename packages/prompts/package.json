@@ -1,0 +1,7 @@
+{
+  "name": "@luma/prompts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Versioned agent prompts (markdown). Read at runtime by the api."
+}
