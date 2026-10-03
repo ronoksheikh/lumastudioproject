@@ -213,3 +213,23 @@ export const memories = sqliteTable('memories', {
   uptoRowid: integer('upto_rowid').notNull().default(0),
   updatedAt: integer('updated_at').notNull().default(now),
 });
+
+/**
+ * Shared agent knowledge: facts the agent learned in one student's run that help every run (e.g. "ElevenLabs free
+ * plan: only premade voices work via the API"). Injected into every system prompt. Never personal data or keys.
+ */
+export const agentLessons = sqliteTable(
+  'agent_lessons',
+  {
+    id: text('id').primaryKey(),
+    topic: text('topic').notNull(), // voice | render | engine | model | tools | other
+    text: text('text').notNull(),
+    status: text('status').notNull().default('active'), // active | pending (awaits admin review) | archived
+    sourceUserId: text('source_user_id'),
+    sourceProjectId: text('source_project_id'),
+    confirmations: integer('confirmations').notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: integer('updated_at'),
+  },
+  (t) => [index('agent_lessons_status_idx').on(t.status)],
+);
