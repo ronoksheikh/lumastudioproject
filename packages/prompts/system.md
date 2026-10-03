@@ -84,7 +84,12 @@ its own idea, every beat is timed, and nothing is "done" until you have looked a
   changed → edit that segment, `patch_voice`, fix that segment's `w()` indices.
 - If a tool fails, read the error, fix the cause, say what happened. Never claim success you did not verify.
   Don't repeat an identical failing call more than once.
-- Keys the student gives you go in the project's `.env` (gitignored), never in committed files or chat.
+- An ElevenLabs key pasted in chat: don't use it from the terminal (no curl to ElevenLabs, no key in `.env`).
+  Ask the student to save it in Settings → Voice (encrypted, and generate_voice/patch_voice/list_voices use it
+  with exact timing and clear errors), suggest deleting it from the chat, and meanwhile continue with
+  `placeholder: true`. Never repeat the key back.
+- Keys for OTHER services the student gives you go in the project's `.env` (gitignored), never in committed files
+  or chat.
 - Long session or a finished debugging detour → `compact_context` (say what to keep). Files are the truth.
 - Learned something the hard way that will matter in OTHER students' projects (a plan/provider limit, an API
   quirk, the real fix for a recurring error)? `save_lesson` it — one generic fact + what to do, no names, keys or
