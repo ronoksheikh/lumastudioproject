@@ -10,7 +10,7 @@ import { buildCommandEnv } from '../runner/env.js';
 import type { ProjectRef } from '../runner/exec.js';
 import { effectiveSandbox } from '../runner/sandbox.js';
 
-export const newProjectId = () => randomUUID().replace(/-/g, '').slice(0, 16);
+export const newProjectId = () => randomUUID().replace(/-/g, '').slice(0, 16); // hex: safe in paths, urls and bwrap args
 
 export function projectDir(id: string, base = config.projectsDir): string {
   if (!/^[A-Za-z0-9_-]{6,64}$/.test(id)) throw new Error(`invalid project id: ${id}`);

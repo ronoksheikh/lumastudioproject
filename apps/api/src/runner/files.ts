@@ -49,7 +49,7 @@ function openRegular(abs: string, flags: number) {
   return { fd, st };
 }
 
-export function readProjectFile(project: FileProject, p: string, opts: { offset?: number; limit?: number } = {}): ReadResult {
+export function readProjectFile(project: FileProject, p: string, opts: { offset?: number; limit?: number; numbered?: boolean } = {}): ReadResult {
   const { abs, rel } = resolve(project, p);
   if (!fs.existsSync(abs)) throw new ToolError(`File not found: ${rel || p}`);
   const { fd, st } = openRegular(abs, fs.constants.O_RDONLY);
@@ -67,8 +67,8 @@ export function readProjectFile(project: FileProject, p: string, opts: { offset?
     const offset = Math.max(0, (opts.offset ?? 1) - 1);
     const limit = opts.limit ?? 2000;
     const slice = lines.slice(offset, offset + limit);
-    const numbered = slice.map((l, i) => `${String(offset + i + 1).padStart(6)}\t${l}`).join('\n');
-    const { text, truncated } = truncateMiddle(numbered, 60_000);
+    const body = opts.numbered === false ? slice.join('\n') : slice.map((l, i) => `${String(offset + i + 1).padStart(6)}\t${l}`).join('\n');
+    const { text, truncated } = truncateMiddle(body, 200_000);
     return { kind: 'text', path: rel, text, totalLines: lines.length, truncated: truncated || st.size > MAX_READ_BYTES || offset + limit < lines.length };
   } finally {
     fs.closeSync(fd);

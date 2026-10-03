@@ -4,23 +4,23 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Luma project</title>
-  <link rel="icon" href="/assets/favicon.svg" />
+  <link rel="icon" href="assets/favicon.svg" />
   <link rel="stylesheet" href="css/fonts.css" />
   <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/recipes.css" />
   <link rel="stylesheet" href="css/scenes.css" />
-  <!-- Extra npm packages: `npm install <pkg>` in the project, then add `"<pkg>": "/vendor/<pkg>/<entry>.js"` here. -->
+  <!-- Extra npm packages: `npm install <pkg>` in the project, then add `"<pkg>": "./vendor/<pkg>/<entry>.js"` here. -->
   <script type="importmap">
     {
       "imports": {
-        "three": "/vendor/three/build/three.module.js",
-        "three/addons/": "/vendor/three/examples/jsm/"
+        "three": "./vendor/three/build/three.module.js",
+        "three/addons/": "./vendor/three/examples/jsm/"
       }
     }
   </script>
-  <script src="/vendor/gsap/dist/gsap.min.js"></script>
-  <script src="/vendor/gsap/dist/CustomEase.min.js"></script>
-  <script src="/vendor/gsap/dist/DrawSVGPlugin.min.js"></script>
+  <script src="./vendor/gsap/dist/gsap.min.js"></script>
+  <script src="./vendor/gsap/dist/CustomEase.min.js"></script>
+  <script src="./vendor/gsap/dist/DrawSVGPlugin.min.js"></script>
 </head>
 <body>
   <div id="viewport">

@@ -32,6 +32,19 @@ const schema = z.object({
   PROJECT_UID_BASE: num(100000),
   /** Per-project disk cap in MB (project folder incl. node_modules). */
   PROJECT_QUOTA_MB: num(2048),
+  /** Allow model endpoints on private/loopback addresses (self-hosted setups). Off by default: SSRF protection. */
+  ALLOW_PRIVATE_PROVIDER_URLS: z.enum(['0', '1']).default('0'),
+  /** Max accepted upload, MB (per file / per project). */
+  UPLOAD_MAX_MB: num(20),
+  UPLOAD_PROJECT_MAX_MB: num(200),
+  /** Lifetime of a signed preview URL, seconds. */
+  PREVIEW_TOKEN_TTL_S: num(3600),
+  /** Disable rate limits (tests only). */
+  RATE_LIMIT_DISABLED: z.enum(['0', '1']).default('0'),
+  /** ElevenLabs API base (override only for tests / proxies). */
+  ELEVENLABS_API_BASE: z.string().default('https://api.elevenlabs.io'),
+  /** Set to 1 to allow signup (closed beta switch). */
+  SIGNUP_ENABLED: z.enum(['0', '1']).default('1'),
 });
 
 const env = schema.parse(process.env);
@@ -60,6 +73,13 @@ export const config = {
   sandbox: env.SANDBOX,
   projectUidBase: env.PROJECT_UID_BASE,
   projectQuotaMb: env.PROJECT_QUOTA_MB,
+  allowPrivateProviderUrls: env.ALLOW_PRIVATE_PROVIDER_URLS === '1',
+  uploadMaxBytes: env.UPLOAD_MAX_MB * 1024 * 1024,
+  uploadProjectMaxBytes: env.UPLOAD_PROJECT_MAX_MB * 1024 * 1024,
+  previewTokenTtlS: env.PREVIEW_TOKEN_TTL_S,
+  rateLimitDisabled: env.RATE_LIMIT_DISABLED === '1' || env.NODE_ENV === 'test',
+  signupEnabled: env.SIGNUP_ENABLED === '1',
+  elevenBase: env.ELEVENLABS_API_BASE.replace(/\/$/, ''),
   cores,
 };
 export type Config = typeof config;

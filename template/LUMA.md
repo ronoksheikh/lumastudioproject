@@ -148,4 +148,5 @@ Working examples: `public/js/scenes/` is a small starter built only from recipes
 15. **Match cuts need exact geometry.** Use `stageRect(ctx, node)` to read an element's on-screen rect at build time instead of guessing.
 16. **Portrait (9:16):** the stage is 1080×1920 — the starter's px layout is for 16:9, so re-lay out scenes (single column, bigger type). 3D content auto-fits.
 17. **`show()` owns a scene's `visibility`** (it only toggles `visibility`, never opacity) — so tween the scene's children or its opacity freely, but never `tl.set(scene, { visibility … })` yourself or add a second set/`autoAlpha` on the same property at an overlapping time.
-18. **Extra npm packages:** `npm install <pkg>` here, then map it in the `importmap` in `public/index.html` (`"<pkg>": "/vendor/<pkg>/<entry>.js"`). `three` and `gsap` are already available.
+18. **Use relative URLs everywhere** (`assets/logo.svg`, `audio/…`, `vendor/gsap/…` — no leading `/`). The Studio serves the project under `/p/<id>/<token>/`, so root-absolute URLs would escape it.
+19. **Extra npm packages:** `npm install <pkg>` here, then map it in the `importmap` in `public/index.html` (`"<pkg>": "./vendor/<pkg>/<entry>.js"`). `three` and `gsap` are already available.
