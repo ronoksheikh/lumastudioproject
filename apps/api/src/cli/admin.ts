@@ -12,7 +12,10 @@
 //   boost-grant <email> [min]  give someone fast render minutes (default RENDER_BOOST_MINUTES)
 //   lessons [active|pending|archived]   the agent's shared lessons
 //   lesson-approve <id> | lesson-archive <id> | lesson-add <topic> <text>
+//   assets [active|pending|archived]    the shared library (fonts, sounds, data, snippets)
+//   asset-approve <id> | asset-archive <id>
 import { createDb, runMigrations } from '../db/index.js';
+import { listAssets, setAssetStatus } from '../agent/library.js';
 import { addLesson, LESSON_TOPICS, listLessons, setLessonStatus, type LessonTopic } from '../agent/lessons.js';
 import { config } from '../config.js';
 import { backupDatabase } from '../maintenance/backup.js';
@@ -94,6 +97,15 @@ try {
       if (!setLessonStatus(db, arg, cmd === 'lesson-approve' ? 'active' : 'archived')) throw new Error(`no such lesson: ${arg}`);
       console.log(`${arg}: ${cmd === 'lesson-approve' ? 'active — every run sees it now' : 'archived'}`);
       break;
+    case 'assets':
+      for (const a of listAssets(db, arg)) console.log(`${a.id}  ${a.status.padEnd(8)}  ${a.kind.padEnd(7)}  ×${a.uses}  ${a.name} (${a.license}, ${Math.round(a.size / 1024)} KB)  ${a.description}`);
+      break;
+    case 'asset-approve':
+    case 'asset-archive':
+      if (!arg) throw new Error(`usage: ${cmd} <id>`);
+      if (!setAssetStatus(db, arg, cmd === 'asset-approve' ? 'active' : 'archived')) throw new Error(`no such asset: ${arg}`);
+      console.log(`${arg}: ${cmd === 'asset-approve' ? 'active' : 'archived (projects that copied it keep their copy)'}`);
+      break;
     case 'lesson-add': {
       const text = process.argv.slice(4).join(' ');
       if (!arg || !LESSON_TOPICS.includes(arg as LessonTopic) || text.length < 20) throw new Error(`usage: lesson-add <${LESSON_TOPICS.join('|')}> <text, 20+ chars>`);
@@ -101,7 +113,7 @@ try {
       break;
     }
     default:
-      console.log('commands: users | ban <email> | unban <email> | purge [--days N] | backup | rotate-key | worker-add <name> | workers | worker-disable|worker-enable|worker-remove <id|name> | boosts [status] | boost-paid <id> [ref] | boost-grant <email> [min] | lessons [status] | lesson-approve|lesson-archive <id> | lesson-add <topic> <text>');
+      console.log('commands: users | ban <email> | unban <email> | purge [--days N] | backup | rotate-key | worker-add <name> | workers | worker-disable|worker-enable|worker-remove <id|name> | boosts [status] | boost-paid <id> [ref] | boost-grant <email> [min] | lessons [status] | lesson-approve|lesson-archive <id> | lesson-add <topic> <text> | assets [status] | asset-approve|asset-archive <id>');
       process.exitCode = cmd ? 2 : 0;
   }
 } catch (e) {

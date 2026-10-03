@@ -5,7 +5,7 @@ import { decrypt, encrypt, keyHint } from '../security/crypto.js';
 import { loadSecrets } from '../security/secrets.js';
 import { newId } from '../util/id.js';
 
-export type SecretKind = 'elevenlabs' | 'voice_prefs' | 'agent_prompt';
+export type SecretKind = 'elevenlabs' | 'voice_prefs' | 'agent_prompt' | 'agent_prefs';
 
 export function getSecret(db: DB, userId: string, kind: SecretKind): { value: string; hint: string } | null {
   const row = db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.kind, kind))).get();
@@ -110,4 +110,29 @@ export function getAgentPrompt(db: DB, userId: string): AgentPrompt | null {
 export function setAgentPrompt(db: DB, userId: string, p: AgentPrompt | null) {
   if (!p || !p.text.trim()) return deleteSecret(db, userId, 'agent_prompt');
   setSecret(db, userId, 'agent_prompt', JSON.stringify({ mode: p.mode, text: p.text }));
+}
+
+/**
+ * Settings → Agent switches. frameChecks: 'full' = preview_frames as much as needed (best quality), 'light' = one
+ * preview_frames call per message, 'off' = no screenshots at all: the agent runs the cheap `npm run check` and asks
+ * the student to watch the preview and report problems (saves the student's model tokens).
+ */
+export interface AgentPrefs {
+  frameChecks: 'full' | 'light' | 'off';
+}
+export const DEFAULT_AGENT_PREFS: AgentPrefs = { frameChecks: 'full' };
+
+export function getAgentPrefs(db: DB, userId: string): AgentPrefs {
+  const s = getSecret(db, userId, 'agent_prefs');
+  if (!s) return DEFAULT_AGENT_PREFS;
+  try {
+    const p = JSON.parse(s.value) as Partial<AgentPrefs>;
+    return { frameChecks: p.frameChecks === 'light' || p.frameChecks === 'off' ? p.frameChecks : 'full' };
+  } catch {
+    return DEFAULT_AGENT_PREFS;
+  }
+}
+
+export function setAgentPrefs(db: DB, userId: string, p: AgentPrefs) {
+  setSecret(db, userId, 'agent_prefs', JSON.stringify(p));
 }

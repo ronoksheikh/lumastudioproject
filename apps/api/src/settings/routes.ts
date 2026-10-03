@@ -7,7 +7,7 @@ import { HttpError } from '../http/errors.js';
 import { parse } from '../http/validate.js';
 import { redactSecrets } from '../security/redact.js';
 import { buildSystemPrompt } from '../agent/prompts.js';
-import { deleteSecret, getAgentPrompt, getSecret, getVoicePrefs, setAgentPrompt, setSecret, setVoicePrefs } from './service.js';
+import { deleteSecret, getAgentPrefs, getAgentPrompt, getSecret, getVoicePrefs, setAgentPrefs, setAgentPrompt, setSecret, setVoicePrefs } from './service.js';
 
 /** Every field is an optional override; null clears it (the agent decides again). */
 const prefsSchema = z.object({
@@ -44,6 +44,7 @@ export async function settingsRoutes(app: FastifyInstance, ctx: AppContext) {
   /** Settings → Agent: the student's own system prompt (append to Luma's, or replace it). Also returns Luma's default for reference. */
   const agentView = (userId: string) => ({
     prompt: getAgentPrompt(db, userId),
+    prefs: getAgentPrefs(db, userId),
     defaultPrompt: buildSystemPrompt({ aspect: '16:9', brandSummary: '{brand_summary}', attachmentsSummary: '{attachments_summary}' }),
   });
   app.get('/settings/agent', auth, async (req) => agentView(authUser(req).id));
@@ -51,6 +52,12 @@ export async function settingsRoutes(app: FastifyInstance, ctx: AppContext) {
     const u = authUser(req);
     const body = parse(z.object({ mode: z.enum(['append', 'replace']), text: z.string().max(40_000) }).nullable(), req.body ?? null);
     setAgentPrompt(db, u.id, body);
+    return agentView(u.id);
+  });
+
+  app.put('/settings/agent/prefs', auth, async (req) => {
+    const u = authUser(req);
+    setAgentPrefs(db, u.id, parse(z.object({ frameChecks: z.enum(['full', 'light', 'off']) }), req.body));
     return agentView(u.id);
   });
 

@@ -204,3 +204,31 @@ export function dirSize(dir: string): number {
   walk(dir);
   return total;
 }
+
+/** A project file's bytes (regular file, no symlinks), refusing anything over `maxBytes`. */
+export function readProjectBytes(project: FileProject, p: string, maxBytes: number): { rel: string; bytes: Buffer } {
+  const { abs, rel } = resolve(project, p);
+  const { fd, st } = openRegular(abs, fs.constants.O_RDONLY);
+  try {
+    if (st.size > maxBytes) throw new ToolError(`${rel} is larger than ${Math.round(maxBytes / 1024 / 1024)} MB`);
+    return { rel, bytes: fs.readFileSync(fd) };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/** Write bytes into the project (owned by the project uid). Refuses to overwrite an existing file. */
+export function writeProjectBytes(project: FileProject, p: string, bytes: Buffer): { rel: string } {
+  const { abs, rel } = resolve(project, p);
+  if (!rel) throw new ToolError('Cannot write to the project root itself');
+  if (fs.existsSync(abs)) throw new ToolError(`${rel} already exists — choose another path or delete it first`);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  const fd = fs.openSync(abs, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o644);
+  try {
+    fs.writeSync(fd, bytes);
+  } finally {
+    fs.closeSync(fd);
+  }
+  ensureOwned(project, abs);
+  return { rel };
+}

@@ -322,6 +322,11 @@ function AgentTab() {
     onSuccess: (r) => { qc.setQueryData(['agent-prompt'], r); setDraft(null); toast.success(r.prompt ? 'Saved — used from the next message on' : 'Back to Luma’s own prompt'); },
     onError: (e) => toast.danger(msg(e)),
   });
+  const savePrefs = useMutation({
+    mutationFn: (frameChecks: 'full' | 'light' | 'off') => api.saveAgentPrefs({ frameChecks }),
+    onSuccess: (r) => { qc.setQueryData(['agent-prompt'], r); toast.success('Saved — used from the next message on'); },
+    onError: (e) => toast.danger(msg(e)),
+  });
   if (!q.data) return <Skeleton className="h-40 max-w-2xl rounded-2xl" />;
   const cur = draft ?? q.data.prompt ?? { mode: 'append' as const, text: '' };
   const set = (patch: Partial<typeof cur>) => setDraft({ ...cur, ...patch });
@@ -330,6 +335,24 @@ function AgentTab() {
   );
   return (
     <div className="flex flex-col gap-4">
+      <Card className="max-w-2xl p-2">
+        <Card.Header>
+          <Card.Title className="flex items-center gap-2"><Icon name="image" /> Frame checks</Card.Title>
+          <Card.Description>Luma takes screenshots of the video to check its own work. That gives the best results but uses a lot of your model’s tokens. Turn it down to save tokens — then you watch the preview and tell Luma what to fix.</Card.Description>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-2">
+          {([
+            ['full', 'Full', 'Luma checks every scene with screenshots (best quality).'],
+            ['light', 'Light', 'One round of screenshots per message.'],
+            ['off', 'Off', 'No screenshots. Luma runs quick code checks, then asks you to watch the preview.'],
+          ] as const).map(([v, label, hint]) => (
+            <label key={v} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${q.data.prefs.frameChecks === v ? 'border-[#2970EC] bg-[#eff5ff]' : 'border-[#d6e2f5]'}`}>
+              <input type="radio" name="frame-checks" className="mt-1 accent-[#2970EC]" checked={q.data.prefs.frameChecks === v} disabled={savePrefs.isPending} onChange={() => savePrefs.mutate(v)} />
+              <span><span className="font-semibold">{label}</span><span className="block text-sm text-[#5b6b8f]">{hint}</span></span>
+            </label>
+          ))}
+        </Card.Content>
+      </Card>
       <Card className="max-w-2xl p-2">
         <Card.Header>
           <Card.Title className="flex items-center gap-2"><Icon name="robot" /> Your instructions for Luma</Card.Title>
