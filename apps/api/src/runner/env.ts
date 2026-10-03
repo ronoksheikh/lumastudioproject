@@ -20,6 +20,8 @@ export function buildCommandEnv(projectDir: string, extra: Record<string, string
     TERM: 'dumb',
     TMPDIR: '/tmp',
     NODE_PATH: config.sharedModules,
+    // the read-only engine (index.html, main.js, lib/, recipes, scripts, examples) every project runs on
+    LUMA_ENGINE: config.templateDir,
     // npm: scripts off by default, per-project cache (a cache shared between students could be poisoned)
     npm_config_cache: path.join(home, '.npm'),
     npm_config_ignore_scripts: 'true',

@@ -27,7 +27,7 @@ afterAll(async () => {
 const ref = () => toRef(t.db.select().from(projects).where(eq(projects.id, projectId)).get()!);
 
 describe('projects', () => {
-  it('creates a project from the template with its own folder, uid and first commit', async () => {
+  it('creates an EMPTY project with its own folder, uid and first commit', async () => {
     const r = await ada.post('/api/projects', { title: 'My first ad', aspect: '9:16' });
     expect(r.status).toBe(201);
     projectId = r.json.project.id;
@@ -35,11 +35,16 @@ describe('projects', () => {
     const row = t.db.select().from(projects).where(eq(projects.id, projectId)).get()!;
     expect(row.uid).toBeGreaterThanOrEqual(100000);
     const dir = ref().dir;
-    expect(fs.existsSync(path.join(dir, 'LUMA.md'))).toBe(true);
     expect(JSON.parse(fs.readFileSync(path.join(dir, 'project.json'), 'utf8'))).toMatchObject({ title: 'My first ad', aspect: '9:16' });
+    // only the project's own files: no demo scenes, examples, script, audio, docs or engine copies
+    const files = (fs.readdirSync(dir, { recursive: true }) as string[]).filter((f) => !/^(\.git|\.home|\.luma)(\/|$)/.test(f) && fs.statSync(path.join(dir, f)).isFile()).sort();
+    expect(files).toEqual(['.gitignore', 'brand.json', 'package.json', 'project.json', 'public/css/scenes.css']);
+    for (const demo of ['LUMA.md', 'examples', 'script.json', 'public/js', 'public/audio', 'public/index.html', 'scripts']) expect(fs.existsSync(path.join(dir, demo))).toBe(false);
     const log = await ada.get(`/api/projects/${projectId}/git/log`);
     expect(log.json.commits).toHaveLength(1);
-    expect(log.json.commits[0].message).toBe('Create project from Luma template');
+    expect(log.json.commits[0].message).toBe('Create empty project');
+    const got = await ada.get(`/api/projects/${projectId}`);
+    expect(got.json.project.content).toEqual({ scenes: false, script: false, voice: false });
   });
 
   it('gives every project a different uid', async () => {
@@ -74,8 +79,8 @@ describe('projects', () => {
   it('browses files read-only and refuses paths outside the project', async () => {
     const tree = await ada.get(`/api/projects/${projectId}/tree`, { depth: '3' });
     const paths = tree.json.entries.map((e: any) => e.path);
-    expect(paths).toContain('script.json');
-    expect(paths).toContain('public/js/scenes');
+    expect(paths).toContain('project.json');
+    expect(paths).toContain('public/css/scenes.css');
     const file = await ada.get(`/api/projects/${projectId}/file`, { path: 'project.json' });
     expect(file.json.kind).toBe('text');
     expect(JSON.parse(file.json.content).aspect).toBe('9:16');

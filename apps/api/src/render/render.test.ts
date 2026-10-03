@@ -8,7 +8,7 @@ import type { RunEvent } from '@luma/shared';
 import { config } from '../config.js';
 import { renderJobs } from '../db/schema.js';
 import { toRef, type ProjectRow } from '../projects/service.js';
-import { Client, makeTestApp, startMockLlm, type MockTurn } from '../test/helpers.js';
+import { Client, makeTestApp, startMockLlm, type MockTurn, seedExample } from '../test/helpers.js';
 import { projects } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 
@@ -73,6 +73,7 @@ beforeAll(async () => {
   await c.post(`/api/settings/models/${model.id}/test`);
   projectId = (await c.post('/api/projects', { title: 'Render', aspect: '16:9' })).json.project.id;
   project = t.db.select().from(projects).where(eq(projects.id, projectId)).get()!;
+  await seedExample(toRef(project)); // something to render (new projects start empty)
 
   tmpl = fs.mkdtempSync(path.join(os.tmpdir(), 'luma-stub-template-'));
   fs.mkdirSync(path.join(tmpl, 'scripts'));

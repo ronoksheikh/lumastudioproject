@@ -31,8 +31,9 @@ afterAll(() => {
 });
 
 describe('project creation', () => {
-  it('copies the template, makes the first commit and keeps the folder private', () => {
-    expect(fs.existsSync(path.join(A.dir, 'LUMA.md'))).toBe(true);
+  it('creates an empty project from the scaffold, makes the first commit and keeps the folder private', () => {
+    expect(fs.existsSync(path.join(A.dir, '.gitignore'))).toBe(true);
+    expect(fs.existsSync(path.join(A.dir, 'public/js'))).toBe(false); // the engine is not copied
     expect(fs.existsSync(path.join(A.dir, 'node_modules'))).toBe(false);
     expect(JSON.parse(fs.readFileSync(path.join(A.dir, 'project.json'), 'utf8')).title).toBe('A');
     expect(fs.statSync(A.dir).mode & 0o777).toBe(0o700);
@@ -42,7 +43,7 @@ describe('project creation', () => {
 
 describe('path confinement', () => {
   it('accepts normal paths and rejects escapes', () => {
-    expect(resolveInProject(A.dir, 'public/index.html')).toBe(path.join(fs.realpathSync(A.dir), 'public/index.html'));
+    expect(resolveInProject(A.dir, 'public/css/scenes.css')).toBe(path.join(fs.realpathSync(A.dir), 'public/css/scenes.css'));
     expect(resolveInProject(A.dir, 'new/dir/file.txt')).toContain('new/dir/file.txt');
     expect(() => resolveInProject(A.dir, '../x')).toThrow(PathError);
     expect(() => resolveInProject(A.dir, '/etc/passwd')).toThrow(PathError);

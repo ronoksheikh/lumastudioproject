@@ -50,6 +50,33 @@ describe('preview file mapping', () => {
   });
 });
 
+describe('engine overlay', () => {
+  it('falls back to the engine for engine files, never for scenes/audio, and the project copy wins', () => {
+    const engine = fs.mkdtempSync(path.join(os.tmpdir(), 'luma-engine-'));
+    const proj = fs.mkdtempSync(path.join(os.tmpdir(), 'luma-empty-'));
+    try {
+      for (const f of ['public/index.html', 'public/js/main.js', 'public/js/scenes/index.js', 'public/audio/timing.json', 'public/css/scenes.css', 'assets/fonts/a.woff2']) {
+        fs.mkdirSync(path.dirname(path.join(engine, f)), { recursive: true });
+        fs.writeFileSync(path.join(engine, f), `engine ${f}`);
+      }
+      const r = (u: string) => resolvePreviewFile(proj, u, shared, engine);
+      expect(r('/')).toBe(fs.realpathSync(path.join(engine, 'public/index.html')));
+      expect(r('/js/main.js')).toBe(fs.realpathSync(path.join(engine, 'public/js/main.js')));
+      expect(r('/assets/fonts/a.woff2')).toBe(fs.realpathSync(path.join(engine, 'assets/fonts/a.woff2')));
+      expect(r('/js/scenes/index.js')).toBeNull(); // an empty project stays empty
+      expect(r('/audio/timing.json')).toBeNull();
+      expect(r('/css/scenes.css')).toBeNull();
+      expect(r('/../engine/public/index.html')).toBeNull();
+      fs.mkdirSync(path.join(proj, 'public/js'), { recursive: true });
+      fs.writeFileSync(path.join(proj, 'public/js/main.js'), 'legacy copy');
+      expect(r('/js/main.js')).toBe(fs.realpathSync(path.join(proj, 'public/js/main.js')));
+    } finally {
+      fs.rmSync(engine, { recursive: true, force: true });
+      fs.rmSync(proj, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('preview http', () => {
   it('serves with content types and ranges; 416 when unsatisfiable', async () => {
     const full = await app.inject({ url: '/audio/v.mp3' });

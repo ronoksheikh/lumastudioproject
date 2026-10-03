@@ -1,9 +1,10 @@
 // Serves a project's preview straight from its folder — there is no dev server per project.
 //   /vendor/<pkg>/…  -> <project>/node_modules/<pkg>, else the shared base (/opt/luma/node_modules)
-//   /assets/…        -> <project>/assets
+//   /assets/…        -> <project>/assets, else the engine's assets (fonts, logos, world map)
 //   /project.json, /brand.json, /script.json -> project root
-//   everything else  -> <project>/public
-// Same mapping as template/server.mjs. Range requests are supported; unsatisfiable ranges answer 416.
+//   everything else  -> <project>/public, else the engine's public/ (index.html, main.js, lib/, base css)
+// The engine is Luma Studio's own read-only template (config.templateDir). Project-owned paths (scenes, audio,
+// scenes.css) never fall back to it, so an empty project looks empty. Same mapping as template/server.mjs. Range requests are supported; unsatisfiable ranges answer 416.
 import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -28,11 +29,13 @@ const TYPES: Record<string, string> = {
   '.map': 'application/json',
 };
 const ROOT_FILES = new Set(['project.json', 'brand.json', 'script.json']);
+/** Paths (relative to public/) that belong to the project alone. Keep in sync with template/server.mjs. */
+export const PROJECT_OWNED = /^(js\/scenes(\/|$)|audio(\/|$)|css\/scenes\.css$)/;
 
 const within = (base: string, target: string) => target === base || target.startsWith(base + path.sep);
 
 /** The first existing regular file for a URL path, or null. Symlinks may not lead outside their base. */
-export function resolvePreviewFile(projectDir: string, urlPath: string, sharedModules: string = config.sharedModules): string | null {
+export function resolvePreviewFile(projectDir: string, urlPath: string, sharedModules: string = config.sharedModules, engineDir: string = config.templateDir): string | null {
   let clean: string;
   try {
     clean = decodeURIComponent(urlPath.split('?')[0]!);
@@ -44,9 +47,15 @@ export function resolvePreviewFile(projectDir: string, urlPath: string, sharedMo
   if (clean.startsWith('/vendor/')) {
     const rel = clean.slice('/vendor/'.length);
     bases.push([path.join(projectDir, 'node_modules'), rel], [sharedModules, rel]);
-  } else if (clean.startsWith('/assets/')) bases.push([path.join(projectDir, 'assets'), clean.slice('/assets/'.length)]);
-  else if (ROOT_FILES.has(clean.slice(1))) bases.push([projectDir, clean.slice(1)]);
-  else bases.push([path.join(projectDir, 'public'), clean === '/' || clean === '' ? 'index.html' : clean.slice(1)]);
+  } else if (clean.startsWith('/assets/')) {
+    const rel = clean.slice('/assets/'.length);
+    bases.push([path.join(projectDir, 'assets'), rel], [path.join(engineDir, 'assets'), rel]);
+  } else if (ROOT_FILES.has(clean.slice(1))) bases.push([projectDir, clean.slice(1)]);
+  else {
+    const rel = clean === '/' || clean === '' ? 'index.html' : clean.slice(1);
+    bases.push([path.join(projectDir, 'public'), rel]);
+    if (!PROJECT_OWNED.test(rel)) bases.push([path.join(engineDir, 'public'), rel]);
+  }
 
   for (const [base, rel] of bases) {
     const file = path.normalize(path.join(base, rel));

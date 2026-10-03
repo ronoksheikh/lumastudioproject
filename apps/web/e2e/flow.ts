@@ -9,6 +9,52 @@ const require = createRequire(import.meta.url);
 const puppeteer = require(path.resolve(import.meta.dirname, '../../../template/node_modules/puppeteer-core')) as typeof import('puppeteer-core');
 type Page = import('puppeteer-core').Page;
 
+// what the scripted model writes into the empty project: a tiny two-scene video built on the engine
+const E2E_INDEX = `import { makeContext } from '../lib/timeline.js';
+import hook from './00-hook.js';
+import cta from './01-cta.js';
+
+const SCENES = [hook, cta];
+
+export async function buildTimeline(args) {
+  const ctx = makeContext(args);
+  ctx.initWorld({ night: 0, jitter: 0.35, particles: 0.14 });
+  for (const scene of SCENES) await scene(ctx);
+  return ctx.finish();
+}
+`;
+const E2E_HOOK = `import { q } from '../lib/core.js';
+import { maskedWords } from '../lib/recipes/kinetic-type.js';
+
+export default function hook(ctx) {
+  const { tl, cue, flash, show, add, wordsOut } = ctx;
+  const [start, end] = ctx.range('hook');
+  const s = add('<div class="scene s-hook"><div class="h-chip mono">MADE WITH LUMA</div><div class="h-title en">Every video starts with one idea.</div></div>');
+  show(s, start, end);
+  flash(start, 0.7, 0.4);
+  cue(start, 'impact', 1);
+  tl.fromTo(q(s, '.h-chip'), { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.4 }, start + 0.05);
+  maskedWords(ctx, q(s, '.h-title'), 'hook', 0);
+  wordsOut(s, end - 0.3);
+}
+`;
+const E2E_CTA = `import { q } from '../lib/core.js';
+import { maskedWords } from '../lib/recipes/kinetic-type.js';
+
+export default function cta(ctx) {
+  const { show, add, cue } = ctx;
+  const [start, end] = ctx.range('cta');
+  const s = add('<div class="scene s-cta"><div class="c-line en">Make yours today with Luma.</div></div>');
+  show(s, start, end);
+  cue(start, 'whoosh', 0.6);
+  maskedWords(ctx, q(s, '.c-line'), 'cta', 0);
+}
+`;
+const E2E_CSS = `.s-hook .h-chip { position: absolute; left: 0; right: 0; top: 300px; text-align: center; font-size: 24px; letter-spacing: .2em; }
+.s-hook .h-title { position: absolute; left: 160px; right: 160px; top: 400px; text-align: center; font: 800 110px/1.05 var(--font-display); text-wrap: balance; }
+.s-cta .c-line { position: absolute; left: 160px; right: 160px; top: 460px; text-align: center; font: 800 96px/1.1 var(--font-display); }
+`;
+
 const OUT = path.resolve(process.argv[2] ?? path.join(import.meta.dirname, 'out'));
 fs.mkdirSync(OUT, { recursive: true });
 let step = 0;
@@ -95,11 +141,15 @@ async function main() {
     const projectUrl = page.url();
     await shot(page, 'project-empty');
 
-    // the untouched template plays in the preview iframe (separate origin)
-    log('preview of the untouched template');
+    // a new project is empty: the preview says so instead of showing a demo or a broken frame
+    log('empty project');
+    await page.waitForSelector('[data-testid="preview-empty"]', { timeout: 20_000 });
+    await text(page, 'Nothing here yet');
+    await shot(page, 'preview-empty');
+
     const previewFrame = async () => {
       for (let i = 0; i < 60; i++) {
-        const f = page.frames().find((fr) => fr.url().includes(`localhost:${new URL(stack.appUrl).port.replace(/0$/, '1')}`) || /\/p\/[a-f0-9]+\//.test(fr.url()));
+        const f = page.frames().find((fr) => /\/p\/[a-f0-9]+\//.test(fr.url()));
         if (f) {
           const ok = await f.evaluate(() => (window as unknown as { ad?: { duration: number } }).ad?.duration ?? 0).catch(() => 0);
           if (ok > 0) return { frame: f, duration: ok };
@@ -108,21 +158,25 @@ async function main() {
       }
       return fail('the preview never became playable');
     };
-    const pv = await previewFrame();
-    if (pv.duration < 10) fail(`unexpected preview duration ${pv.duration}`);
-    await text(page, '0:00');
-    await shot(page, 'preview-template');
 
     // ---------- script the model ----------
     stack.turns.push(
-      { reasoning: 'The student wants a quick explainer. I will plan the work, make a placeholder voice and check the project.', content: 'Great idea — let me plan this.', toolCalls: [
-        { name: 'update_plan', args: { items: [{ text: 'Read LUMA.md and check the starter', status: 'doing' }, { text: 'Generate the voice', status: 'todo' }, { text: 'Tweak the title chip', status: 'todo' }, { text: 'Check the frames', status: 'todo' }] } },
-        { name: 'bash', args: { command: 'head -n 3 LUMA.md && ls public/js/scenes && echo "warning: demo stderr" 1>&2' } },
+      { reasoning: 'The project is empty. I will plan, write the script, make a placeholder voice and build one scene.', content: 'Great idea — let me plan this.', toolCalls: [
+        { name: 'update_plan', args: { items: [{ text: 'Read the engine guide', status: 'doing' }, { text: 'Write the script + voice', status: 'todo' }, { text: 'Build the scenes', status: 'todo' }, { text: 'Check the frames', status: 'todo' }] } },
+        { name: 'read_guide', args: { topic: 'engine' } },
+        { name: 'bash', args: { command: 'ls -a && echo "warning: demo stderr" 1>&2' } },
       ] },
+      { toolCalls: [{ name: 'write_file', args: { path: 'script.json', content: JSON.stringify({ voice: { voice_id: 'v1', model_id: 'eleven_multilingual_v2', language_code: 'en', voice_settings: {} }, segments: [{ id: 'hook', text: 'Every video starts with one idea.' }, { id: 'cta', text: 'Make yours today with Luma.' }] }, null, 2) } }] },
       { toolCalls: [{ name: 'generate_voice', args: { placeholder: true } }] },
-      { toolCalls: [{ name: 'edit_file', args: { path: 'public/js/scenes/00-title.js', old_string: 'MADE WITH LUMA STUDIO', new_string: 'MADE WITH LUMA — E2E' } }] },
+      { toolCalls: [
+        { name: 'write_file', args: { path: 'public/js/scenes/index.js', content: E2E_INDEX } },
+        { name: 'write_file', args: { path: 'public/js/scenes/00-hook.js', content: E2E_HOOK } },
+        { name: 'write_file', args: { path: 'public/js/scenes/01-cta.js', content: E2E_CTA } },
+        { name: 'write_file', args: { path: 'public/css/scenes.css', content: E2E_CSS } },
+      ] },
+      { toolCalls: [{ name: 'edit_file', args: { path: 'public/js/scenes/00-hook.js', old_string: 'MADE WITH LUMA', new_string: 'MADE WITH LUMA — E2E' } }] },
       { toolCalls: [{ name: 'bash', args: { command: 'npm run check' } }] },
-      { toolCalls: [{ name: 'preview_frames', args: { times: [1, 5.5, 9], width: 640 } }] },
+      { toolCalls: [{ name: 'preview_frames', args: { times: [0.5, 1.8, 3.5], width: 640 } }] },
       { toolCalls: [{ name: 'ask_user', args: { question: 'Shall I render a draft now?', options: ['Yes, draft', 'Not yet'] } }] },
       { content: '## All set\n\nI built the demo:\n\n- **Scene 1** – title with the new chip\n- **Scene 2** – map zoom\n\n> Placeholder voice only – add your ElevenLabs key for the real one.' },
     );
@@ -137,7 +191,7 @@ async function main() {
     await text(page, 'Great idea — let me plan this.');
     await text(page, 'Luma is working');
     await shot(page, 'run-start');
-    await text(page, 'Read LUMA.md and check the starter'); // pinned plan
+    await text(page, 'Read the engine guide'); // pinned plan
     await text(page, 'Voiceover');
     await text(page, 'placeholder (silent)');
     await shot(page, 'run-voice');
@@ -160,7 +214,8 @@ async function main() {
 
     // diff modal for the edited file
     log('diff modal');
-    await clickText(page, 'button[title="View changes"]', 'public/js/scenes/00-title.js');
+    // the edit (the last change to that file), not the file's creation
+    await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('button[title="View changes"]')].filter((e) => e.innerText.includes('public/js/scenes/00-hook.js')).at(-1)?.click());
     await text(page, 'MADE WITH LUMA — E2E');
     await shot(page, 'diff');
     await page.keyboard.press('Escape');
@@ -169,7 +224,7 @@ async function main() {
     log('preview after the agent finished');
     const pv2 = await previewFrame();
     if (pv2.duration <= 0) fail('preview broken after edit');
-    const chipText = await pv2.frame.evaluate(() => document.querySelector('.t-chip')?.textContent ?? '');
+    const chipText = await pv2.frame.evaluate(() => document.querySelector('.h-chip')?.textContent ?? '');
     if (!chipText.includes('E2E')) fail(`preview did not pick up the edit: "${chipText}"`);
     await shot(page, 'preview-after');
 
@@ -177,15 +232,15 @@ async function main() {
     log('files tab');
     await clickText(page, '[role="tab"]', 'Files');
     await text(page, 'scenes');
-    await clickText(page, '[role="treeitem"]', '00-title.js');
+    await clickText(page, '[role="treeitem"]', '00-hook.js');
     await page.waitForSelector('[data-testid="code-viewer"] .monaco-editor', { timeout: 20_000 });
     await page.waitForFunction(() => document.querySelector('[data-testid="code-viewer"]')?.textContent?.includes('E2E'), { timeout: 10_000 });
     await shot(page, 'files');
 
     log('history tab');
     await clickText(page, '[role="tab"]', 'History');
-    await text(page, 'Create project from Luma template');
-    await clickText(page, 'button', 'Create project from Luma template');
+    await text(page, 'Create empty project');
+    await clickText(page, 'button', 'Create empty project');
     await text(page, 'Restore this version');
     await shot(page, 'history');
 
@@ -204,7 +259,7 @@ async function main() {
     await page.goto(projectUrl, { waitUntil: 'networkidle0' });
     await text(page, 'Make a short explainer about our course.');
     await text(page, 'All set');
-    await text(page, 'Read LUMA.md and check the starter');
+    await text(page, 'Read the engine guide');
     await shot(page, 'reloaded');
 
     // ---------- stop a long command ----------

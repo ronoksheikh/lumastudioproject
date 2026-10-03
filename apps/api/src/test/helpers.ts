@@ -7,6 +7,21 @@ import { buildApp } from '../app.js';
 import { CpuBudget } from '../cpu/budget.js';
 import { createDb, runMigrations } from '../db/index.js';
 import { RenderQueue } from '../render/service.js';
+import { runPristineScript } from '../agent/tools/scripts.js';
+import { chownTree } from '../projects/dirs.js';
+import { commitAll } from '../projects/git.js';
+import type { ProjectRef } from '../runner/exec.js';
+
+/**
+ * New projects start empty. Tests that need a playable video fill one with an engine example — the same
+ * files an agent would have written (scenes, scenes.css, script.json, audio) — and commit them.
+ */
+export async function seedExample(project: ProjectRef, name = 'starter') {
+  const r = await runPristineScript(project, 'use-example.mjs', [name], { timeoutMs: 60_000 });
+  if (r.code !== 0) throw new Error(`use-example failed: ${r.output}`);
+  chownTree(project);
+  commitAll(project, `Use the ${name} example`);
+}
 
 export async function makeTestApp(opts: { agent?: boolean; render?: boolean } = {}) {
   const { db, sqlite } = createDb(':memory:');

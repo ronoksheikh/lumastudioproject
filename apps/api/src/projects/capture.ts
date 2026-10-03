@@ -5,10 +5,13 @@ import { config } from '../config.js';
 import { FRAMES_DIR } from '../agent/tools/frames.js';
 import { runPristineScript } from '../agent/tools/scripts.js';
 import { HttpError } from '../http/errors.js';
+import { notPlayableReason } from './content.js';
 import type { ProjectRef } from '../runner/exec.js';
 
 /** Screenshot of the video at time `t` (full stage size), through the CPU budget. Returns an authenticated URL. */
 export async function capturePng(ctx: AppContext, project: ProjectRef, projectId: string, t: number): Promise<{ url: string }> {
+  const empty = notPlayableReason(project.dir);
+  if (empty) throw new HttpError(409, 'empty_project', 'There is no video to capture yet.');
   const stamp = String(Date.now());
   const outDir = path.join(project.dir, FRAMES_DIR, stamp);
   fs.mkdirSync(outDir, { recursive: true });

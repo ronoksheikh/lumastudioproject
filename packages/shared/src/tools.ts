@@ -54,6 +54,9 @@ export const toolSchemas = {
     question: z.string().min(1).max(500),
     options: z.array(z.string().min(1).max(120)).max(6).optional().describe('Optional quick-reply buttons'),
   }),
+  read_guide: z.object({
+    topic: z.string().max(300).optional().describe('A guide topic (e.g. "engine", "recipes", "design") or an engine/example file path (e.g. "public/js/lib/recipes/counter.js", "examples/explainer/scenes/02-map.js"). Omit to list everything.'),
+  }),
   web_fetch: z.object({
     url: z.string().url().describe('http(s) URL to fetch; HTML is converted to readable text'),
   }),
@@ -76,6 +79,7 @@ const descriptions: Record<ToolName, string> = {
   render_video: 'Queue an MP4 render (draft or final). The student sees live progress; returns when the render is done.',
   ask_user: 'Ask the student a question and wait for the answer. Use only when you are genuinely blocked; otherwise choose sensible defaults.',
   web_fetch: 'Fetch a web page or text file (HTML converted to readable text, truncated).',
+  read_guide: 'Read Luma\'s reference docs (engine API, recipes, design rules, voice, pitfalls, 9:16, icons) or the source of an engine file / example scene. The engine and examples are not in the project folder; this is how you read them. Call without a topic for the index.',
 };
 
 export interface ToolDefinition {

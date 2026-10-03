@@ -5,6 +5,7 @@ import { htmlToText } from '../html-text.js';
 import { fail, ok, type ToolContext, type ToolResult } from './types.js';
 import { truncateMiddle } from '../../runner/truncate.js';
 import fs from 'node:fs';
+import { notPlayableReason } from '../../projects/content.js';
 import path from 'node:path';
 
 export function updatePlan(ctx: ToolContext, a: ToolArgs<'update_plan'>): ToolResult {
@@ -59,6 +60,8 @@ export async function webFetch(ctx: ToolContext, a: ToolArgs<'web_fetch'>): Prom
 }
 
 export async function renderVideo(ctx: ToolContext, a: ToolArgs<'render_video'>): Promise<ToolResult> {
+  const empty = notPlayableReason(ctx.project.dir);
+  if (empty) return fail(empty);
   if (!ctx.render) return fail('Rendering is not available on this server yet.');
   return ctx.render.render({ projectId: ctx.projectId, userId: ctx.userId, runId: ctx.runId, preset: a.preset, signal: ctx.signal, bus: ctx.bus });
 }

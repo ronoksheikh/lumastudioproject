@@ -23,6 +23,7 @@ const TOOL_META: Record<string, { icon: IconName; label: string }> = {
   render_video: { icon: 'film', label: 'Render' },
   ask_user: { icon: 'help', label: 'Question' },
   web_fetch: { icon: 'globe', label: 'Fetch page' },
+  read_guide: { icon: 'help', label: 'Guide' },
 };
 
 const argOf = (b: ToolBlock, key: string): string | undefined => {
@@ -195,7 +196,8 @@ export function ToolCard({ block }: { block: ToolBlock }) {
     case 'read_file':
     case 'list_files':
     case 'web_fetch':
-      return <CardShell block={block} title={<span className="mono">{argOf(block, 'path') ?? argOf(block, 'url') ?? block.summary}</span>} defaultOpen={failed}>{err}</CardShell>;
+    case 'read_guide':
+      return <CardShell block={block} title={<span className="mono">{argOf(block, 'path') ?? argOf(block, 'url') ?? argOf(block, 'topic') ?? block.summary}</span>} defaultOpen={failed}>{err}</CardShell>;
     case 'update_plan':
       return <CardShell block={block} title={block.summary ?? 'updated'} defaultOpen={false} />;
     case 'generate_voice':

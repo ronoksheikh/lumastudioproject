@@ -57,14 +57,9 @@ describe('ElevenLabs voice settings', () => {
     expect(JSON.stringify(bad.json)).not.toContain('xi-wrong');
   });
 
-  it('new projects start with the saved voice defaults', async () => {
-    await c.put('/api/settings/voice', { prefs: { speed: 1.2, tempo: 1.1, languageCode: 'bn', voiceId: 'abcDEF12345' } });
-    const id = (await c.post('/api/projects', { title: 'Voice defaults', aspect: '16:9' })).json.project.id;
-    const file = (await c.get(`/api/projects/${id}/file`, { path: 'script.json' })).json.content;
-    const voice = JSON.parse(file).voice;
-    expect(voice).toMatchObject({ voice_id: 'abcDEF12345', language_code: 'bn', tempo: 1.1, model_id: 'eleven_v4' });
-    expect(voice.voice_settings.speed).toBe(1.2);
-    expect(JSON.parse(file).segments.length).toBeGreaterThan(0); // the starter script is kept
+  it('new projects are empty: no script.json is written from the voice settings', async () => {
+    const id = (await c.post('/api/projects', { title: 'Voice', aspect: '16:9' })).json.project.id;
+    expect((await c.get(`/api/projects/${id}/file`, { path: 'script.json' })).status).toBe(400);
   });
 
   it('removes the key', async () => {

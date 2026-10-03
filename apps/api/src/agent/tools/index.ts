@@ -2,6 +2,7 @@ import { toolSchemas, type ToolArgs, type ToolName } from '@luma/shared';
 import { bash } from './bash.js';
 import { editFile, listFiles, readFile, writeFile } from './files.js';
 import { previewFrames } from './frames.js';
+import { readGuide } from './guide.js';
 import { askUser, renderVideo, updatePlan, webFetch } from './misc.js';
 import { fail, type ToolContext, type ToolResult } from './types.js';
 import { generateVoice, patchVoice } from './voice.js';
@@ -22,6 +23,7 @@ const handlers: { [N in ToolName]: Handler<N> } = {
   render_video: renderVideo,
   ask_user: askUser,
   web_fetch: webFetch,
+  read_guide: readGuide,
 };
 
 export const isToolName = (n: string): n is ToolName => n in toolSchemas;

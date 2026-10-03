@@ -94,7 +94,7 @@ luma-studio/
     shared/         zod schemas, event types, tool schemas, constants
     prompts/        system prompt + agent guides (markdown, versioned)
   Dockerfile        the single luma-studio image (app + node + ffmpeg + chromium + fonts)
-  template/         the Luma video template (Phase 1) — copied into every new project
+  template/         the Luma video engine (Phase 1) — served read-only to every project; scaffold/ = a new project's files (Round 2)
   evals/            golden prompts + rubric (Phase 7)
   docker-compose.yml
   .env.example
@@ -313,7 +313,7 @@ public/
 - Email + password (argon2id), httpOnly secure session cookie, CSRF protection for mutations. No email verification in v1 (see Open questions). Rate-limit signup/login.
 
 **Projects**
-- `POST /api/projects {title, aspect}` → create row, `cp -r template` → `/data/projects/<id>`, `git init`, initial commit "Create project from Luma template".
+- `POST /api/projects {title, aspect}` → create row, copy `template/scaffold` → `/data/projects/<id>`, `git init`, initial commit "Create empty project". (Round 2: projects start empty; the engine is served, not copied — see "Round 2".)
 - List / rename / delete (soft delete, purge job later).
 - Git service (server-side `git` CLI on the projects volume): log, diff for a commit, file at commit, **restore** (checkout tree of commit X → new commit "Restore to …").
 
@@ -591,6 +591,23 @@ Put these in `LUMA.md` so the agent avoids them:
 15. **Match cuts need exact geometry.** Compute the on-screen rect of the source element after its transforms (or use `getBoundingClientRect()/stageScale` at build time) so the cut is seamless.
 
 ---
+
+## Round 2 — feedback from local testing
+
+Changes made after the product owner ran Phases 0–8 locally with a real model.
+
+1. **New projects start empty.** Chosen architecture: *engine served read-only* (option b). A project holds only its
+   own files (`project.json`, `brand.json`, `package.json`, `.gitignore`, `public/css/scenes.css`, later `script.json`,
+   `public/js/scenes/*`, `public/audio/*`, `assets/*`). The preview server and the pristine scripts' static server
+   resolve every other path (index.html, main.js, world.js, lib/, recipes, base css, fonts, logos, world map) from
+   the Studio's `template/`; project files always win, so legacy projects that carry a full copy are untouched.
+   Project-owned paths (scenes, audio, scenes.css, root json) never fall back, so an empty project looks empty
+   (engine `main.js` shows "Nothing here yet"; tools return "no scenes yet" errors). Why not option (a): copying a
+   skeleton still puts ~40 engine files in every project and freezes each project on the engine version it was
+   created with; (b) keeps trees tiny, fixes reach every project, and needs no new mechanism for the pristine
+   scripts (they already run from the Studio's copy with `--root`). Agent knowledge moved from `template/LUMA.md`
+   into `packages/prompts/guide/*.md`, read on demand with the `read_guide` tool (which also reads engine and
+   example sources); bash sees the engine read-only at `$LUMA_ENGINE`.
 
 ## Open questions (defaults assumed)
 

@@ -1,10 +1,39 @@
 // Shared by the CLI scripts: argument parsing, project root, .env loading, project files.
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 export const scriptsDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+/** The engine (this template): index.html, main.js, lib/, recipes, base css, fonts — shared read-only by every project. */
+export const engineDir = path.dirname(scriptsDir);
+
+/** Project paths that never fall back to the engine (see server.mjs). */
+const PROJECT_OWNED = /^(public\/js\/scenes(\/|$)|public\/audio(\/|$)|public\/css\/scenes\.css$|(project|brand|script)\.json$)/;
+
+/**
+ * Where a project-relative path really lives: the project's own file if it exists, else the engine's copy
+ * (for engine paths like public/js/lib/… or assets/fonts/…). Returns null when neither exists.
+ */
+export function overlayFile(root, rel) {
+  const clean = path.normalize(rel).replace(/^[/\\]+/, '');
+  if (clean.startsWith('..')) return null;
+  const candidates = [path.join(root, clean)];
+  if (!PROJECT_OWNED.test(clean.split(path.sep).join('/')) && path.resolve(root) !== path.resolve(engineDir)) candidates.push(path.join(engineDir, clean));
+  return candidates.find((f) => existsSync(f)) ?? null;
+}
+
+/** Plain-language reason a project cannot be played/rendered yet, or null when it has scenes. */
+export function emptyProjectReason(root) {
+  if (!existsSync(path.join(root, 'public/js/scenes/index.js'))) {
+    return 'This project has no scenes yet (public/js/scenes/index.js does not exist). Write script.json, generate the voice, then create the scene files and public/js/scenes/index.js — see read_guide("engine").';
+  }
+  if (!existsSync(path.join(root, 'public/audio/timing.json'))) {
+    return 'This project has no voice timing yet (public/audio/timing.json is missing). Generate the voice first (generate_voice; placeholder:true works without a key).';
+  }
+  return null;
+}
 
 /** Flags that never take a value (so a positional argument after them stays positional). */
 const BOOLEAN_FLAGS = new Set(['placeholder', 'key-stdin', 'no-env', 'video-only', 'page', 'json', 'list', 'help', 'no-checks']);

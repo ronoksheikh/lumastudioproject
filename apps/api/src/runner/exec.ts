@@ -72,7 +72,7 @@ export function execInProject(project: ProjectRef, command: string, opts: ExecOp
   }
 
   const inner = ['prlimit', `--nproc=${limits.nproc}`, `--fsize=${limits.fsize}`, `--cpu=${limits.cpu}`, '--', 'nice', '-n', '10', 'bash', '-lc', command];
-  const argv = sb.bwrap ? bwrapArgv({ bwrap: sb.bwrap, projectDir: project.dir, sharedModules: config.sharedModules, cwd: opts.cwd }, inner) : inner;
+  const argv = sb.bwrap ? bwrapArgv({ bwrap: sb.bwrap, projectDir: project.dir, sharedModules: config.sharedModules, extraRo: [config.templateDir], cwd: opts.cwd }, inner) : inner;
   const env = buildCommandEnv(project.dir, opts.env);
   const secrets = opts.secrets ?? [];
 

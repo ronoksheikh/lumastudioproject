@@ -5,6 +5,7 @@ import type { DB } from '../db/index.js';
 import { uploads } from '../db/schema.js';
 import type { ProjectRef } from '../runner/exec.js';
 import { listProjectFiles } from '../runner/files.js';
+import { projectContent } from '../projects/content.js';
 
 const readJson = <T>(file: string): T | null => {
   try {
@@ -31,6 +32,10 @@ export function projectFacts(db: DB, project: ProjectRef): string {
   const lines: string[] = [];
   const pj = readJson<{ title?: string; aspect?: string; fps?: number }>(path.join(project.dir, 'project.json'));
   lines.push(`Project: "${pj?.title ?? '?'}" · ${pj?.aspect ?? '16:9'} · ${pj?.fps ?? 60} fps`);
+
+  const content = projectContent(project.dir);
+  if (!content.scenes && !content.script) lines.push('This project is EMPTY: no script.json, no scenes, no voice yet. Build everything from scratch (read_guide("engine")).');
+  else if (!content.scenes) lines.push('No scenes yet (public/js/scenes/index.js is missing).');
 
   const script = readJson<{ segments?: Array<{ id: string; text: string }> }>(path.join(project.dir, 'script.json'));
   if (script?.segments?.length) lines.push(`script.json segments: ${script.segments.map((s) => s.id).join(', ')}`);

@@ -1,5 +1,4 @@
 import { createWorld } from './world.js';
-import { buildTimeline } from './scenes/index.js';
 import { Sfx } from './sfx.js';
 
 gsap.registerPlugin(DrawSVGPlugin, CustomEase);
@@ -24,7 +23,26 @@ try {
   throw err;
 }
 
+/** A brand-new project has no scenes yet: show a calm placeholder instead of an error. */
+function showEmpty() {
+  window.adEmpty = true;
+  document.body.dataset.empty = '1';
+  document.body.insertAdjacentHTML('beforeend', '<div class="luma-empty"><b>Nothing here yet</b><span>Tell Luma what video you want.</span></div>');
+  document.getElementById('start')?.classList.add('hidden');
+  document.body.classList.add('ready');
+  try { parent.postMessage({ source: 'luma-preview', type: 'empty' }, '*'); } catch { /* not framed */ }
+}
+
 async function boot() {
+  // scenes are the project's own files; the engine around them is shared
+  let buildTimeline;
+  try {
+    ({ buildTimeline } = await import('./scenes/index.js'));
+  } catch (e) {
+    const probe = await fetch('js/scenes/index.js', { cache: 'no-store' }).catch(() => null);
+    if (probe?.status === 404) return showEmpty();
+    throw e;
+  }
   const stage = document.getElementById('stage');
   const scenesRoot = document.getElementById('scenes');
   const fxRoot = document.getElementById('fx');
@@ -52,7 +70,7 @@ async function boot() {
     root.setProperty('--font-mono', `'${brand.fonts.mono}', monospace`);
   }
 
-  const timing = await getJson('audio/timing.json', 'run `npm run voice` first (or `npm run example`).');
+  const timing = await getJson('audio/timing.json', 'generate the voice first (generate_voice).');
   // fonts must be ready before any layout is measured or text is sampled (pitfall #9)
   await Promise.all([
     ...[400, 500, 600, 700, 800].map((w) => document.fonts.load(`${w} 100px "Anek Bangla"`, 'আ')),

@@ -100,6 +100,8 @@ export function ProjectPage() {
     return () => clearTimeout(t);
   }, [tick]);
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
+  // what the project holds (scenes yet?) follows the agent too
+  useEffect(() => { if (reloadKey) void qc.invalidateQueries({ queryKey: ['project', id] }); }, [reloadKey, id, qc]);
   const previewCtx = useMemo(() => ({ base: token.data?.url ?? null, reloadKey, reload, projectId: id }), [token.data?.url, reloadKey, reload, id]);
 
   const send = async (text: string, attachmentIds: string[]) => {
@@ -160,7 +162,7 @@ export function ProjectPage() {
                   ))}
                 </Tabs.List>
               </Tabs.ListContainer>
-              <Tabs.Panel id="preview" className="min-h-0 flex-1"><PreviewPane aspect={p.aspect} /></Tabs.Panel>
+              <Tabs.Panel id="preview" className="min-h-0 flex-1"><PreviewPane aspect={p.aspect} empty={p.content?.scenes === false} /></Tabs.Panel>
               <Tabs.Panel id="files" className="min-h-0 flex-1">{tab === 'files' && <FilesPane projectId={id} tick={tick} />}</Tabs.Panel>
               <Tabs.Panel id="renders" className="min-h-0 flex-1">{tab === 'renders' && <RendersPane projectId={id} tick={tick} />}</Tabs.Panel>
               <Tabs.Panel id="history" className="min-h-0 flex-1">{tab === 'history' && <HistoryPane projectId={id} tick={tick} running={running} onRestored={reload} />}</Tabs.Panel>

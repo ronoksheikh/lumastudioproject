@@ -6,7 +6,8 @@ import type { RunEvent } from '@luma/shared';
 import { config } from '../config.js';
 import { projects } from '../db/schema.js';
 import { toRef } from '../projects/service.js';
-import { Client, makeTestApp, startMockEleven, startMockLlm, type MockTurn } from '../test/helpers.js';
+import { chownTree } from '../projects/dirs.js';
+import { Client, makeTestApp, seedExample, startMockEleven, startMockLlm, type MockTurn } from '../test/helpers.js';
 import { htmlToText } from './html-text.js';
 
 let t: Awaited<ReturnType<typeof makeTestApp>>;
@@ -52,6 +53,7 @@ beforeAll(async () => {
   const tested = await c.post(`/api/settings/models/${model.id}/test`);
   expect(tested.json.model.supportsVision).toBe(true);
   projectId = (await c.post('/api/projects', { title: 'Tools', aspect: '16:9' })).json.project.id;
+  await seedExample(toRef(t.db.select().from(projects).where(eq(projects.id, projectId)).get()!)); // as if the agent had built the starter
 }, 60_000);
 
 afterAll(async () => {
@@ -193,8 +195,8 @@ describe('screenshots (preview_frames) and vision', () => {
     expect(pf.issues.join(' ')).toMatch(/failed to build.*w\('title', 99\)/);
     // restore
     const r = (await c.get(`/api/projects/${projectId}/git/log`)).json.commits;
-    const first = r.at(-1).sha;
-    expect((await c.post(`/api/projects/${projectId}/git/restore`, { sha: first })).status).toBe(200);
+    const seeded = r.find((x: { message: string }) => x.message === 'Use the starter example').sha;
+    expect((await c.post(`/api/projects/${projectId}/git/restore`, { sha: seeded })).status).toBe(200);
   }, 120_000);
 
   it('read_file shows images to vision models and says so to others', async () => {
@@ -210,6 +212,107 @@ describe('screenshots (preview_frames) and vision', () => {
     expect(JSON.stringify(seen.at(-1).messages)).toContain('cannot view images');
     t.sqlite.prepare('update provider_configs set supports_vision = 1').run();
   });
+});
+
+describe('an empty project', () => {
+  const SCENE = `import { q } from '../lib/core.js';
+import { maskedWords } from '../lib/recipes/kinetic-type.js';
+
+export default function hook(ctx) {
+  const { w, cue, flash, show, add, wordsOut } = ctx;
+  const [start, end] = ctx.range('hook');
+  const s = add('<div class="scene s-hook"><div class="h-title en">Made from one prompt</div></div>');
+  show(s, start, end);
+  flash(start, 0.7, 0.4);
+  cue(start, 'impact', 1);
+  maskedWords(ctx, q(s, '.h-title'), 'hook', 0);
+  cue(w('hook', 2), 'pop', 0.5);
+  wordsOut(s, end - 0.3);
+}
+`;
+  const INDEX = `import { makeContext } from '../lib/timeline.js';
+import hook from './00-hook.js';
+
+const SCENES = [hook];
+
+export async function buildTimeline(args) {
+  const ctx = makeContext(args);
+  ctx.initWorld({ night: 0, jitter: 0.35, particles: 0.14 });
+  for (const scene of SCENES) await scene(ctx);
+  return ctx.finish();
+}
+`;
+  it('explains what is missing, and the agent can scaffold a scene from the guide and preview it', async () => {
+    const empty = (await c.post('/api/projects', { title: 'From scratch', aspect: '16:9' })).json.project.id as string;
+    const before = projectId;
+    projectId = empty;
+    try {
+      turns = [
+        { toolCalls: [{ name: 'preview_frames', args: { times: [1] } }, { name: 'render_video', args: { preset: 'draft' } }] },
+        { toolCalls: [{ name: 'read_guide', args: {} }, { name: 'read_guide', args: { topic: 'engine' } }, { name: 'read_guide', args: { topic: 'public/js/lib/recipes/kinetic-type.js' } }, { name: 'read_guide', args: { topic: '../../apps/api/src/config.ts' } }] },
+        { toolCalls: [{ name: 'write_file', args: { path: 'script.json', content: JSON.stringify({ voice: { voice_id: 'v', model_id: 'm', language_code: 'en', voice_settings: {} }, segments: [{ id: 'hook', text: 'Made from one prompt.' }] }) } }] },
+        { toolCalls: [{ name: 'generate_voice', args: { placeholder: true } }] },
+        { toolCalls: [{ name: 'write_file', args: { path: 'public/js/scenes/index.js', content: INDEX } }, { name: 'write_file', args: { path: 'public/js/scenes/00-hook.js', content: SCENE } }, { name: 'write_file', args: { path: 'public/css/scenes.css', content: '.s-hook .h-title { position: absolute; left: 160px; right: 160px; top: 420px; text-align: center; font: 800 120px/1.05 var(--font-display); }\n' } }] },
+        { toolCalls: [{ name: 'bash', args: { command: 'npm run check' } }] },
+        { toolCalls: [{ name: 'preview_frames', args: { times: [0.4, 1.2], width: 640 } }] },
+        { content: 'Built the first scene.' },
+      ];
+      const { events } = await runToEnd('Make a one-line hook video.');
+      const r = results(events);
+      expect(r[0]).toMatchObject({ ok: false });
+      expect(r[0]!.summary).toMatch(/no scenes yet/);
+      expect(r[1]).toMatchObject({ ok: false }); // render: same reason
+      expect(r[1]!.summary).toMatch(/no scenes yet/);
+      expect(r.slice(2, 5).every((x) => x.ok)).toBe(true); // guide index, topic, engine source
+      expect(r[5]).toMatchObject({ ok: false }); // escapes the engine
+      const sawGuide = JSON.stringify(seen.at(-1).messages.filter((m: any) => m.role === 'tool'));
+      expect(sawGuide).toContain('Guide topics');
+      expect(sawGuide).toContain('export function maskedWords');
+      const check = r.find((x, i) => of(events, 'tool.call')[i]!.data.name === 'bash')!;
+      expect(check.ok, JSON.stringify(of(events, 'tool.output.delta').map((e) => e.data.text).join(''))).toBe(true);
+      expect(r.at(-1), JSON.stringify(r.at(-1))).toMatchObject({ ok: true });
+      const pf = of(events, 'preview.frames')[0]!.data;
+      expect(pf.frames.map((f) => f.t)).toEqual([0.4, 1.2]);
+      expect(pf.issues.filter((i) => /failed to build|browser:/.test(i))).toEqual([]);
+      // the project still holds only its own files
+      const files = (fs.readdirSync(dir(), { recursive: true }) as string[]).filter((f) => !/^(\.git|\.home|\.luma)(\/|$)/.test(f) && fs.statSync(path.join(dir(), f)).isFile());
+      expect(files.some((f) => f.startsWith('public/js/lib') || f === 'public/index.html' || f.startsWith('examples'))).toBe(false);
+      expect((await c.get(`/api/projects/${empty}`)).json.project.content).toEqual({ scenes: true, script: true, voice: true });
+    } finally {
+      projectId = before;
+    }
+  }, 180_000);
+});
+
+describe('a legacy project (created before projects started empty)', () => {
+  it('carries its own engine copy and still previews and checks', async () => {
+    const id = (await c.post('/api/projects', { title: 'Legacy', aspect: '16:9' })).json.project.id as string;
+    const before = projectId;
+    projectId = id;
+    try {
+      // the old layout: the whole template copied in, starter scenes + script + audio included
+      const tpl = config.templateDir;
+      for (const d of ['public', 'assets', 'scripts']) fs.cpSync(path.join(tpl, d), path.join(dir(), d), { recursive: true });
+      fs.copyFileSync(path.join(tpl, 'server.mjs'), path.join(dir(), 'server.mjs'));
+      fs.cpSync(path.join(tpl, 'examples/starter/scenes'), path.join(dir(), 'public/js/scenes'), { recursive: true });
+      fs.cpSync(path.join(tpl, 'examples/starter/audio'), path.join(dir(), 'public/audio'), { recursive: true });
+      fs.copyFileSync(path.join(tpl, 'examples/starter/script.json'), path.join(dir(), 'script.json'));
+      fs.copyFileSync(path.join(tpl, 'examples/starter/scenes.css'), path.join(dir(), 'public/css/scenes.css'));
+      fs.writeFileSync(path.join(dir(), 'public/js/main.js'), fs.readFileSync(path.join(dir(), 'public/js/main.js'), 'utf8') + '\n// legacy-marker\n');
+      fs.writeFileSync(path.join(dir(), 'package.json'), JSON.stringify({ type: 'module', scripts: { check: 'node scripts/check.mjs' } }));
+      chownTree(toRef(t.db.select().from(projects).where(eq(projects.id, id)).get()!));
+      turns = [{ toolCalls: [{ name: 'bash', args: { command: 'npm run check' } }] }, { toolCalls: [{ name: 'preview_frames', args: { times: [1, 6], width: 640 } }] }, { content: 'ok' }];
+      const { events } = await runToEnd('check the old project');
+      expect(results(events).map((r) => r.ok), JSON.stringify(results(events))).toEqual([true, true]);
+      expect(of(events, 'preview.frames')[0]!.data.issues).toEqual([]);
+      // the preview serves the project's own engine copy, not the Studio's
+      const url = new URL((await c.post(`/api/projects/${id}/preview-token`)).json.url);
+      const main = await t.app.inject({ method: 'GET', url: `${url.pathname}js/main.js`, headers: { host: new URL(config.previewOrigin).host } });
+      expect(main.body).toContain('legacy-marker');
+    } finally {
+      projectId = before;
+    }
+  }, 180_000);
 });
 
 describe('attachments', () => {

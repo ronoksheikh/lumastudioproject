@@ -6,12 +6,24 @@ import { usePreview } from './preview-context';
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-export function PreviewPane({ aspect }: { aspect: '16:9' | '9:16' }) {
+function EmptyState() {
+  return (
+    <div className="luma-gradient grid h-full place-items-center p-6 text-center text-white" data-testid="preview-empty">
+      <div>
+        <Icon name="spark" size={28} className="mx-auto mb-3 opacity-90" />
+        <p className="text-lg font-semibold sm:text-xl">Nothing here yet</p>
+        <p className="mt-1 text-sm text-white/85">Tell Luma what video you want — it appears here as it’s built.</p>
+      </div>
+    </div>
+  );
+}
+
+export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'; empty?: boolean }) {
   const { base, reloadKey, reload, projectId } = usePreview();
   const frame = useRef<HTMLIFrameElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [state, setState] = useState({ t: 0, playing: false, duration: 0 });
-  const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [phase, setPhase] = useState<'loading' | 'ready' | 'error' | 'empty'>('loading');
   const [error, setError] = useState('');
   const [scrub, setScrub] = useState<number | null>(null);
   const [capturing, setCapturing] = useState(false);
@@ -31,6 +43,8 @@ export function PreviewPane({ aspect }: { aspect: '16:9' | '9:16' }) {
       if (m.type === 'ready') {
         setPhase('ready');
         setState((s) => ({ ...s, duration: m.duration }));
+      } else if (m.type === 'empty') {
+        setPhase('empty');
       } else if (m.type === 'error') {
         setPhase('error');
         setError(String(m.message));
@@ -72,7 +86,9 @@ export function PreviewPane({ aspect }: { aspect: '16:9' | '9:16' }) {
     <div className="flex h-full min-h-0 flex-col gap-2 p-3">
       <div ref={box} className="relative grid min-h-0 flex-1 place-items-center overflow-hidden rounded-xl bg-[#eff5ff]">
         <div className={`relative max-h-full max-w-full overflow-hidden rounded-lg shadow-lg ${portrait ? 'aspect-[9/16] h-full' : 'aspect-video w-full'}`}>
-          {base ? (
+          {empty || phase === 'empty' ? (
+            <EmptyState />
+          ) : base ? (
             <iframe
               ref={frame}
               key={`${base}-${reloadKey}`}
@@ -86,7 +102,7 @@ export function PreviewPane({ aspect }: { aspect: '16:9' | '9:16' }) {
           ) : (
             <div className="grid h-full place-items-center bg-[#2970ec]"><Spinner color="current" /></div>
           )}
-          {phase === 'loading' && base && <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#2970ec]/70"><Spinner color="current" /></div>}
+          {phase === 'loading' && base && !empty && <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#2970ec]/70"><Spinner color="current" /></div>}
         </div>
         {phase === 'error' && (
           <div role="alert" className="absolute inset-x-3 bottom-3 max-h-40 overflow-auto rounded-lg border border-[#f3c5c5] bg-[#fdf2f2] p-3 text-sm text-[#7f1d1d]">

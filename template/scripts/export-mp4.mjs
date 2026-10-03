@@ -28,7 +28,12 @@ const format = opts.format ?? (quality === 'draft' ? 'jpeg' : 'png');
 const out = path.resolve(process.cwd(), pos.find((a) => a.endsWith('.mp4')) ?? path.join(root, `export/${path.basename(root)}-${quality}.mp4`));
 
 await mkdir(path.dirname(out), { recursive: true });
-const { browser, url, close } = await openProject(root, { url: opts.url });
+const opened = await openProject(root, { url: opts.url }).catch((e) => {
+  if (e.code !== 'EMPTY_PROJECT') throw e;
+  console.error(e.message);
+  process.exit(3);
+});
+const { browser, url, close } = opened;
 
 let exitCode = 0;
 try {

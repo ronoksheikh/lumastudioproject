@@ -6,7 +6,7 @@ import { projects } from '../db/schema.js';
 import { signPreviewToken, verifyPreviewToken } from '../security/crypto.js';
 import { loadSecrets } from '../security/secrets.js';
 import { toRef } from '../projects/service.js';
-import { Client, makeTestApp } from '../test/helpers.js';
+import { Client, makeTestApp, seedExample } from '../test/helpers.js';
 
 let t: Awaited<ReturnType<typeof makeTestApp>>;
 let ada: Client;
@@ -44,7 +44,18 @@ describe('signed preview tokens', () => {
 });
 
 describe('preview origin', () => {
-  it('serves the untouched template from the signed URL (index, assets, vendor, root json)', async () => {
+  it('serves an empty project: the engine from the Studio, no scenes or audio', async () => {
+    const base = previewUrl.pathname;
+    expect((await get(base)).body).toContain('id="stage"');
+    expect((await get(`${base}js/main.js`)).statusCode).toBe(200);
+    expect((await get(`${base}js/lib/recipes/counter.js`)).statusCode).toBe(200);
+    expect((await get(`${base}js/scenes/index.js`)).statusCode).toBe(404); // main.js shows the empty state
+    expect((await get(`${base}audio/timing.json`)).statusCode).toBe(404);
+    expect((await get(`${base}css/scenes.css`)).statusCode).toBe(200); // the project's own (empty) styles
+  });
+
+  it('serves a built project from the signed URL (index, assets, vendor, root json)', async () => {
+    await seedExample(toRef(t.db.select().from(projects).where(eq(projects.id, projectId)).get()!));
     expect(previewUrl.origin).toBe('http://preview.test');
     const base = previewUrl.pathname; // /p/<id>/<token>/
     const index = await get(base);

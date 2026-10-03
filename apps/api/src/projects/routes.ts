@@ -29,7 +29,7 @@ export async function projectRoutes(app: FastifyInstance, ctx: AppContext) {
   const { db } = ctx;
   const auth = { preHandler: requireAuth };
 
-  app.get('/projects', auth, async (req) => ({ projects: listProjects(db, authUser(req).id).map(publicProject) }));
+  app.get('/projects', auth, async (req) => ({ projects: listProjects(db, authUser(req).id).map((p) => publicProject(p)) }));
 
   app.get('/usage', auth, async (req) => ({ usage: usageFor(db, authUser(req).id) }));
 
@@ -42,7 +42,7 @@ export async function projectRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.get('/projects/:id', auth, async (req) => {
     const { id } = req.params as { id: string };
-    return { project: publicProject(getOwnedProject(db, authUser(req).id, id)) };
+    return { project: publicProject(getOwnedProject(db, authUser(req).id, id), true) };
   });
 
   app.patch('/projects/:id', auth, async (req) => {

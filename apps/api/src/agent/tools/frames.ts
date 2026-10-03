@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ToolArgs } from '@luma/shared';
 import { config } from '../../config.js';
+import { notPlayableReason } from '../../projects/content.js';
 import { runPristineScript } from './scripts.js';
 import { fail, ok, type ImagePart, type ToolContext, type ToolResult } from './types.js';
 
@@ -9,6 +10,8 @@ export const FRAMES_DIR = '.luma/frames';
 
 /** Captures the video at the requested times and (for vision models) hands the screenshots to the model. */
 export async function previewFrames(ctx: ToolContext, a: ToolArgs<'preview_frames'>): Promise<ToolResult> {
+  const empty = notPlayableReason(ctx.project.dir);
+  if (empty) return fail(empty);
   const stamp = String(Date.now());
   const outDir = path.join(ctx.project.dir, FRAMES_DIR, stamp);
   fs.mkdirSync(outDir, { recursive: true });

@@ -132,3 +132,8 @@ body.ready #stage { opacity: 1; }
 #hud:hover { opacity: 1; }
 #hud .bar { flex: 1; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.2); cursor: pointer; overflow: hidden; }
 #hud .fill { height: 100%; background: var(--sky); transform-origin: left; transform: scaleX(0); }
+
+/* empty project (no scenes yet): a calm placeholder that fills the viewport */
+.luma-empty { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6em; background: var(--grad); color: #fff; font: 600 clamp(16px, 3.4vw, 40px)/1.2 var(--font-display); text-align: center; padding: 1em; }
+.luma-empty span { font-weight: 400; font-size: 0.6em; opacity: 0.88; }
+body[data-empty] #stage, body[data-empty] #hud { display: none; }

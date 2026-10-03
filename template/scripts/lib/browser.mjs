@@ -1,6 +1,6 @@
 // Launch headless Chrome against a project (starting the static server if no URL is given).
 import { access } from 'node:fs/promises';
-import { importPkg } from './common.mjs';
+import { importPkg, emptyProjectReason } from './common.mjs';
 import { createServer } from '../../server.mjs';
 
 export async function findChrome() {
@@ -23,6 +23,9 @@ export async function findChrome() {
 
 /** → { browser, url, close() }. Without `url`, serves `root` on a random local port. */
 export async function openProject(root, { url, query = '?pr=1', width = 1920, height = 1080 } = {}) {
+  // an empty project has nothing to play: say so plainly instead of timing out in Chrome
+  const empty = url ? null : emptyProjectReason(root);
+  if (empty) throw Object.assign(new Error(empty), { code: 'EMPTY_PROJECT' });
   const puppeteer = await importPkg('puppeteer-core', root).then((m) => m.default ?? m);
   let server;
   if (!url) {
@@ -55,9 +58,9 @@ export async function loadVideo(browser, url, { timeout = 120000 } = {}) {
   const logs = [];
   page.on('pageerror', (e) => logs.push(`page error: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') logs.push(`console: ${m.text()}`); });
-  page.on('requestfailed', (r) => logs.push(`request failed: ${r.url()}`));
+  page.on('requestfailed', (r) => logs.push(`request failed: ${r.url()} ${r.method()} ${r.failure()?.errorText}`));
   await page.goto(url, { waitUntil: 'networkidle0' });
-  await page.waitForFunction(() => window.ad?.duration > 0 || window.adError, { timeout });
+  await page.waitForFunction(() => window.ad?.duration > 0 || window.adError || window.adEmpty, { timeout });
   const error = await page.evaluate(() => window.adError);
   await page.addStyleTag({ content: '#start,#hud{display:none!important}' });
   return { page, error, logs };

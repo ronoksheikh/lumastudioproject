@@ -3,7 +3,8 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { execFileSync, execFile, spawnSync } from 'node:child_process';
-import { cp, mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,8 +22,7 @@ function silentMp3(seconds) {
 
 before(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'luma-tpl-'));
-  await cp(template, dir, { recursive: true, filter: (s) => !s.includes('node_modules') });
-  await rm(path.join(dir, 'export'), { recursive: true, force: true });
+  await cp(path.join(template, 'scaffold'), dir, { recursive: true });
   // mock /v1/text-to-speech/:voice/with-timestamps: 0.05s per character, audio length = text length * 0.05
   mock = http.createServer((req, res) => {
     let body = '';
@@ -126,18 +126,73 @@ test('patch-voice replaces one segment and shifts the following ones', async () 
   assert.equal(requests.at(-1).body.next_text, 'Last segment words.');
 });
 
-test('check passes on the shipped starter and flags a bad word reference', async () => {
-  // fresh copy of the starter with a placeholder voice
-  const p = await mkdtemp(path.join(tmpdir(), 'luma-chk-'));
+/** A new project exactly as Luma Studio creates it: the scaffold only (no scenes, no script, no audio). */
+async function newProject() {
+  const p = await mkdtemp(path.join(tmpdir(), 'luma-new-'));
+  await cp(path.join(template, 'scaffold'), p, { recursive: true });
+  return p;
+}
+const node = (script, p, args = []) => spawnSync('node', [path.join(template, 'scripts', script), '--root', p, ...args], { encoding: 'utf8' });
+
+test('a new project is empty: no scenes, script, audio or engine copies', async () => {
+  const p = await newProject();
   try {
-    await cp(template, p, { recursive: true, filter: (s) => !s.includes('node_modules') && !s.includes('/export') });
-    const gen = spawnSync('node', [path.join(p, 'scripts/generate-voice.mjs'), '--placeholder'], { encoding: 'utf8' });
+    const files = (await readdir(p, { recursive: true })).map((f) => f.split(path.sep).join('/')).sort();
+    assert.deepEqual(files.filter((f) => !f.endsWith('/') && !['public', 'public/css'].includes(f)), ['brand.json', 'gitignore', 'package.json', 'project.json', 'public/css/scenes.css']);
+  } finally {
+    await rm(p, { recursive: true, force: true });
+  }
+});
+
+test('check and preview-frames explain an empty project instead of crashing', async () => {
+  const p = await newProject();
+  try {
+    const chk = node('check.mjs', p, ['--json']);
+    assert.equal(chk.status, 1);
+    const report = JSON.parse(chk.stdout);
+    assert.ok(report.errors.some((e) => e.startsWith('no scenes yet')), chk.stdout);
+    assert.ok(report.errors.some((e) => e.includes('script.json does not exist yet')), chk.stdout);
+    const pf = node('preview-frames.mjs', p, ['--times', '1']);
+    assert.equal(pf.status, 3);
+    assert.match(pf.stderr, /no scenes yet/);
+    assert.doesNotMatch(pf.stderr, /at .*\.mjs:\d+/); // no stack trace
+  } finally {
+    await rm(p, { recursive: true, force: true });
+  }
+});
+
+test('the engine overlay serves engine files to a project but never its scenes or audio', async () => {
+  const { candidates } = await import('../server.mjs');
+  const p = await newProject();
+  try {
+    const first = (u) => candidates(u, p).find((f) => existsSync(f));
+    assert.equal(first('/js/main.js'), path.join(template, 'public/js/main.js'));
+    assert.equal(first('/'), path.join(template, 'public/index.html'));
+    assert.equal(first('/assets/fonts/inter-latin-400-normal.woff2'), path.join(template, 'assets/fonts/inter-latin-400-normal.woff2'));
+    assert.equal(first('/css/scenes.css'), path.join(p, 'public/css/scenes.css'));
+    assert.equal(first('/js/scenes/index.js'), undefined);
+    assert.equal(first('/audio/timing.json'), undefined);
+    // a project's own copy wins (legacy projects carry the whole engine)
+    await mkdir(path.join(p, 'public/js'), { recursive: true });
+    await writeFile(path.join(p, 'public/js/main.js'), '// mine');
+    assert.equal(first('/js/main.js'), path.join(p, 'public/js/main.js'));
+  } finally {
+    await rm(p, { recursive: true, force: true });
+  }
+});
+
+test('check passes on the starter example and flags a bad word reference', async () => {
+  const p = await newProject();
+  try {
+    const ex = node('use-example.mjs', p, ['starter']);
+    assert.equal(ex.status, 0, ex.stderr);
+    const gen = node('generate-voice.mjs', p, ['--placeholder']);
     assert.equal(gen.status, 0, gen.stderr);
-    const ok = spawnSync('node', [path.join(p, 'scripts/check.mjs'), '--json'], { encoding: 'utf8' });
+    const ok = node('check.mjs', p, ['--json']);
     assert.equal(ok.status, 0, ok.stdout);
     const scene = path.join(p, 'public/js/scenes/00-title.js');
     await writeFile(scene, (await readFile(scene, 'utf8')) + "\nconst bad = w('title', 99);\nsetTimeout(() => {}, 1);\n");
-    const bad = spawnSync('node', [path.join(p, 'scripts/check.mjs'), '--json'], { encoding: 'utf8' });
+    const bad = node('check.mjs', p, ['--json']);
     assert.equal(bad.status, 1);
     const report = JSON.parse(bad.stdout);
     assert.ok(report.errors.some((e) => e.includes("w('title', 99)")), bad.stdout);

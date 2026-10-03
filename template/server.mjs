@@ -1,8 +1,11 @@
 // Zero-dependency static server for a Luma project.
 //   /vendor/<pkg>/…  -> <project>/node_modules/<pkg>, else the shared base (NODE_PATH, e.g. /opt/luma/node_modules)
-//   /assets/…        -> <project>/assets
+//   /assets/…        -> <project>/assets, else the engine's assets (fonts, logos, world map)
 //   /project.json, /brand.json, /script.json -> project root
-//   everything else  -> <project>/public
+//   everything else  -> <project>/public, else the engine's public/ (index.html, main.js, lib/, base css)
+// The engine is the folder this file lives in. A project only holds its own files (scenes, audio, styles,
+// assets); anything it does not have comes from the engine — except the project-owned paths below, which
+// never fall back (an empty project must look empty, not like a demo).
 // Range requests are supported (audio seeking). Unsatisfiable ranges answer 416 (pitfall #10).
 
 import http from 'node:http';
@@ -16,6 +19,8 @@ const PORT = Number(process.env.PORT) || 5173;
 const HOST = process.env.HOST || '0.0.0.0';
 const SHARED = (process.env.NODE_PATH || '').split(path.delimiter).filter(Boolean);
 const ROOT_FILES = new Set(['project.json', 'brand.json', 'script.json']);
+/** Paths (relative to public/) that belong to the project alone. */
+export const PROJECT_OWNED = /^(js\/scenes(\/|$)|audio(\/|$)|css\/scenes\.css$)/;
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -48,9 +53,15 @@ export function candidates(urlPath, root = defaultRoot) {
     const rel = clean.slice('/vendor/'.length);
     return [path.join(root, 'node_modules'), ...SHARED].map((b) => within(b, rel)).filter(Boolean);
   }
-  if (clean.startsWith('/assets/')) return [within(path.join(root, 'assets'), clean.slice('/assets/'.length))].filter(Boolean);
+  const engine = path.resolve(defaultRoot) === path.resolve(root) ? [] : [defaultRoot];
+  if (clean.startsWith('/assets/')) {
+    const rel = clean.slice('/assets/'.length);
+    return [root, ...engine].map((b) => within(path.join(b, 'assets'), rel)).filter(Boolean);
+  }
   if (ROOT_FILES.has(clean.slice(1))) return [path.join(root, clean.slice(1))];
-  return [within(path.join(root, 'public'), clean === '/' ? 'index.html' : clean.slice(1))].filter(Boolean);
+  const rel = clean === '/' ? 'index.html' : clean.slice(1);
+  const bases = PROJECT_OWNED.test(rel) ? [root] : [root, ...engine];
+  return bases.map((b) => within(path.join(b, 'public'), rel)).filter(Boolean);
 }
 
 async function find(urlPath, root) {
@@ -76,6 +87,10 @@ export function createServer(root = defaultRoot) {
       'Accept-Ranges': 'bytes',
       'Cache-Control': 'no-cache',
     };
+    if (req.method === 'HEAD') {
+      res.writeHead(200, { ...headers, 'Content-Length': info.size }).end();
+      return;
+    }
     const range = req.headers.range?.match(/bytes=(\d*)-(\d*)/);
     if (range) {
       // a suffix range ("bytes=-500") means the last N bytes
@@ -96,5 +111,7 @@ export function createServer(root = defaultRoot) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  createServer().listen(PORT, HOST, () => console.log(`Luma project → http://localhost:${PORT}`));
+  const i = process.argv.indexOf('--root');
+  const root = path.resolve(i > 0 ? process.argv[i + 1] : process.cwd());
+  createServer(root).listen(PORT, HOST, () => console.log(`Luma project ${root} → http://localhost:${PORT}`));
 }

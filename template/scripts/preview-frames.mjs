@@ -20,7 +20,15 @@ if (!times.length) {
 const outDir = path.resolve(opts.out ?? path.join(root, '.luma/frames'));
 await mkdir(outDir, { recursive: true });
 
-const { browser, url, close } = await openProject(root, { url: opts.url });
+let opened;
+try {
+  opened = await openProject(root, { url: opts.url });
+} catch (e) {
+  if (e.code !== 'EMPTY_PROJECT') throw e;
+  console.error(e.message);
+  process.exit(3);
+}
+const { browser, url, close } = opened;
 const result = { frames: [], issues: [], duration: 0, size: null };
 try {
   const { page, error, logs } = await loadVideo(browser, url);

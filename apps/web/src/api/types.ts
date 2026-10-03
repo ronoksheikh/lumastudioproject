@@ -13,6 +13,8 @@ export interface Project {
   status: string;
   createdAt: number;
   updatedAt: number;
+  /** what the project holds so far (GET /projects/:id only); new projects are empty */
+  content?: { scenes: boolean; script: boolean; voice: boolean };
 }
 
 export interface ModelConfig {

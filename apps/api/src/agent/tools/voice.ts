@@ -36,7 +36,8 @@ export async function generateVoice(ctx: ToolContext, a: ToolArgs<'generate_voic
   const scriptFile = path.join(ctx.project.dir, 'script.json');
   if (a.segments) {
     try {
-      const script = readJson<{ segments: unknown }>(scriptFile);
+      // a new project has no script.json yet: start one (the voice settings are chosen separately)
+      const script = fs.existsSync(scriptFile) ? readJson<{ segments: unknown; voice?: unknown }>(scriptFile) : { voice: {}, segments: [] as unknown };
       script.segments = a.segments;
       fs.writeFileSync(scriptFile, JSON.stringify(script, null, 2) + '\n');
       if (typeof process.getuid === 'function' && process.getuid() === 0 && ctx.project.uid != null) fs.chownSync(scriptFile, ctx.project.uid, ctx.project.uid);
@@ -44,6 +45,7 @@ export async function generateVoice(ctx: ToolContext, a: ToolArgs<'generate_voic
       return fail(`Could not update script.json: ${(e as Error).message}`);
     }
   }
+  if (!fs.existsSync(scriptFile)) return fail('script.json does not exist yet. Write it first (voice settings + one segment per scene — read_guide("voice")), or pass segments.');
   const key = ctx.elevenKey();
   if (!key && !a.placeholder) {
     return fail('No ElevenLabs API key is saved for this student. Tell them to add it in Settings → Voice, and meanwhile call generate_voice with placeholder:true (silent audio with evenly spaced word timings) so the visuals can be built and previewed.');

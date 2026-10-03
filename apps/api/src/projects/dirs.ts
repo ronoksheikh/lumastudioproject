@@ -45,41 +45,18 @@ export function git(project: ProjectRef, args: string[], opts?: { input?: string
   return runAsProject(project, 'git', args, opts);
 }
 
-/** The student's saved voice defaults (Settings → Voice), written into the new project's script.json. */
-export interface VoiceDefaults {
-  voiceId: string;
-  modelId: string;
-  languageCode: string | null;
-  speed: number;
-  tempo: number;
-  stability: number;
-  similarityBoost: number;
-  style: number;
-}
-
-export function applyVoiceDefaults(scriptFile: string, v: VoiceDefaults) {
-  const script = JSON.parse(fs.readFileSync(scriptFile, 'utf8'));
-  const voice = script.voice ?? {};
-  script.voice = {
-    ...voice,
-    model_id: v.modelId,
-    voice_id: v.voiceId,
-    ...(v.languageCode ? { language_code: v.languageCode } : {}),
-    voice_settings: { ...(voice.voice_settings ?? {}), stability: v.stability, similarity_boost: v.similarityBoost, style: v.style, speed: v.speed },
-    tempo: v.tempo,
-  };
-  fs.writeFileSync(scriptFile, JSON.stringify(script, null, 2) + '\n');
-}
-
-const COPY_SKIP = new Set(['node_modules', 'export', 'test', '.git', '.home']);
-
 /**
- * Creates the project folder from the Luma template: copy → own it → `git init` → first commit.
+ * Creates an EMPTY project folder from the template's scaffold (project.json, brand.json, package.json,
+ * .gitignore, an empty scenes.css): copy → own it → `git init` → first commit. No demo scenes, script or
+ * audio — the agent builds everything. The engine (index.html, main.js, lib/, recipes, fonts, scripts) is
+ * NOT copied: Luma Studio serves it read-only from config.templateDir (see preview/static.ts and
+ * template/server.mjs), so projects stay small and pick up engine fixes.
  * The folder is 0700 and owned by the project's uid, so other students' commands cannot read it.
  */
-export function initProjectDir(project: ProjectRef, opts: { title?: string; aspect?: string; templateDir?: string; voice?: VoiceDefaults } = {}) {
+export function initProjectDir(project: ProjectRef, opts: { title?: string; aspect?: string; templateDir?: string } = {}) {
   const templateDir = opts.templateDir ?? config.templateDir;
-  if (!fs.existsSync(path.join(templateDir, 'project.json'))) throw new Error(`Luma template not found at ${templateDir}`);
+  const scaffold = path.join(templateDir, 'scaffold');
+  if (!fs.existsSync(path.join(scaffold, 'project.json'))) throw new Error(`Luma template scaffold not found at ${scaffold}`);
   if (fs.existsSync(project.dir)) throw new Error(`project folder already exists: ${project.dir}`);
   fs.mkdirSync(path.dirname(project.dir), { recursive: true });
   // /data/projects itself must be traversable (not listable) so each uid can reach its own folder
@@ -87,10 +64,9 @@ export function initProjectDir(project: ProjectRef, opts: { title?: string; aspe
     fs.chmodSync(path.dirname(project.dir), 0o711);
   } catch { /* not ours to chmod in dev */ }
 
-  fs.cpSync(templateDir, project.dir, {
-    recursive: true,
-    filter: (src) => !COPY_SKIP.has(path.basename(src)) || src === templateDir,
-  });
+  fs.cpSync(scaffold, project.dir, { recursive: true });
+  // shipped as "gitignore" (package tools like to drop dotfiles)
+  if (fs.existsSync(path.join(project.dir, 'gitignore'))) fs.renameSync(path.join(project.dir, 'gitignore'), path.join(project.dir, '.gitignore'));
   if (opts.title || opts.aspect) {
     const file = path.join(project.dir, 'project.json');
     const pj = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -98,7 +74,6 @@ export function initProjectDir(project: ProjectRef, opts: { title?: string; aspe
     if (opts.aspect) pj.aspect = opts.aspect;
     fs.writeFileSync(file, JSON.stringify(pj, null, 2) + '\n');
   }
-  if (opts.voice) applyVoiceDefaults(path.join(project.dir, 'script.json'), opts.voice);
   fs.mkdirSync(path.join(project.dir, '.home'), { recursive: true });
   fs.mkdirSync(path.join(project.dir, '.luma'), { recursive: true });
   fs.mkdirSync(path.join(project.dir, 'assets/uploads'), { recursive: true });
@@ -115,7 +90,7 @@ export function initProjectDir(project: ProjectRef, opts: { title?: string; aspe
   run(['config', 'user.email', 'luma@lumademy.local']);
   run(['config', 'core.fileMode', 'false']);
   run(['add', '-A']);
-  run(['commit', '-q', '-m', 'Create project from Luma template']);
+  run(['commit', '-q', '-m', 'Create empty project']);
   return run(['rev-parse', 'HEAD']);
 }
 
