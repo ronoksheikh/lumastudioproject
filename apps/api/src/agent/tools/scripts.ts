@@ -6,7 +6,7 @@ import path from 'node:path';
 import { config } from '../../config.js';
 import { buildCommandEnv } from '../../runner/env.js';
 import type { ProjectRef } from '../../runner/exec.js';
-import { killUidProcesses } from '../../runner/exec.js';
+import { killUidProcesses, trackUid } from '../../runner/exec.js';
 import { effectiveSandbox } from '../../runner/sandbox.js';
 import { OutputBuffer } from '../../runner/truncate.js';
 import { redactSecrets } from '../../security/redact.js';
@@ -36,11 +36,11 @@ export function runPristineScript(
       stdio: ['pipe', 'pipe', 'pipe'],
       ...(sb.uid && project.uid != null ? { uid: project.uid, gid: project.uid } : {}),
     });
+    const release = trackUid(sb.uid ? project.uid : null);
     const kill = () => {
       try {
         if (child.pid) process.kill(-child.pid, 'SIGKILL');
       } catch { /* gone */ }
-      if (project.uid != null) killUidProcesses(project.uid);
     };
     const timer = setTimeout(() => ((timedOut = true), kill()), opts.timeoutMs ?? 300_000);
     opts.signal?.addEventListener('abort', kill, { once: true });
@@ -56,10 +56,13 @@ export function runPristineScript(
     child.on('close', (code) => {
       clearTimeout(timer);
       kill();
+      release();
+      if (project.uid != null) killUidProcesses(project.uid); // stragglers, unless another command of this project still runs
       resolve({ code, output: buf.toString(), timedOut });
     });
     child.on('error', (e) => {
       clearTimeout(timer);
+      release();
       buf.push(`failed to start: ${e.message}`);
       resolve({ code: null, output: buf.toString(), timedOut });
     });

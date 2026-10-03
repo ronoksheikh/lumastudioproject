@@ -49,9 +49,31 @@ export interface ExecResult {
 
 const DEFAULT_LIMITS: Limits = { nproc: 1024, fsize: 2 * 1024 ** 3, cpu: 3600 };
 
-/** Kills everything that belongs to the project uid (background processes the command left behind). */
-export function killUidProcesses(uid: number) {
+/** How many commands/scripts are running right now per project uid. */
+const activeByUid = new Map<number, number>();
+
+/** Marks a process started as `uid`; call the returned function exactly once when it has exited. */
+export function trackUid(uid: number | null): () => void {
+  if (uid == null) return () => {};
+  activeByUid.set(uid, (activeByUid.get(uid) ?? 0) + 1);
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    const n = (activeByUid.get(uid) ?? 1) - 1;
+    if (n > 0) activeByUid.set(uid, n);
+    else activeByUid.delete(uid);
+  };
+}
+
+/**
+ * Kills everything that belongs to the project uid (background processes a command left behind) — but only
+ * when no other command of that project is still running: a render, a frame capture and an agent command
+ * can overlap, and one finishing must never kill the others. Stragglers are reaped when the last one ends.
+ */
+export function killUidProcesses(uid: number, opts: { force?: boolean } = {}) {
   if (typeof process.getuid !== 'function' || process.getuid() !== 0) return;
+  if (!opts.force && (activeByUid.get(uid) ?? 0) > 0) return;
   spawnSync('pkill', ['-9', '-U', String(uid)], { timeout: 3000 });
 }
 
@@ -96,15 +118,16 @@ export function execInProject(project: ProjectRef, command: string, opts: ExecOp
         if (child.pid) process.kill(-child.pid, sig);
       } catch { /* already gone */ }
     };
+    const release = trackUid(sb.uid ? project.uid : null);
+    let hardKill: NodeJS.Timeout | null = null;
     const stop = (reason: 'timeout' | 'abort') => {
       if (finished) return;
       if (reason === 'timeout') timedOut = true;
       else aborted = true;
       killGroup('SIGTERM');
-      setTimeout(() => {
-        killGroup('SIGKILL');
-        if (project.uid != null) killUidProcesses(project.uid);
-      }, 2000).unref();
+      // escalate if it ignores SIGTERM; cancelled as soon as it has exited (a later command may own the uid by then)
+      hardKill = setTimeout(() => killGroup('SIGKILL'), 2000);
+      hardKill.unref();
     };
 
     const timer = setTimeout(() => stop('timeout'), timeoutS * 1000);
@@ -126,9 +149,11 @@ export function execInProject(project: ProjectRef, command: string, opts: ExecOp
       if (finished) return;
       finished = true;
       clearTimeout(timer);
+      if (hardKill) clearTimeout(hardKill);
       opts.signal?.removeEventListener('abort', onAbort);
       // leave nothing running behind a finished command
       killGroup('SIGKILL');
+      release();
       if (project.uid != null) killUidProcesses(project.uid);
       let output = buf.toString();
       if (timedOut) output += `\n[command timed out after ${timeoutS}s and was killed]`;

@@ -16,7 +16,7 @@ export function purgeDeletedProjects(db: DB, now = Date.now(), days = config.pur
   const purged: string[] = [];
   for (const p of old) {
     try {
-      if (p.uid != null) killUidProcesses(p.uid);
+      if (p.uid != null) killUidProcesses(p.uid, { force: true });
       fs.rmSync(projectDir(p.id), { recursive: true, force: true });
       db.delete(projects).where(eq(projects.id, p.id)).run(); // messages, runs, renders… cascade
       forgetUsage(p.userId);

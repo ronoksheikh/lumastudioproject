@@ -161,6 +161,19 @@ describe('exec', () => {
     expect(r.aborted).toBe(true);
   }, 20_000);
 
+  it('a command finishing (or being stopped) never kills another command of the same project', async () => {
+    // e.g. a render or a frame capture running while the agent's shell command ends or is stopped
+    const long = execInProject(A, 'sleep 4; echo survived', { timeoutS: 30 });
+    await new Promise((r) => setTimeout(r, 300));
+    await execInProject(A, 'echo quick');
+    const ac = new AbortController();
+    setTimeout(() => ac.abort(), 200);
+    await execInProject(A, 'sleep 60', { signal: ac.signal });
+    const after = execInProject(A, 'sleep 3; echo also-survived', { timeoutS: 30 }); // starts right after a stop
+    expect((await long).output).toContain('survived');
+    expect((await after).output).toContain('also-survived');
+  }, 30_000);
+
   it('scrubs known secrets from output', async () => {
     const r = await execInProject(A, 'echo my-llm-key-123456', { secrets: ['my-llm-key-123456'] });
     expect(r.output).not.toContain('my-llm-key');

@@ -210,7 +210,12 @@ export class RenderQueue implements RenderService {
       if (ctl.signal.aborted) return failJob(String((ctl.signal.reason as Error | undefined)?.message ?? 'Stopped.'));
       if (r.timedOut) return failJob(`The render took longer than ${config.renderTimeoutMin} minutes and was stopped.`);
       const line = r.output.split('\n').reverse().find((l) => l.startsWith('{"render"'));
-      if (r.code !== 0 || !line) return failJob(`The render failed:\n${tail.replace(/\[luma\] frame [^\n]*\n?/g, '').trim().slice(-1500) || 'unknown error'}`);
+      if (r.code !== 0 || !line) {
+        const details = tail.replace(/\[luma\] frame [^\n]*\n?/g, '').trim().slice(-1500);
+        // the card shows the first line: make it the reason, not just "failed"
+        const reason = details.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('at ')).at(0) ?? `the render process stopped (${r.code === null ? 'killed' : `exit code ${r.code}`}) without saying why`;
+        return failJob(`The render failed: ${reason}${details && details !== reason ? `\n${details}` : ''}`);
+      }
       const result = (JSON.parse(line) as { render: RenderResult }).render;
 
       const row = {
