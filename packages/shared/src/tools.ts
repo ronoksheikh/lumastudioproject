@@ -64,6 +64,11 @@ export const toolSchemas = {
   web_fetch: z.object({
     url: z.string().url().describe('http(s) URL to fetch; HTML is converted to readable text'),
   }),
+  save_lesson: z.object({
+    topic: z.enum(['voice', 'render', 'engine', 'model', 'tools', 'design', 'other']),
+    text: z.string().min(1).max(600).describe('One generic fact + what to do about it, useful in OTHER students\' projects. No names, keys, e-mails or project details.'),
+    replaces: z.string().max(20).optional().describe('Id of a shared lesson this corrects or updates (it gets archived)'),
+  }),
   compact_context: z.object({
     keep: z.string().max(2000).optional().describe('What the summary must keep (decisions, word indices, open problems) — optional'),
   }),
@@ -87,6 +92,7 @@ const descriptions: Record<ToolName, string> = {
   render_video: 'Queue an MP4 render (draft or final). The student sees live progress; returns when the render is done.',
   ask_user: 'Ask the student a question and wait for the answer. Use only when you are genuinely blocked; otherwise choose sensible defaults.',
   web_fetch: 'Fetch a web page or text file (HTML converted to readable text, truncated).',
+  save_lesson: 'Save a SHARED lesson every future run sees (all students): a reusable fact you discovered the hard way — a provider/plan limit, an API quirk, a fix for a recurring error, an engine gotcha. Example: "ElevenLabs free plan: library voices fail via the API (402 paid_plan_required) — use premade voices from list_voices." Not for one student\'s preferences or project details, never personal data or keys. Check the shared lessons in your prompt first; correct a wrong one with `replaces`.',
   compact_context: 'Fold the older part of this conversation into a short project memory to free context, e.g. after a long debugging session, before a big new phase, or when your earlier messages are no longer needed. The last few messages stay verbatim. Happens automatically near the context limit; call it yourself to stay sharp earlier.',
   read_guide: 'Read Luma\'s reference docs (engine API, recipes, design rules, voice, pitfalls, 9:16, icons) or the source of an engine file / example scene. The engine and examples are not in the project folder; this is how you read them. Call without a topic for the index.',
 };

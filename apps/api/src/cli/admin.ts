@@ -10,7 +10,10 @@
 //   boosts [pending|paid]      list fast-render-hour purchases
 //   boost-paid <id> [ref]      mark a pending purchase paid (until the payment gateway does it)
 //   boost-grant <email> [min]  give someone fast render minutes (default RENDER_BOOST_MINUTES)
+//   lessons [active|pending|archived]   the agent's shared lessons
+//   lesson-approve <id> | lesson-archive <id> | lesson-add <topic> <text>
 import { createDb, runMigrations } from '../db/index.js';
+import { addLesson, LESSON_TOPICS, listLessons, setLessonStatus, type LessonTopic } from '../agent/lessons.js';
 import { config } from '../config.js';
 import { backupDatabase } from '../maintenance/backup.js';
 import { purgeDeletedProjects } from '../maintenance/purge.js';
@@ -82,8 +85,23 @@ try {
       console.log(`granted (${id})`);
       break;
     }
+    case 'lessons':
+      for (const l of listLessons(db, arg)) console.log(`${l.id}  ${l.status.padEnd(8)}  ${l.topic.padEnd(6)}  ×${l.confirmations}  ${l.text}`);
+      break;
+    case 'lesson-approve':
+    case 'lesson-archive':
+      if (!arg) throw new Error(`usage: ${cmd} <id>`);
+      if (!setLessonStatus(db, arg, cmd === 'lesson-approve' ? 'active' : 'archived')) throw new Error(`no such lesson: ${arg}`);
+      console.log(`${arg}: ${cmd === 'lesson-approve' ? 'active — every run sees it now' : 'archived'}`);
+      break;
+    case 'lesson-add': {
+      const text = process.argv.slice(4).join(' ');
+      if (!arg || !LESSON_TOPICS.includes(arg as LessonTopic) || text.length < 20) throw new Error(`usage: lesson-add <${LESSON_TOPICS.join('|')}> <text, 20+ chars>`);
+      console.log(`added ${addLesson(db, arg as LessonTopic, text)}`);
+      break;
+    }
     default:
-      console.log('commands: users | ban <email> | unban <email> | purge [--days N] | backup | rotate-key | worker-add <name> | workers | worker-disable|worker-enable|worker-remove <id|name> | boosts [status] | boost-paid <id> [ref] | boost-grant <email> [min]');
+      console.log('commands: users | ban <email> | unban <email> | purge [--days N] | backup | rotate-key | worker-add <name> | workers | worker-disable|worker-enable|worker-remove <id|name> | boosts [status] | boost-paid <id> [ref] | boost-grant <email> [min] | lessons [status] | lesson-approve|lesson-archive <id> | lesson-add <topic> <text>');
       process.exitCode = cmd ? 2 : 0;
   }
 } catch (e) {

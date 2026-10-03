@@ -27,6 +27,7 @@ const TOOL_META: Record<string, { icon: IconName; label: string }> = {
   read_guide: { icon: 'guide', label: 'Guide' },
   list_voices: { icon: 'mic', label: 'Voices' },
   compact_context: { icon: 'brain', label: 'Tidy memory' },
+  save_lesson: { icon: 'brain', label: 'Learned' },
 };
 
 const argOf = (b: ToolBlock, key: string): string | undefined => {

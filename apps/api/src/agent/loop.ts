@@ -16,6 +16,7 @@ import { compactIfNeeded } from './compact.js';
 import { ConvoStore, type ChatMessage, type StoredMessage } from './convo.js';
 import type { RunBus } from './events.js';
 import { attachmentsSummary, brandSummary, projectFacts } from './facts.js';
+import { forgetRun, lessonsForPrompt } from './lessons.js';
 import { buildSystemPrompt, fillPromptVars } from './prompts.js';
 import { describeOverrides, getVoicePrefs, getAgentPrompt } from '../settings/service.js';
 import { collectTurn, type AssistantTurn } from './stream.js';
@@ -114,7 +115,8 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
         : `${luma}\n\n## The student's own instructions (from Settings → Agent; follow them unless they break the engine contract)\n${custom.text}`;
     const overrides = describeOverrides(getVoicePrefs(db, input.userId));
     const voiceLine = `\nVoice settings from the student: ${overrides ? `${overrides} (these override your choice automatically)` : 'none — you choose the voice and model (list_voices)'}. ElevenLabs key: ${input.elevenKey() ? 'saved' : 'NOT saved — use generate_voice placeholder:true and tell the student to add it in Settings → Voice'}.`;
-    return { role: 'system', content: `${base}\n\n## Current project state\n${projectFacts(db, project)}${voiceLine}${mem ? `\n\n## Project memory (summary of earlier work)\n${mem}` : ''}` };
+    const lessons = lessonsForPrompt(db);
+    return { role: 'system', content: `${base}${lessons ? `\n\n${lessons}` : ''}\n\n## Current project state\n${projectFacts(db, project)}${voiceLine}${mem ? `\n\n## Project memory (summary of earlier work)\n${mem}` : ''}` };
   };
   let system = systemFor(memory?.summary ?? null);
   const messages = () => [system, ...rows.map((r) => live.get(r.rowid) ?? r.msg)];
@@ -289,6 +291,7 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
   }
 
   function finish(): RunOutcome {
+    forgetRun(input.runId);
     bus.flushDeltas();
     // every tool call must have an answer, or the next request to the provider would be rejected
     closeDanglingToolCalls();

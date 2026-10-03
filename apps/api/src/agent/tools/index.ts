@@ -1,4 +1,5 @@
 import { toolSchemas, type ToolArgs, type ToolName } from '@luma/shared';
+import { saveLesson } from '../lessons.js';
 import { bash } from './bash.js';
 import { editFile, listFiles, readFile, writeFile } from './files.js';
 import { previewFrames } from './frames.js';
@@ -25,6 +26,10 @@ const handlers: { [N in ToolName]: Handler<N> } = {
   ask_user: askUser,
   web_fetch: webFetch,
   read_guide: readGuide,
+  save_lesson: (ctx, args) => {
+    const r = saveLesson(ctx.db, { ...args, userId: ctx.userId, projectId: ctx.projectId, runId: ctx.runId, secrets: ctx.secrets });
+    return r.ok ? ok(r.message, r.message) : fail(r.message);
+  },
   compact_context: (ctx, args) => {
     if (!ctx.requestCompaction) return fail('Context compaction is not available here.');
     ctx.requestCompaction(args.keep);
