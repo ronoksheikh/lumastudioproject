@@ -1,0 +1,8 @@
+node_modules/
+.env
+.env.*
+export.log
+*.[mM][pP]4
+.DS_Store
+/work/
+/outputs/

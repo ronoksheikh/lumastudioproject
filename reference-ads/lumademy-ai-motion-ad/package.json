@@ -1,0 +1,19 @@
+{
+  "name": "lumademy-ai-motion-ad",
+  "version": "1.0.0",
+  "description": "Lumademy AI Motion Graphics course ad — GSAP + Three.js, ElevenLabs voiceover",
+  "scripts": {
+    "start": "node server.mjs",
+    "voice": "node scripts/generate-voice.mjs",
+    "export": "node scripts/export-mp4.mjs"
+  },
+  "type": "module",
+  "dependencies": {
+    "gsap": "^3.15.0",
+    "three": "^0.186.1"
+  },
+  "private": true,
+  "devDependencies": {
+    "puppeteer-core": "^25.12.0"
+  }
+}
