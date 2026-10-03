@@ -42,7 +42,7 @@ const handlers: { [N in ToolName]: Handler<N> } = {
     const r = saveLesson(ctx.db, { ...args, userId: ctx.userId, projectId: ctx.projectId, runId: ctx.runId, secrets: ctx.secrets });
     return r.ok ? ok(r.message, r.message) : fail(r.message);
   },
-  share_asset: (ctx, args) => plain(() => shareAsset(ctx.db, ctx.project, ctx.userId, args, ctx.secrets)),
+  share_asset: (ctx, args) => plain(() => shareAsset(ctx.db, ctx.project, ctx.userId, args)),
   use_asset: (ctx, args) => plain(() => useAsset(ctx.db, ctx.project, args.id, args.to)),
   compact_context: (ctx, args) => {
     if (!ctx.requestCompaction) return fail('Context compaction is not available here.');

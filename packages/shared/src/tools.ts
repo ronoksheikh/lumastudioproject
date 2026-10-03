@@ -71,11 +71,9 @@ export const toolSchemas = {
   }),
   share_asset: z.object({
     path: z.string().min(1).max(400).describe('Project file to share, e.g. "assets/fonts/Sora-Bold.woff2"'),
-    kind: z.enum(['font', 'image', 'audio', 'data', 'snippet']),
+    kind: z.enum(['font', 'image', 'audio', 'data', 'snippet', 'other']),
     name: z.string().min(2).max(80).describe('Short name, e.g. "Sora Bold"'),
-    description: z.string().min(10).max(300).describe('What it is and when to use it'),
-    license: z.string().min(2).max(80).describe('e.g. "OFL-1.1", "MIT", "CC0", "made by Luma"'),
-    source_url: z.string().url().optional().describe('Where it was downloaded from'),
+    description: z.string().max(300).optional().describe('When it is useful (optional)'),
   }),
   use_asset: z.object({
     id: z.string().min(1).max(20).describe('Id from the shared library list in your prompt'),
@@ -105,7 +103,7 @@ const descriptions: Record<ToolName, string> = {
   ask_user: 'Ask the student a question and wait for the answer. Use only when you are genuinely blocked; otherwise choose sensible defaults.',
   web_fetch: 'Fetch a web page or text file (HTML converted to readable text, truncated).',
   save_lesson: 'Save a SHARED lesson every future run sees (all students): a reusable fact you discovered the hard way — a provider/plan limit, an API quirk, a fix for a recurring error, an engine gotcha. Example: "ElevenLabs free plan: library voices fail via the API (402 paid_plan_required) — use premade voices from list_voices." Not for one student\'s preferences or project details, never personal data or keys. Check the shared lessons in your prompt first; correct a wrong one with `replaces`.',
-  share_asset: 'Add a reusable project file to the SHARED library so other projects (all students) copy it instead of downloading or rebuilding it: an open-licence font you downloaded, a sound or music loop that is free to use, a generated data file (e.g. a country map json), a generic scene snippet/recipe you wrote. Never student uploads, logos/brand files, personal content or anything with keys. Licence required.',
+  share_asset: 'Save a reusable project file to the SHARED library so other projects copy it instead of downloading or rebuilding it — e.g. a font you downloaded, a sound or music loop, a generated data file (a country map json), a reusable scene snippet. You decide what is worth reusing; skip things only this student would ever want (their own logo, their photos, their personal content).',
   use_asset: 'Copy an item from the shared library (listed in your prompt) into this project. Cheaper than downloading or rebuilding it. Read a snippet before using it.',
   compact_context: 'Fold the older part of this conversation into a short project memory to free context, e.g. after a long debugging session, before a big new phase, or when your earlier messages are no longer needed. The last few messages stay verbatim. Happens automatically near the context limit; call it yourself to stay sharp earlier.',
   read_guide: 'Read Luma\'s reference docs (engine API, recipes, design rules, voice, pitfalls, 9:16, icons) or the source of an engine file / example scene. The engine and examples are not in the project folder; this is how you read them. Call without a topic for the index.',

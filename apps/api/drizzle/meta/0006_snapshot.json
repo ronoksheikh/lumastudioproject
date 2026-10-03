@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "710dbe35-04b2-4f4f-ac35-9d93b5d87a26",
+  "id": "683a5d81-55b5-4ddc-92e0-f69ea14f59da",
   "prevId": "7095c549-8db4-49b6-ace6-c8a5916cc194",
   "tables": {
     "agent_lessons": {
@@ -1140,20 +1140,6 @@
         },
         "description": {
           "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "license": {
-          "name": "license",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source_url": {
-          "name": "source_url",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
