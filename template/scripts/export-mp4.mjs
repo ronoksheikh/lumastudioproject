@@ -4,6 +4,7 @@
 // Usage: node scripts/export-mp4.mjs [out.mp4] [options]
 //   --fps N          frames per second (default: project.json fps, else 60)
 //   --quality Q      final (crf 16, slow — default) | draft (crf 23, veryfast)
+//   --format F       png (lossless, default for final) | jpeg (quality 92, faster — default for draft)
 //   --scale S        render size multiplier, e.g. 0.5 for 960×540 (default 1)
 //   --from A --to B  render only frames [A, B) as a video-only chunk (parallel rendering; mux later)
 //   --video-only     skip audio even for a full render
@@ -23,6 +24,7 @@ const project = await readJson(path.join(root, 'project.json'));
 const fps = Number(opts.fps) || project.fps || 60;
 const scale = Number(opts.scale) || 1;
 const quality = opts.quality ?? 'final';
+const format = opts.format ?? (quality === 'draft' ? 'jpeg' : 'png');
 const out = path.resolve(process.cwd(), pos.find((a) => a.endsWith('.mp4')) ?? path.join(root, `export/${path.basename(root)}-${quality}.mp4`));
 
 await mkdir(path.dirname(out), { recursive: true });
@@ -65,7 +67,7 @@ try {
   for (let i = from; i < to; i++) {
     // two animation frames after a seek: the first screenshot can otherwise be stale (pitfall #12)
     await page.evaluate((t) => new Promise((r) => { window.ad.seek(t); requestAnimationFrame(() => requestAnimationFrame(r)); }), i / fps);
-    const png = await page.screenshot({ type: 'png', optimizeForSpeed: true });
+    const png = await page.screenshot(format === 'jpeg' ? { type: 'jpeg', quality: 92 } : { type: 'png', optimizeForSpeed: true });
     if (!ff.stdin.write(png)) await new Promise((r) => ff.stdin.once('drain', r));
     if ((i - from) % Math.max(1, Math.round(fps / 2)) === 0) console.log(`[luma] frame ${i - from}/${to - from} ${((Date.now() - t0) / 1000).toFixed(0)}s`);
   }

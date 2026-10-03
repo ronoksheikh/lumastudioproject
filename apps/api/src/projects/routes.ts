@@ -6,13 +6,17 @@ import type { AppContext } from '../app.js';
 import { authUser, requireAuth } from '../auth/plugin.js';
 import { config } from '../config.js';
 import { renders, runs } from '../db/schema.js';
-import { badRequest, conflict } from '../http/errors.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { resolveInProject } from '../runner/paths.js';
+import { badRequest, conflict, notFound } from '../http/errors.js';
 import { parse } from '../http/validate.js';
 import { listProjectFiles, readProjectFile, ToolError } from '../runner/files.js';
 import { signPreviewToken } from '../security/crypto.js';
 import { loadSecrets } from '../security/secrets.js';
 import { assertSha, gitFileAt, gitLog, gitRestore, gitShow } from './git.js';
 import { capturePng } from './capture.js';
+import { sendExportFile } from '../render/serve.js';
 import { createProject, getOwnedProject, listProjects, publicProject, softDeleteProject, toRef, touchProject, updateProject } from './service.js';
 
 const title = z.string().trim().min(1, 'Give the project a title').max(120);
@@ -122,6 +126,34 @@ export async function projectRoutes(app: FastifyInstance, ctx: AppContext) {
         contactSheetUrl: `/api/projects/${id}/renders/${r.id}/sheet`,
       })),
     };
+  });
+
+  const ownedRender = (req: { params: unknown }, userId: string) => {
+    const { id, rid } = req.params as { id: string; rid: string };
+    const project = getOwnedProject(db, userId, id);
+    const row = db.select().from(renders).where(and(eq(renders.id, rid), eq(renders.projectId, id))).get();
+    if (!row) throw notFound();
+    return { project, row };
+  };
+  app.get('/projects/:id/renders/:rid/file', auth, async (req, reply) => {
+    const { project, row } = ownedRender(req, authUser(req).id);
+    const dl = (req.query as { download?: string }).download;
+    return sendExportFile(req, reply, toRef(project).dir, row.path, { download: dl ? path.basename(row.path) : undefined });
+  });
+  app.get('/projects/:id/renders/:rid/sheet', auth, async (req, reply) => {
+    const { project, row } = ownedRender(req, authUser(req).id);
+    return sendExportFile(req, reply, toRef(project).dir, row.path.replace(/\.mp4$/, '.jpg'));
+  });
+  app.delete('/projects/:id/renders/:rid', auth, async (req) => {
+    const { project, row } = ownedRender(req, authUser(req).id);
+    const dir = toRef(project).dir;
+    for (const rel of [row.path, row.path.replace(/\.mp4$/, '.jpg')]) {
+      try {
+        fs.rmSync(resolveInProject(dir, rel), { force: true });
+      } catch { /* already gone or outside: nothing to remove */ }
+    }
+    db.delete(renders).where(eq(renders.id, row.id)).run();
+    return { ok: true };
   });
 
   // ---- one frame as a PNG (the preview's "capture frame" button) ----

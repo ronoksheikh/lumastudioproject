@@ -4,15 +4,21 @@ import type { AddressInfo } from 'node:net';
 import type { FastifyInstance } from 'fastify';
 import { RunRegistry } from '../agent/registry.js';
 import { buildApp } from '../app.js';
+import { CpuBudget } from '../cpu/budget.js';
 import { createDb, runMigrations } from '../db/index.js';
+import { RenderQueue } from '../render/service.js';
 
-export async function makeTestApp(opts: { agent?: boolean } = {}) {
+export async function makeTestApp(opts: { agent?: boolean; render?: boolean } = {}) {
   const { db, sqlite } = createDb(':memory:');
   runMigrations(db);
-  const agent = opts.agent ? new RunRegistry({ db, sqlite, retryDelaysMs: [10, 10, 10] }, sqlite) : undefined;
-  const app = await buildApp({ db, sqlite, agent });
+  // renders get their own idle CPU budget so tests never wait on the real machine's load
+  const cpu = opts.render ? new CpuBudget({ budget: 0.9, maxSlots: 2, usage: () => 0, grantCooldownMs: 0 }) : undefined;
+  const render = cpu ? new RenderQueue(db, cpu, { pollMs: 50 }) : undefined;
+  const agent = opts.agent ? new RunRegistry({ db, sqlite, retryDelaysMs: [10, 10, 10], cpu, render }, sqlite) : undefined;
+  const app = await buildApp({ db, sqlite, agent, render });
   await app.ready();
-  return { app, db, sqlite, agent };
+  render?.start();
+  return { app, db, sqlite, agent, render, cpu };
 }
 
 /** A tiny cookie-jar client around app.inject that remembers the session and CSRF token. */

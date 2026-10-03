@@ -160,7 +160,7 @@ function RenderBody({ block }: { block: ToolBlock }) {
           <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
         </ProgressBar>
       )}
-      {r.eta != null && <p className="text-xs text-[#5b6b8f]">About {Math.ceil(r.eta)} s left</p>}
+      {r.eta != null && <p className="text-xs text-[#5b6b8f]">About {r.eta > 90 ? `${Math.ceil(r.eta / 60)} min` : `${Math.ceil(r.eta)} s`} left</p>}
     </div>
   );
 }

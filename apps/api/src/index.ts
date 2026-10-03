@@ -6,6 +6,7 @@ import { RunRegistry } from './agent/registry.js';
 import { createCpuBudget } from './cpu/index.js';
 import { createDb, runMigrations } from './db/index.js';
 import { logger } from './logger.js';
+import { RenderQueue } from './render/service.js';
 import { effectiveSandbox } from './runner/sandbox.js';
 
 /**
@@ -31,15 +32,18 @@ async function main() {
 
   logger.info({ isolation: effectiveSandbox().description }, 'agent command isolation');
   const cpu = createCpuBudget();
-  const agent = new RunRegistry({ db, sqlite, cpu: cpu.budget }, sqlite);
+  const render = new RenderQueue(db, cpu.budget);
+  const agent = new RunRegistry({ db, sqlite, cpu: cpu.budget, render }, sqlite);
   agent.resetStaleRuns();
-  const app = await buildApp({ db, sqlite, cpu, agent });
+  render.start();
+  const app = await buildApp({ db, sqlite, cpu, agent, render });
   await app.listen({ port: config.port, host: '0.0.0.0' });
   const previewServer = await listenPreviewPort(app);
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'shutting down');
     previewServer?.close();
+    await render.stop();
     await agent.stopAll();
     await app.close();
     cpu.stop();

@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Layout:
 
-- `apps/api` — Fastify app: `src/db` (SQLite/Drizzle), `auth`, `projects` (dirs/git/service), `providers` (BYO model keys), `settings` (ElevenLabs), `uploads`, `preview` (separate-origin file server), `runner` (sandboxed exec + file tools), `cpu` (budget), `agent` (loop, tools, run registry, SSE routes). `apps/web` — Vite + React + HeroUI v3 (Tailwind v4) SPA: `src/lib/reduce.ts` turns run events into chat blocks, `src/stores/live.ts` follows runs over SSE, `src/components` has the chat cards and the Preview/Files/Renders/History/Terminal panes. `packages/shared` — constants/zod schemas shared by both (TypeScript source, bundled into the api by tsup). `packages/prompts` — versioned agent prompts. `template/` — the video template copied into every project. `docker/runtime-deps` — the shared `/opt/luma/node_modules` package list.
+- `apps/api` — Fastify app: `src/db` (SQLite/Drizzle), `auth`, `projects` (dirs/git/service), `providers` (BYO model keys), `settings` (ElevenLabs), `uploads`, `preview` (separate-origin file server), `runner` (sandboxed exec + file tools), `cpu` (budget), `render` (queue + file serving), `agent` (loop, tools, run registry, SSE routes). `apps/web` — Vite + React + HeroUI v3 (Tailwind v4) SPA: `src/lib/reduce.ts` turns run events into chat blocks, `src/stores/live.ts` follows runs over SSE, `src/components` has the chat cards and the Preview/Files/Renders/History/Terminal panes. `packages/shared` — constants/zod schemas shared by both (TypeScript source, bundled into the api by tsup). `packages/prompts` — versioned agent prompts. `template/` — the video template copied into every project. `docker/runtime-deps` — the shared `/opt/luma/node_modules` package list.
 - `plan.md` — the build plan.
 - `reference-ads/` — three finished, standalone ad projects. Per `plan.md` §2 they are the ground truth for how a "Lumademy-quality" video is made, and Phase 1 extracts them into one reusable template (use `lumademy-explainer-ad` as the base: newest and cleanest).
 - `Lumademy_Brand_Kit/` — logos (SVG/PNG), social assets, and `03_Colors_and_Guidelines/Brand_Guidelines.md`.
@@ -30,6 +30,8 @@ pnpm db:generate                      # after editing apps/api/src/db/schema.ts 
 ```
 
 Agent runs use a mock OpenAI-compatible server from `apps/api/src/test/helpers.ts` (`startMockLlm`) — no network or API keys needed. Template scripts have their own tests: `cd template && npm test`.
+
+**Rendering.** `render_video` inserts a `render_jobs` row (one active per user) and waits; `render/service.ts` polls it, waits for a CPU-budget slot, then runs the pristine `template/scripts/render.mjs` as the project's uid. That script splits the frames into chunks (one Chromium + `export-mp4.mjs --from/--to` each), joins them, mixes voice + SFX, runs ffprobe checks and writes a 2×2 contact sheet; progress comes back as `[luma] frame i/total` lines. MP4s live in `<project>/export/` (gitignored) and are served by `render/serve.ts` (Range support, `O_NOFOLLOW`, owner-only). Timings and the CPU-vs-chunk findings are in `docs/rendering.md`. `render/render.test.ts` swaps `config.templateDir` for a stub `render.mjs`.
 
 Configuration is via env (see `.env.example`, parsed in `apps/api/src/config.ts`). `docker compose up` builds the single `luma-studio` image (Dockerfile at the root).
 

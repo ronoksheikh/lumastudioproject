@@ -142,7 +142,7 @@ export function reduceEvent(turn: TurnState, e: RunEvent): TurnState {
         blocks: updateTool(blocks, i, (b) => {
           const r = b.render ?? { jobId: d.jobId, state: 'queued' as const };
           if (e.type === 'render.queued') return { ...b, render: { ...r, state: 'queued', position: d.position as number } };
-          if (e.type === 'render.progress') return { ...b, render: { ...r, state: 'running', frame: d.frame as number, total: d.total as number, eta: d.eta as number | undefined, position: d.position as number | undefined } };
+          if (e.type === 'render.progress') return { ...b, render: { ...r, state: d.total ? 'running' : 'queued', frame: d.frame as number, total: d.total as number, eta: d.eta as number | undefined, position: d.position as number | undefined } };
           return { ...b, render: { ...r, state: 'done', url: d.url as string, contactSheetUrl: d.contactSheetUrl as string | undefined, durationS: d.durationS as number | undefined } };
         }),
       };

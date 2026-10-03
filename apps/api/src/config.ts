@@ -15,6 +15,7 @@ const schema = z.object({
   PREVIEW_ORIGIN: z.string().default('http://localhost:8081'),
   CPU_BUDGET: num(0.9),
   MAX_RENDER_WORKERS: z.coerce.number().optional(),
+  RENDER_TIMEOUT_MIN: z.coerce.number().default(90),
   CMD_TIMEOUT_S: num(120),
   LOG_LEVEL: z.string().default('info'),
   /** Where the built SPA lives (apps/web/dist). */
@@ -67,6 +68,7 @@ export const config = {
   previewOrigin: env.PREVIEW_ORIGIN,
   cpuBudget: env.CPU_BUDGET,
   maxRenderWorkers: env.MAX_RENDER_WORKERS ?? Math.max(1, cores - 1),
+  renderTimeoutMin: env.RENDER_TIMEOUT_MIN,
   cmdTimeoutS: env.CMD_TIMEOUT_S,
   logLevel: env.LOG_LEVEL,
   webDist: env.WEB_DIST ?? path.resolve(process.cwd(), '../web/dist'),

@@ -26,6 +26,8 @@ export interface AppContext {
   cpu?: ReturnType<typeof import('./cpu/index.js').createCpuBudget>;
   /** agent runs; created in index.ts (tests inject their own) */
   agent?: RunRegistry;
+  /** render queue; created in index.ts */
+  render?: import('./render/service.js').RenderQueue;
 }
 
 const hostOf = (origin: string) => new URL(origin).host.toLowerCase();
