@@ -190,6 +190,21 @@ async function main() {
     );
 
     // ---------- chat ----------
+    // ---------- attachments: uploaded into the project at once; X before sending only detaches (and drops that unsent upload) ----------
+    log('attachments');
+    const logoPng = path.join(OUT, 'brand-logo.png');
+    const extraPng = path.join(OUT, 'extra.png');
+    fs.copyFileSync(path.resolve(import.meta.dirname, '../../../Lumademy_Brand_Kit/01_Logos/PNG/Lumademy_Icon_Blue.png'), logoPng);
+    fs.copyFileSync(path.resolve(import.meta.dirname, '../../../Lumademy_Brand_Kit/01_Logos/PNG/Lumademy_Icon_Navy.png'), extraPng);
+    const fileInput = await page.$('input[type="file"]');
+    await fileInput!.uploadFile(logoPng, extraPng);
+    await page.waitForSelector('button[aria-label="Detach brand-logo.png"]', { timeout: 15_000 });
+    await page.waitForSelector('button[aria-label="Detach extra.png"]', { timeout: 15_000 });
+    await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="Attachments"] img')].length === 2, { timeout: 10_000 });
+    await shot(page, 'attachments-pending');
+    await page.click('button[aria-label="Detach extra.png"]');
+    await page.waitForFunction(() => !document.querySelector('button[aria-label="Detach extra.png"]'), { timeout: 5_000 });
+
     log('send the first message');
     await page.click('textarea[aria-label="Message to Luma"]');
     await page.type('textarea[aria-label="Message to Luma"]', 'Make a short explainer about our course.');
@@ -197,6 +212,11 @@ async function main() {
     await clickText(page, 'button', 'Send');
     await text(page, 'Make a short explainer about our course.');
     await text(page, 'Great idea — let me plan this.');
+    // the chip moved onto the sent message and left the composer
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="user-message"] [aria-label="Attached files"]')].some((e) => e.textContent?.includes('brand-logo.png')), { timeout: 10_000 });
+    if (await page.$('button[aria-label="Detach brand-logo.png"]')) fail('the sent attachment is still in the composer');
+    await page.$eval('[data-testid="user-message"]', (e) => e.scrollIntoView({ block: 'center' }));
+    await shot(page, 'attachment-sent');
     await text(page, 'Luma is working');
     await shot(page, 'run-start');
     await text(page, 'Read the engine guide'); // pinned plan
@@ -236,6 +256,26 @@ async function main() {
     if (!chipText.includes('E2E')) fail(`preview did not pick up the edit: "${chipText}"`);
     await shot(page, 'preview-after');
 
+    // ---------- "Attach this frame": the exact time goes with the next message; the agent gets facts (+ image) ----------
+    log('attach this frame');
+    await pv2.frame.evaluate(() => (window as unknown as { ad: { seek(t: number): void } }).ad.seek(1.5));
+    await page.waitForFunction(() => document.querySelector('[aria-label="Preview controls"]')?.textContent?.includes('0:01'), { timeout: 5_000 }).catch(() => {});
+    await page.click('button[aria-label="Attach this frame to the chat"]');
+    await page.waitForSelector('[data-testid="frame-chip"]', { timeout: 5_000 });
+    const chip = await page.$eval('[data-testid="frame-chip"]', (e) => e.textContent ?? '');
+    if (!/t=1\.50s/.test(chip)) fail(`frame chip shows the wrong time: ${chip}`);
+    await shot(page, 'attach-frame-chip');
+    stack.turns.push({ content: 'Got it — at 1.50 s the hook title is still revealing; I will slow it down.' });
+    await page.click('textarea[aria-label="Message to Luma"]');
+    await page.type('textarea[aria-label="Message to Luma"]', 'This moment feels rushed.');
+    await clickText(page, 'button', 'Send');
+    await text(page, 'I will slow it down.', 60_000);
+    await page.waitForFunction(() => !document.querySelector('[data-testid="frame-chip"]'), { timeout: 5_000 });
+    await page.waitForFunction(() => { const i = document.querySelector<HTMLImageElement>('[data-testid="sent-frame"] img'); return !!i && i.complete && i.naturalWidth > 0; }, { timeout: 30_000 });
+    const sawFacts = stack.llm.requests.some((r: { messages?: unknown }) => JSON.stringify(r.messages ?? '').includes('Frame the student attached: t=1.50s'));
+    if (!sawFacts) fail('the model never received the attached frame');
+    await shot(page, 'attach-frame-sent');
+
     // ---------- tabs ----------
     log('files tab');
     await clickText(page, '[role="tab"]', 'Files');
@@ -244,6 +284,16 @@ async function main() {
     await page.waitForSelector('[data-testid="code-viewer"] .monaco-editor', { timeout: 20_000 });
     await page.waitForFunction(() => document.querySelector('[data-testid="code-viewer"]')?.textContent?.includes('E2E'), { timeout: 10_000 });
     await shot(page, 'files');
+    // the sent attachment is a project file; the detached one is gone
+    await clickText(page, '[role="treeitem"]', 'assets');
+    await clickText(page, '[role="treeitem"]', 'uploads');
+    await text(page, 'brand-logo.png');
+    if (await page.evaluate(() => document.body.innerText.includes('extra.png'))) fail('the detached, never-sent upload is still in the project');
+    await clickText(page, '[role="treeitem"]', 'brand-logo.png');
+    await page.waitForFunction(() => { const i = document.querySelector<HTMLImageElement>('img[data-testid="file-preview"]'); return !!i && i.complete && i.naturalWidth > 0; }, { timeout: 10_000 });
+    await shot(page, 'files-upload');
+    await clickText(page, '[role="treeitem"]', 'uploads'); // fold back
+    await clickText(page, '[role="treeitem"]', 'assets');
     // every kind of file opens: html (was blank before), audio, svg preview + code
     await clickText(page, '[role="treeitem"]', 'index.html');
     await page.waitForFunction(() => document.querySelector('[data-testid="code-viewer"] .view-lines')?.textContent?.includes('id="stage"'), { timeout: 15_000 });

@@ -1,7 +1,9 @@
 import { Spinner } from '@heroui/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PlanItem } from '@luma/shared';
-import type { ConversationMessage } from '../api/types';
+import { api } from '../api/client';
+import type { ConversationMessage, MessageAttachment, MessageFrame } from '../api/types';
+import type { FrameChip } from './preview-context';
 import type { Block, TurnState } from '../lib/reduce';
 import { AskCard, AssistantText, CommitLine, Notice, Thinking, ToolCard } from './Blocks';
 import { Icon } from './Icon';
@@ -67,10 +69,11 @@ export function TurnView({ turn, onAnswer }: { turn: TurnState; onAnswer: (a: st
   );
 }
 
-export function ChatList({ messages, turns, pending, onAnswer }: {
+export function ChatList({ projectId, messages, turns, pending, onAnswer }: {
+  projectId: string;
   messages: ConversationMessage[];
   turns: Record<string, TurnState>;
-  pending: Array<{ key: string; text: string }>;
+  pending: Array<{ key: string; text: string; attachments?: MessageAttachment[]; frames?: FrameChip[] }>;
   onAnswer: (runId: string, a: string) => void;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -104,26 +107,61 @@ export function ChatList({ messages, turns, pending, onAnswer }: {
         )}
         {messages.map((m) => (
           <div key={m.id} className="flex flex-col gap-3">
-            <UserBubble text={m.text} />
+            <UserBubble projectId={projectId} text={m.text} attachments={m.attachments ?? []} frames={m.frames ?? []} />
             {m.runId && turns[m.runId] && <TurnView turn={turns[m.runId]!} onAnswer={(a) => onAnswer(m.runId!, a)} />}
           </div>
         ))}
-        {pending.map((p) => <UserBubble key={p.key} text={p.text} />)}
+        {pending.map((p) => <UserBubble key={p.key} projectId={projectId} text={p.text} attachments={p.attachments ?? []} frames={(p.frames ?? []).map((f) => ({ id: `p${f.t}`, t: f.t, url: '', ready: false }))} />)}
       </div>
     </div>
   );
 }
 
-function UserBubble({ text }: { text: string }) {
-  const [main, attached] = text.split(/\n\nAttached files: /);
+/** Files that went out with a message: thumbnails for images, chips for the rest. */
+export function AttachmentStrip({ projectId, attachments }: { projectId: string; attachments: MessageAttachment[] }) {
+  if (!attachments.length) return null;
   return (
-    <div className="ml-auto max-w-[88%] rounded-2xl rounded-br-md bg-[#2970ec] px-3.5 py-2 text-sm text-white shadow-sm">
+    <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Attached files">
+      {attachments.map((a) => {
+        const name = a.path?.split('/').pop() ?? 'deleted file';
+        const image = !!a.path && /^image\/(png|jpeg|webp|svg)/.test(a.mime ?? '');
+        return (
+          <li key={a.id} title={a.path ?? 'This file was deleted from the project'} className={`flex items-center gap-1.5 rounded-lg bg-white/15 py-1 pl-1 pr-2 text-xs ring-1 ring-white/30 ${a.missing ? 'line-through opacity-70' : ''}`}>
+            {image ? <img src={api.rawUrl(projectId, a.path!)} alt="" className="h-8 w-8 rounded-md bg-white object-cover" /> : <span className="grid h-8 w-8 place-items-center rounded-md bg-white/20"><Icon name="file" size={15} /></span>}
+            <span className="max-w-36 truncate">{name}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Preview moments the student attached: the server-rendered frame (once captured) and its time. */
+function FrameStrip({ frames }: { frames: MessageFrame[] }) {
+  const [broken, setBroken] = useState<Set<string>>(new Set());
+  if (!frames.length) return null;
+  return (
+    <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Attached frames">
+      {frames.map((f) => (
+        <li key={f.id} className="overflow-hidden rounded-lg bg-white/15 text-xs ring-1 ring-white/30" data-testid="sent-frame">
+          {f.ready && !broken.has(f.id)
+            ? <img src={f.url} alt={`Frame at ${f.t.toFixed(2)} s`} onError={() => setBroken((b) => new Set(b).add(f.id))} className="block h-16 w-28 bg-[#1557d1] object-cover" />
+            : <span className="grid h-16 w-28 place-items-center bg-white/10"><Icon name="target" size={18} /></span>}
+          <span className="mono block px-1.5 py-0.5">t={f.t.toFixed(2)}s</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function UserBubble({ projectId, text, attachments, frames = [] }: { projectId: string; text: string; attachments: MessageAttachment[]; frames?: MessageFrame[] }) {
+  // the stored text carries model-facing notes ("Attached files: …", frame facts); the chips show those instead
+  const [main] = text.split(/\n\n(?:Attached files: |\[Attached frames: )/);
+  return (
+    <div className="ml-auto max-w-[88%] rounded-2xl rounded-br-md bg-[#2970ec] px-3.5 py-2 text-sm text-white shadow-sm" data-testid="user-message">
       <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{main}</p>
-      {attached && (
-        <p className="mt-1.5 flex flex-wrap items-center gap-1 border-t border-white/30 pt-1.5 text-xs text-white/90">
-          <Icon name="clip" size={12} /> {attached.split(', ').map((f) => f.split('/').pop()).join(' · ')}
-        </p>
-      )}
+      <AttachmentStrip projectId={projectId} attachments={attachments} />
+      <FrameStrip frames={frames} />
     </div>
   );
 }

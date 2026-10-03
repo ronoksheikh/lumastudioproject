@@ -19,10 +19,10 @@ function EmptyState() {
 }
 
 export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'; empty?: boolean }) {
-  const { base, reloadKey, reload, projectId } = usePreview();
+  const { base, reloadKey, reload, projectId, attachFrame } = usePreview();
   const frame = useRef<HTMLIFrameElement>(null);
   const box = useRef<HTMLDivElement>(null);
-  const [state, setState] = useState({ t: 0, playing: false, duration: 0 });
+  const [state, setState] = useState<{ t: number; playing: boolean; duration: number; segment?: string | null }>({ t: 0, playing: false, duration: 0 });
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error' | 'empty'>('loading');
   const [error, setError] = useState('');
   const [scrub, setScrub] = useState<number | null>(null);
@@ -48,7 +48,7 @@ export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'
       } else if (m.type === 'error') {
         setPhase('error');
         setError(String(m.message));
-      } else if (m.type === 'state') setState({ t: m.t, playing: m.playing, duration: m.duration });
+      } else if (m.type === 'state') setState({ t: m.t, playing: m.playing, duration: m.duration, segment: m.segment ?? null });
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
@@ -82,6 +82,11 @@ export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'
   };
 
   const shown = scrub ?? state.t;
+  const attach = () => {
+    if (!attachFrame) return;
+    if (state.playing) send({ type: 'pause' }); // the student points at THIS moment
+    attachFrame({ t: Math.round(shown * 100) / 100, segment: scrub == null ? state.segment : null });
+  };
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-3">
       <div ref={box} className="relative grid min-h-0 flex-1 place-items-center overflow-hidden rounded-xl bg-[#eff5ff]">
@@ -126,6 +131,11 @@ export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'
           className="h-1.5 min-w-0 flex-1 cursor-pointer accent-[#2970ec]"
         />
         <span className="mono hidden w-12 flex-none text-right text-xs text-[#5b6b8f] min-[420px]:block" aria-hidden="true">{fmt(state.duration)}</span>
+        {attachFrame && (
+          <Button size="sm" variant="secondary" className="flex-none" onPress={attach} isDisabled={phase !== 'ready'} aria-label="Attach this frame to the chat">
+            <Icon name="target" size={14} /><span className="hidden sm:inline">Attach this frame</span>
+          </Button>
+        )}
         <Tooltip><Tooltip.Trigger><Button isIconOnly size="sm" variant="tertiary" className="flex-none" onPress={reload} aria-label="Reload preview"><Icon name="refresh" size={15} /></Button></Tooltip.Trigger><Tooltip.Content>Reload</Tooltip.Content></Tooltip>
         <Tooltip><Tooltip.Trigger><Button isIconOnly size="sm" variant="tertiary" className="flex-none" onPress={() => void capture()} isDisabled={phase !== 'ready' || capturing} aria-label="Capture this frame as PNG">{capturing ? <Spinner size="sm" /> : <Icon name="camera" size={15} />}</Button></Tooltip.Trigger><Tooltip.Content>Capture frame (PNG)</Tooltip.Content></Tooltip>
         <Tooltip><Tooltip.Trigger><Button isIconOnly size="sm" variant="tertiary" className="flex-none" onPress={() => void box.current?.requestFullscreen?.()} aria-label="Full screen"><Icon name="maximize" size={15} /></Button></Tooltip.Trigger><Tooltip.Content>Full screen</Tooltip.Content></Tooltip>

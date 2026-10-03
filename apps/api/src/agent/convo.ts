@@ -27,6 +27,11 @@ export class ConvoStore {
     return { rowid: Number(info.lastInsertRowid), id, msg: stored, createdAt: Date.now() };
   }
 
+  /** Rewrites a stored message (e.g. the user message once its attached frames were described). */
+  replace(rowid: number, stored: ChatMessage) {
+    this.sqlite.prepare('update messages set content_json = ? where rowid = ? and project_id = ?').run(JSON.stringify(stored), rowid, this.projectId);
+  }
+
   /** Messages after `uptoRowid`, oldest first. */
   load(uptoRowid = 0): StoredMessage[] {
     const rows = this.sqlite

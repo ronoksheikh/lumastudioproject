@@ -1,6 +1,7 @@
 // Renders the project at the given timeline seconds and saves PNGs; prints one JSON line with the result.
 //
-// Usage: node scripts/preview-frames.mjs --times 1.5,6,12 [--width 960] [--out <dir>] [--root <project>] [--no-checks]
+// Usage: node scripts/preview-frames.mjs --times 1.5,6,12 [--width 960] [--out <dir>] [--root <project>] [--no-checks] [--describe]
+// --describe adds per-frame facts (segment, word being spoken, scenes on screen, readable text): frames[].facts
 // Each frame is also probed for layout problems (see lib/layout-probe.mjs); they come back in "issues".
 //   → {"frames":[{"t":1.5,"file":"/abs/t1.50.png"}],"issues":["…"],"duration":14.56,"size":{"W":1920,"H":1080}}
 
@@ -8,7 +9,7 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs, projectRoot } from './lib/common.mjs';
 import { openProject, loadVideo } from './lib/browser.mjs';
-import { probeLayout } from './lib/layout-probe.mjs';
+import { probeLayout, describeFrame } from './lib/layout-probe.mjs';
 
 const { opts } = parseArgs();
 const root = projectRoot(opts);
@@ -48,7 +49,8 @@ try {
       const file = path.join(outDir, `t${tt.toFixed(2)}.png`);
       await page.screenshot({ path: file, type: 'png' });
       if (!opts['no-checks']) result.issues.push(...(await page.evaluate(probeLayout, { t: tt })));
-      result.frames.push({ t: tt, file });
+      const facts = opts.describe ? await page.evaluate(describeFrame, { t: tt }) : undefined;
+      result.frames.push({ t: tt, file, ...(facts ? { facts } : {}) });
     }
   }
 } finally {

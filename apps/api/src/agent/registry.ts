@@ -12,7 +12,10 @@ import { reportError } from '../observability/errors.js';
 import { inc } from '../observability/metrics.js';
 import { logger } from '../logger.js';
 import { newId } from '../util/id.js';
+import type OpenAI from 'openai';
 import { buildUserContent } from './attachments.js';
+import { resolveFrames, type FrameRef } from './frame-attach.js';
+import { markSent } from '../uploads/service.js';
 import { ConvoStore } from './convo.js';
 import { RunBus, loadEvents } from './events.js';
 import { runAgent, type AgentDeps } from './loop.js';
@@ -55,7 +58,7 @@ export class RunRegistry {
     return undefined;
   }
 
-  start(opts: { project: ProjectRow; userId: string; text: string; attachmentIds?: string[]; providerId?: string }): { runId: string; messageId: string } {
+  start(opts: { project: ProjectRow; userId: string; text: string; attachmentIds?: string[]; frames?: number[]; providerId?: string }): { runId: string; messageId: string } {
     const { project, userId } = opts;
     if (this.active.has(project.id)) throw conflict('The agent is already working on this project. Stop it or wait for it to finish.');
     const userRuns = [...this.active.values()].filter((a) => a.userId === userId).length;
@@ -71,7 +74,14 @@ export class RunRegistry {
     const ref = toRef(project);
     const content = buildUserContent(this.db, ref, opts.text, opts.attachmentIds ?? [], provider.supportsVision);
     const store = new ConvoStore(this.sqlite, project.id);
-    const userRow = store.add({ role: 'user', content: content.text }, content.attachmentIds.length ? JSON.stringify(content.attachmentIds) : null);
+    // moments of the preview the student attached: captured lazily once the run starts (see frame-attach.ts)
+    const frames: FrameRef[] = [...new Set((opts.frames ?? []).map((t) => Math.round(t * 100) / 100))].slice(0, 6).map((t) => ({ id: newId(), t }));
+    const storedText = frames.length ? `${content.text}\n\n[Attached frames: ${frames.map((f) => `t=${f.t.toFixed(2)}s`).join(', ')}]` : content.text;
+    const attachmentsJson = frames.length
+      ? JSON.stringify({ uploads: content.attachmentIds, frames })
+      : content.attachmentIds.length ? JSON.stringify(content.attachmentIds) : null;
+    const userRow = store.add({ role: 'user', content: storedText }, attachmentsJson);
+    markSent(this.db, project.id, content.attachmentIds); // from now on the composer's X can't delete them
 
     const runId = newId();
     this.db.insert(runs).values({ id: runId, projectId: project.id, messageId: userRow.id, providerConfigId: provider.id, status: 'running' }).run();
@@ -90,10 +100,25 @@ export class RunRegistry {
       let usage = { input: 0, output: 0 };
       let stopReason: import('@luma/shared').StopReason = 'error';
       try {
+        let parts = content.parts;
+        if (frames.length) {
+          // what the model learns about each attached moment: facts always, the image for vision models
+          const resolved = await resolveFrames(ref, frames, { cpu: this.deps.cpu, signal: controller.signal });
+          const facts = resolved.map((f) => f.facts).join('\n\n');
+          store.replace(userRow.rowid, { role: 'user', content: `${storedText}\n\n${facts}` });
+          const head = parts?.[0]?.type === 'text' ? parts[0].text : content.text;
+          const images = provider.supportsVision
+            ? resolved.filter((f) => f.png).flatMap((f): OpenAI.Chat.Completions.ChatCompletionContentPart[] => [
+              { type: 'text', text: `(frame at ${f.t.toFixed(2)}s)` },
+              { type: 'image_url', image_url: { url: `data:image/png;base64,${f.png!.toString('base64')}` } },
+            ])
+            : [];
+          parts = [{ type: 'text', text: `${head}\n\n${facts}` }, ...(parts?.slice(1) ?? []), ...images];
+        }
         const out = await runAgent(this.deps, {
           runId, projectId: project.id, userId, project: ref, aspect: project.aspect,
           provider: { baseUrl: provider.baseUrl, apiKey: llmKey, model: provider.model, contextWindow: provider.contextWindow, supportsVision: provider.supportsVision },
-          userMessage: { rowid: userRow.rowid, text: opts.text, parts: content.parts },
+          userMessage: { rowid: userRow.rowid, text: opts.text, parts },
           elevenKey: () => getSecret(this.db, userId, 'elevenlabs')?.value ?? null,
           secrets, signal: controller.signal, bus,
           askUser: (question, options) => this.ask(entry, question, options),

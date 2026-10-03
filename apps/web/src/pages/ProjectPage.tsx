@@ -3,12 +3,13 @@ import { Chip, Skeleton, Tabs, toast } from '@heroui/react';
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
+import type { MessageAttachment, UploadRecord } from '../api/types';
 import { Composer } from '../components/Composer';
 import { ChatList, PlanCard } from '../components/Chat';
 import { FilesPane } from '../components/FilesPane';
 import { HistoryPane } from '../components/HistoryPane';
 import { Icon } from '../components/Icon';
-import { PreviewContext } from '../components/preview-context';
+import { PreviewContext, type FrameChip } from '../components/preview-context';
 import { PreviewPane } from '../components/PreviewPane';
 import { RendersPane } from '../components/RendersPane';
 const TerminalPane = lazy(() => import('../components/TerminalPane').then((m) => ({ default: m.TerminalPane })));
@@ -57,7 +58,12 @@ export function ProjectPage() {
   const live = useLive();
   const [tab, setTab] = useState<string>('preview');
   const [mobilePane, setMobilePane] = useState<'chat' | 'work'>('chat');
-  const [pending, setPending] = useState<Array<{ key: string; text: string }>>([]);
+  const [pending, setPending] = useState<Array<{ key: string; text: string; attachments: MessageAttachment[]; frames: FrameChip[] }>>([]);
+  const [frames, setFrames] = useState<FrameChip[]>([]);
+  const attachFrame = useCallback((f: FrameChip) => {
+    setFrames((cur) => (cur.some((x) => Math.abs(x.t - f.t) < 0.01) ? cur : [...cur, f].slice(-6)));
+    toast.success(`Frame at ${f.t.toFixed(2)} s attached — it goes with your next message`);
+  }, []);
   const [modelId, setModelId] = useState<string | undefined>(() => localStorage.getItem('luma.model') ?? undefined);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -102,14 +108,23 @@ export function ProjectPage() {
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
   // what the project holds (scenes yet?) follows the agent too
   useEffect(() => { if (reloadKey) void qc.invalidateQueries({ queryKey: ['project', id] }); }, [reloadKey, id, qc]);
-  const previewCtx = useMemo(() => ({ base: token.data?.url ?? null, reloadKey, reload, projectId: id }), [token.data?.url, reloadKey, reload, id]);
+  const previewCtx = useMemo(() => ({ base: token.data?.url ?? null, reloadKey, reload, projectId: id, attachFrame }), [token.data?.url, reloadKey, reload, id, attachFrame]);
 
-  const send = async (text: string, attachmentIds: string[]) => {
+  const send = async (text: string, attachments: UploadRecord[]) => {
     const key = `p-${Date.now()}`;
-    setPending((p) => [...p, { key, text }]);
+    const sentFrames = frames;
+    setFrames([]); // the chips move onto the sent message
+    setPending((p) => [...p, { key, text, attachments: attachments.map((a) => ({ id: a.id, path: a.path, mime: a.mime, size: a.size })), frames: sentFrames }]);
     try {
-      await live.start(id, text, attachmentIds, modelId);
+      await live.start(id, text, attachments.map((a) => a.id), modelId, sentFrames.map((f) => f.t));
+    } catch (e) {
+      setFrames((cur) => [...sentFrames, ...cur]); // not sent: keep them
+      setPending((p) => p.filter((x) => x.key !== key));
+      throw e;
+    }
+    try {
       await qc.refetchQueries({ queryKey: ['messages', id] });
+      void qc.invalidateQueries({ queryKey: ['tree', id] });
     } finally {
       setPending((p) => p.filter((x) => x.key !== key));
     }
@@ -145,12 +160,13 @@ export function ProjectPage() {
           <section aria-label="Chat" className={`${mobilePane === 'chat' ? 'flex' : 'hidden'} min-h-0 min-w-0 flex-col border-r border-[var(--border)] lg:flex`}>
             {plan && <div className="flex-none px-3 pt-3"><PlanCard items={plan} /></div>}
             <ChatList
+              projectId={id}
               messages={messages.data ?? []}
               turns={live.turns}
               pending={pending.filter((x) => !(messages.data ?? []).some((m) => m.text.startsWith(x.text)))}
               onAnswer={(runId, a) => void live.answer(id, runId, a).catch((e) => toast.danger(e instanceof ApiError ? e.message : 'Could not send the answer'))}
             />
-            <Composer projectId={id} models={modelList} modelId={modelId} onModelChange={chooseModel} running={running} onSend={send} onStop={() => void live.stop(id)} />
+            <Composer projectId={id} frames={frames} onRemoveFrame={(t) => setFrames((cur) => cur.filter((f) => f.t !== t))} models={modelList} modelId={modelId} onModelChange={chooseModel} running={running} onSend={send} onStop={() => void live.stop(id)} />
           </section>
 
           <section aria-label="Work area" className={`${mobilePane === 'work' ? 'flex' : 'hidden'} min-h-0 min-w-0 flex-col lg:flex`}>

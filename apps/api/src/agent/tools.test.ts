@@ -363,6 +363,14 @@ describe('attachments', () => {
     expect(conv.text, conv.text).toContain('assets/uploads/brief.pdf');
     expect(conv.text).toContain('assets/uploads/logo.png');
     expect(conv.attachmentIds).toHaveLength(2);
+    expect(conv.attachments.map((x: any) => x.path)).toEqual(['assets/uploads/brief.pdf', 'assets/uploads/logo.png']);
+    // sent files are the agent's now: the composer's X can't delete them, they are no longer pending
+    const del = await c.del(`/api/projects/${projectId}/uploads/${b.json.uploads[0].id}`);
+    expect(del.status).toBe(409);
+    expect(fs.existsSync(path.join(dir(), 'assets/uploads/logo.png'))).toBe(true);
+    expect((await c.get(`/api/projects/${projectId}/uploads`, { pending: '1' })).json.uploads).toEqual([]);
+    // the PDF's page images went to the vision model even though only the PDF id was sent
+    expect(user.content.filter((p: any) => p.type === 'image_url').length).toBeGreaterThanOrEqual(2);
   }, 60_000);
 });
 

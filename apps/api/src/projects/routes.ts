@@ -5,16 +5,16 @@ import { z } from 'zod';
 import type { AppContext } from '../app.js';
 import { authUser, requireAuth } from '../auth/plugin.js';
 import { config } from '../config.js';
-import { renders, runs } from '../db/schema.js';
+import { renders, runs, uploads } from '../db/schema.js';
 import fs from 'node:fs';
 import path from 'node:path';
-import { resolveInProject } from '../runner/paths.js';
+import { PathError, resolveInProject } from '../runner/paths.js';
 import { badRequest, conflict, notFound } from '../http/errors.js';
 import { parse } from '../http/validate.js';
-import { listProjectFiles, readProjectFile, ToolError } from '../runner/files.js';
+import { deleteProjectFile, listProjectFiles, readProjectFile, ToolError } from '../runner/files.js';
 import { signPreviewToken } from '../security/crypto.js';
 import { loadSecrets } from '../security/secrets.js';
-import { assertSha, gitFileAt, gitLog, gitRestore, gitShow } from './git.js';
+import { assertSha, commitAll, gitFileAt, gitLog, gitRestore, gitShow } from './git.js';
 import { capturePng } from './capture.js';
 import { assertDiskAvailable, forgetUsage, usageFor } from '../quota/service.js';
 import { sendExportFile, sendProjectFile } from '../render/serve.js';
@@ -133,6 +133,33 @@ export async function projectRoutes(app: FastifyInstance, ctx: AppContext) {
       // an SVG opened directly must not run script on this origin; PDFs keep the browser's viewer
       headers: q.path.toLowerCase().endsWith('.pdf') ? {} : { 'Content-Security-Policy': "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; media-src 'self'; sandbox" },
     });
+  });
+
+  /** Delete a file or folder from the Files tab (after a confirmation in the UI). Saved as its own history snapshot. */
+  app.delete('/projects/:id/file', auth, async (req) => {
+    const { id } = req.params as { id: string };
+    const q = parse(z.object({ path: z.string().min(1).max(400) }), req.query);
+    const p = getOwnedProject(db, authUser(req).id, id);
+    if (hasActiveRun(ctx, p.id)) throw conflict('Wait for Luma to finish (or stop it) before deleting files');
+    const ref = toRef(p);
+    let removed: string;
+    try {
+      const abs = resolveInProject(ref.dir, q.path);
+      const rel = path.relative(fs.realpathSync(ref.dir), abs);
+      if (!rel || /^(\.git|\.home|\.luma)(\/|$)/.test(rel)) throw badRequest('That can’t be deleted');
+      if (['project.json', 'brand.json'].includes(rel)) throw badRequest(`${rel} is needed by every project and can’t be deleted (ask Luma to change it instead)`);
+      removed = deleteProjectFile(ref, rel).path;
+    } catch (e) {
+      if (e instanceof ToolError || e instanceof PathError) throw badRequest(e.message);
+      throw e;
+    }
+    // forget upload records under that path (the file is gone)
+    for (const u of db.select().from(uploads).where(eq(uploads.projectId, p.id)).all()) {
+      if (u.path === removed || u.path.startsWith(`${removed}/`)) db.delete(uploads).where(eq(uploads.id, u.id)).run();
+    }
+    const commit = commitAll(ref, `Delete ${removed}`);
+    touchProject(db, p.id);
+    return { ok: true, path: removed, commit };
   });
 
   // ---- history ----

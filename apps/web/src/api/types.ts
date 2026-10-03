@@ -113,6 +113,10 @@ export interface ConversationMessage {
   text: string;
   createdAt: number;
   attachmentIds: string[];
+  /** the files sent with the message (path null when it was deleted since) */
+  attachments?: MessageAttachment[];
+  /** preview moments attached with "Attach this frame"; ready once the server captured it */
+  frames?: MessageFrame[];
   runId: string | null;
   runStatus: string | null;
 }
@@ -136,4 +140,19 @@ export interface TerminalEntry {
   ok: boolean | null;
   summary: string | null;
   ts: number;
+}
+
+export interface MessageAttachment {
+  id: string;
+  path: string | null;
+  mime: string | null;
+  size: number | null;
+  missing?: boolean;
+}
+
+export interface MessageFrame {
+  id: string;
+  t: number;
+  url: string;
+  ready: boolean;
 }

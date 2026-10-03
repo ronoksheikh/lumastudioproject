@@ -4,6 +4,7 @@ import type OpenAI from 'openai';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DB } from '../db/index.js';
 import { uploads } from '../db/schema.js';
+import { derivedOf } from '../uploads/service.js';
 import type { ProjectRef } from '../runner/exec.js';
 
 type Part = OpenAI.Chat.Completions.ChatCompletionContentPart;
@@ -29,9 +30,12 @@ const imagePart = (file: string, mime: string): Part | null => {
 
 /** Turns the student's text + attached files into the user message: text, extracted PDF text, images (vision models). */
 export function buildUserContent(db: DB, project: ProjectRef, text: string, attachmentIds: string[], supportsVision: boolean): UserContent {
-  const rows = attachmentIds.length
+  const chosen = attachmentIds.length
     ? db.select().from(uploads).where(and(eq(uploads.projectId, project.id), inArray(uploads.id, attachmentIds))).all()
     : [];
+  // a PDF brings its extracted text and page images along
+  const all = chosen.some((u) => u.mime === 'application/pdf') ? db.select().from(uploads).where(eq(uploads.projectId, project.id)).all() : [];
+  const rows = [...new Map([...chosen, ...chosen.flatMap((u) => derivedOf(all, u))].map((u) => [u.id, u])).values()];
   if (!rows.length) return { text, parts: null, attachmentIds: [] };
 
   const notes: string[] = [];
@@ -71,6 +75,6 @@ export function buildUserContent(db: DB, project: ProjectRef, text: string, atta
   return {
     text: storedNote,
     parts: extra.length ? [{ type: 'text', text: noteText }, ...extra] : [{ type: 'text', text: noteText }],
-    attachmentIds: rows.map((r) => r.id),
+    attachmentIds: chosen.map((r) => r.id),
   };
 }

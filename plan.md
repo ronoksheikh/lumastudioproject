@@ -626,6 +626,18 @@ Changes made after the product owner ran Phases 0–8 locally with a real model.
    `eleven_multilingual_v2` without `language_code`, free plan → premade voices). The voice scripts drop
    `language_code` when a model refuses it and turn ElevenLabs errors into a reason + what to try next.
 
+7. **"Attach this frame".** The Preview's button puts the exact time on the composer (chip `t=12.40s · segment`).
+   On send (`POST /runs` `frames: number[]`), the run first resolves them lazily: one CPU-budget capture with the
+   pristine `preview-frames.mjs --describe` (layout probe + `describeFrame`: segment and word being spoken, scenes and
+   text on screen, problems at that time). The model always gets those facts as text (stored with the message, so
+   replays keep them); vision models also get the PNG. Nothing is written to the project and nothing is re-rendered:
+   the PNG is moved to `DATA_DIR/frame-attachments/<project>/` and served to the owner for the bubble thumbnail.
+8. **Attachments are files.** Uploads land in `assets/uploads/` at once (visible in the Files tab); `uploads.sent_at`
+   marks the ones that went out with a message. The composer's X only detaches: it deletes the upload only while it
+   was never sent (the server refuses otherwise); unsent chips come back after a reload. Sent messages show their
+   attachments (thumbnails for images). Deleting project files happens in the Files tab (confirmation, saved as a
+   history step) or by the agent.
+
 ## Open questions (defaults assumed)
 
 | # | Question | Default used in this plan |

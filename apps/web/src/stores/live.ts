@@ -17,7 +17,7 @@ interface LiveState {
   error: Record<string, string | null>;
 
   loadProject(projectId: string): Promise<void>;
-  start(projectId: string, message: string, attachmentIds: string[], providerId?: string): Promise<string>;
+  start(projectId: string, message: string, attachmentIds: string[], providerId?: string, frames?: number[]): Promise<string>;
   stop(projectId: string): Promise<void>;
   answer(projectId: string, runId: string, answer: string): Promise<void>;
   reset(projectId: string): void;
@@ -81,9 +81,9 @@ export const useLive = create<LiveState>((set, get) => {
       if (running && !streams.has(projectId)) follow(projectId, running.id, get().turns[running.id]?.lastEventId ?? 0);
     },
 
-    async start(projectId, message, attachmentIds, providerId) {
+    async start(projectId, message, attachmentIds, providerId, frames = []) {
       set((s) => ({ error: { ...s.error, [projectId]: null } }));
-      const { runId } = await api.startRun(projectId, message, attachmentIds, providerId);
+      const { runId } = await api.startRun(projectId, message, attachmentIds, providerId, frames);
       set((s) => ({
         turns: { ...s.turns, [runId]: emptyTurn(runId) },
         order: { ...s.order, [projectId]: [...(s.order[projectId] ?? []), runId] },

@@ -9,6 +9,7 @@ import { logger } from '../logger.js';
 import { projectDir } from '../projects/dirs.js';
 import { forgetUsage } from '../quota/service.js';
 import { killUidProcesses } from '../runner/exec.js';
+import { frameAttachDir } from '../agent/frame-attach.js';
 
 export function purgeDeletedProjects(db: DB, now = Date.now(), days = config.purgeAfterDays): string[] {
   const cutoff = now - days * 86_400_000;
@@ -18,6 +19,7 @@ export function purgeDeletedProjects(db: DB, now = Date.now(), days = config.pur
     try {
       if (p.uid != null) killUidProcesses(p.uid, { force: true });
       fs.rmSync(projectDir(p.id), { recursive: true, force: true });
+      fs.rmSync(frameAttachDir(p.id), { recursive: true, force: true });
       db.delete(projects).where(eq(projects.id, p.id)).run(); // messages, runs, renders… cascade
       forgetUsage(p.userId);
       purged.push(p.id);

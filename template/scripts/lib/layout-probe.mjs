@@ -96,3 +96,54 @@ export function probeLayout({ t }) {
   }
   return issues.slice(0, 10).map((s) => `t=${t.toFixed(2)}s: ${s}`);
 }
+
+/**
+ * Plain facts about the frame at time t, for a model that cannot see it (and as context for one that can):
+ * which segment and word are being spoken, which scenes are on screen, and the readable text. Self-contained
+ * like probeLayout (serialised into the page).
+ * @param {{ t: number }} arg
+ */
+export function describeFrame({ t }) {
+  const stage = document.getElementById('stage');
+  const segs = window.ad?.segments ?? [];
+  const seg = [...segs].reverse().find((s) => s.start <= t + 0.001) ?? null;
+  let word = null;
+  if (seg) {
+    const i = seg.words.reduce((best, w, k) => (w.start <= t ? k : best), -1);
+    if (i >= 0) word = { index: i, w: seg.words[i].w, start: seg.words[i].start, spokenNow: t <= seg.words[i].end + 0.05 };
+  }
+  const visible = (el) => {
+    if (!el.getClientRects().length) return false;
+    for (let a = el; a && a !== stage; a = a.parentElement) {
+      const cs = getComputedStyle(a);
+      if (cs.visibility === 'hidden' || Number(cs.opacity) < 0.3) return false;
+    }
+    const r = el.getBoundingClientRect();
+    return r.width > 1 && r.height > 1;
+  };
+  const scenes = [...stage.querySelectorAll('#scenes > *')].filter(visible).map((el) => [...el.classList].filter((c) => c !== 'scene').join('.') || el.tagName.toLowerCase());
+  // readable text, grouped by the nearest block (word spans joined back into lines)
+  const lines = [];
+  const seen = new Set();
+  for (const el of stage.querySelectorAll('#scenes *')) {
+    if (el.closest('.w') && !el.classList.contains('w')) continue;
+    const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+    const isWordLine = el.querySelector(':scope > .w');
+    if (!own && !isWordLine) continue;
+    if (!visible(el)) continue;
+    const text = isWordLine
+      ? [...el.querySelectorAll(':scope > .w .wi')].filter(visible).map((w) => w.textContent.trim()).join(' ')
+      : el.textContent.replace(/\s+/g, ' ').trim();
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    lines.push(text.length > 120 ? text.slice(0, 117) + '…' : text);
+    if (lines.length >= 14) break;
+  }
+  return {
+    t,
+    segment: seg ? { id: seg.id, start: seg.start, end: seg.end, text: seg.words.map((w) => w.w).join(' ') } : null,
+    word,
+    scenes,
+    text: lines,
+  };
+}

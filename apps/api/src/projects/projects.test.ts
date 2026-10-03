@@ -134,6 +134,15 @@ describe('projects', () => {
     expect((await raw('../../etc/passwd')).status).toBe(404);
     expect((await bob.request('GET', `/api/projects/${projectId}/raw`, { query: { path: 'assets/pic.png' } })).status).toBe(404);
   });
+
+  it('deletes files from the Files tab as a history snapshot, never project.json or git internals', async () => {
+    const r = await ada.request('DELETE', `/api/projects/${projectId}/file`, { query: { path: 'assets/pic.png' } });
+    expect(r.status, r.body).toBe(200);
+    expect(fs.existsSync(path.join(ref().dir, 'assets/pic.png'))).toBe(false);
+    expect((await ada.get(`/api/projects/${projectId}/git/log`)).json.commits[0].message).toBe('Delete assets/pic.png');
+    for (const p of ['project.json', '.git/config', '.', '../x']) expect((await ada.request('DELETE', `/api/projects/${projectId}/file`, { query: { path: p } })).status).toBe(400);
+    expect((await bob.request('DELETE', `/api/projects/${projectId}/file`, { query: { path: 'big.txt' } })).status).toBe(404);
+  });
 });
 
 describe('history', () => {

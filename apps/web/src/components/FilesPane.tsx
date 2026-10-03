@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
-import { Skeleton } from '@heroui/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertDialog, Button, Skeleton, toast } from '@heroui/react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { api } from '../api/client';
+import { api, ApiError } from '../api/client';
 import type { TreeEntry } from '../api/types';
 import { formatBytes, useInvalidateOn } from '../lib/hooks';
 import { Icon } from './Icon';
@@ -65,7 +65,39 @@ function CodeView({ value, path }: { value: string; path: string }) {
 
 const checker = 'bg-[length:16px_16px] bg-[linear-gradient(45deg,#eef3fc_25%,transparent_25%,transparent_75%,#eef3fc_75%),linear-gradient(45deg,#eef3fc_25%,transparent_25%,transparent_75%,#eef3fc_75%)] bg-[position:0_0,8px_8px]';
 
-function Viewer({ projectId, path }: { projectId: string; path: string }) {
+function DeleteFile({ projectId, path, onDeleted }: { projectId: string; path: string; onDeleted: () => void }) {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  const remove = useMutation({
+    mutationFn: () => api.deleteFile(projectId, path),
+    onSuccess: () => {
+      toast.success(`Deleted ${path}`);
+      void qc.invalidateQueries({ queryKey: ['tree', projectId] });
+      void qc.invalidateQueries({ queryKey: ['gitlog', projectId] });
+      onDeleted();
+    },
+    onError: (e) => toast.danger(e instanceof ApiError ? e.message : 'Could not delete the file'),
+  });
+  return (
+    <>
+      <button onClick={() => setOpen(true)} aria-label={`Delete ${path}`} title="Delete" className="grid h-6 w-6 flex-none place-items-center rounded-md text-[#5b6b8f] hover:bg-[#fdf2f2] hover:text-[#b42318]"><Icon name="trash" size={14} /></button>
+      <AlertDialog.Backdrop isOpen={open} onOpenChange={setOpen}>
+        <AlertDialog.Container>
+          <AlertDialog.Dialog className="sm:max-w-[420px]">
+            <AlertDialog.Header><AlertDialog.Icon status="danger" /><AlertDialog.Heading>Delete {path.split('/').pop()}?</AlertDialog.Heading></AlertDialog.Header>
+            <AlertDialog.Body><p className="text-sm">It’s removed from the project and saved as a step in History, so you can restore it from there. If Luma’s video uses this file, ask Luma to update the scenes too.</p></AlertDialog.Body>
+            <AlertDialog.Footer>
+              <Button slot="close" variant="tertiary">Cancel</Button>
+              <Button slot="close" variant="danger" onPress={() => remove.mutate()}>Delete file</Button>
+            </AlertDialog.Footer>
+          </AlertDialog.Dialog>
+        </AlertDialog.Container>
+      </AlertDialog.Backdrop>
+    </>
+  );
+}
+
+function Viewer({ projectId, path, onDeleted }: { projectId: string; path: string; onDeleted: () => void }) {
   const { reloadKey } = usePreview();
   const file = useQuery({ queryKey: ['file', projectId, path, reloadKey], queryFn: () => api.file(projectId, path) });
   const [svgMode, setSvgMode] = useState<'preview' | 'code'>('preview');
@@ -125,6 +157,7 @@ function Viewer({ projectId, path }: { projectId: string; path: string }) {
           </div>
         )}
         {f.kind === 'pdf' && <a href={raw} target="_blank" rel="noreferrer" className="flex-none text-xs font-medium text-[#2970ec]">Open</a>}
+        <DeleteFile projectId={projectId} path={path} onDeleted={onDeleted} />
         <a href={download} aria-label={`Download ${name}`} title="Download" className="grid h-6 w-6 flex-none place-items-center rounded-md text-[#5b6b8f] hover:bg-[#eff5ff] hover:text-[#2970ec]"><Icon name="download" size={14} /></a>
       </div>
       {f.truncated && (
@@ -152,7 +185,7 @@ export function FilesPane({ projectId, tick }: { projectId: string; tick: number
         {tree.isLoading ? <Skeleton className="h-40 rounded-lg" /> : <ul role="tree">{nodes.map((n) => <Row key={n.path} n={n} depth={0} open={open} toggle={toggle} selected={selected} onSelect={setSelected} />)}</ul>}
       </nav>
       <div className="min-h-0 min-w-0">
-        {selected ? <Viewer projectId={projectId} path={selected} /> : <p className="p-4 text-sm text-[#5b6b8f]">Pick a file to read it. Files are read-only — ask Luma to change them.</p>}
+        {selected ? <Viewer projectId={projectId} path={selected} onDeleted={() => setSelected(null)} /> : <p className="p-4 text-sm text-[#5b6b8f]">Pick a file to read it. Files are read-only — ask Luma to change them. Delete a file with its trash button.</p>}
       </div>
     </div>
   );

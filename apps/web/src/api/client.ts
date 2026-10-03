@@ -74,8 +74,8 @@ export const api = {
   gitRestore: (id: string, sha: string) => post<{ commit: unknown; unchanged: boolean }>(`/api/projects/${id}/git/restore`, { sha }),
 
   // ---- agent ----
-  startRun: (id: string, message: string, attachmentIds: string[], providerId?: string) =>
-    post<{ runId: string; messageId: string }>(`/api/projects/${id}/runs`, { message, attachmentIds, providerId }),
+  startRun: (id: string, message: string, attachmentIds: string[], providerId?: string, frames: number[] = []) =>
+    post<{ runId: string; messageId: string }>(`/api/projects/${id}/runs`, { message, attachmentIds, providerId, ...(frames.length ? { frames } : {}) }),
   runs: (id: string) => get<{ runs: RunInfo[] }>(`/api/projects/${id}/runs`),
   activeRun: (id: string) => get<{ run: { id: string; awaitingAnswer: string | null } | null }>(`/api/projects/${id}/active-run`),
   messages: (id: string) => get<{ messages: ConversationMessage[] }>(`/api/projects/${id}/messages`),
@@ -86,7 +86,8 @@ export const api = {
   captureFrame: (id: string, t: number) => post<{ url: string }>(`/api/projects/${id}/capture`, { t }),
 
   // ---- uploads ----
-  uploads: (id: string) => get<{ uploads: Array<UploadRecord & { projectId: string }> }>(`/api/projects/${id}/uploads`),
+  uploads: (id: string, pending = false) => get<{ uploads: Array<UploadRecord & { projectId: string }> }>(`/api/projects/${id}/uploads${pending ? '?pending=1' : ''}`),
+  deleteFile: (id: string, path: string) => del<{ ok: true; path: string }>(`/api/projects/${id}/file${qs({ path })}`),
   upload: (id: string, files: File[]) => {
     const fd = new FormData();
     for (const f of files) fd.append('file', f, f.name);

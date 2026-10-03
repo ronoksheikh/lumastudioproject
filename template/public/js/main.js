@@ -259,6 +259,10 @@ async function boot() {
     if (m.type === 'play') play();
     else if (m.type === 'pause') pause();
     else if (m.type === 'seek') window.ad.seek(m.t);
-    else if (m.type === 'state') parent.postMessage({ source: 'luma-preview', type: 'state', t: now(), playing, duration: END }, '*');
+    else if (m.type === 'state') {
+      const t = now();
+      const seg = [...segments].reverse().find((sg) => sg.start <= t + 0.001);
+      parent.postMessage({ source: 'luma-preview', type: 'state', t, playing, duration: END, segment: seg?.id ?? null }, '*');
+    }
   });
 }

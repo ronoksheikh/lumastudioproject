@@ -6,13 +6,14 @@ import { z } from 'zod';
 import type { RunEvent } from '@luma/shared';
 import type { AppContext } from '../app.js';
 import { authUser, requireAuth } from '../auth/plugin.js';
-import { messages, runs } from '../db/schema.js';
+import { messages, runs, uploads } from '../db/schema.js';
 import { HttpError, notFound } from '../http/errors.js';
 import { parse } from '../http/validate.js';
 import { assertDiskAvailable } from '../quota/service.js';
 import { getOwnedProject, toRef } from '../projects/service.js';
 import { loadEvents } from './events.js';
 import { terminalHistory } from './terminal.js';
+import { frameAttachFile, isFrameId } from './frame-attach.js';
 import { FRAMES_DIR } from './tools/frames.js';
 
 export async function agentRoutes(app: FastifyInstance, ctx: AppContext) {
@@ -33,10 +34,12 @@ export async function agentRoutes(app: FastifyInstance, ctx: AppContext) {
     const body = parse(z.object({
       message: z.string().trim().min(1, 'Write a message first').max(20_000),
       attachmentIds: z.array(z.string().max(40)).max(12).optional(),
+      /** moments of the preview (seconds) the student attached with "Attach this frame" */
+      frames: z.array(z.number().min(0).max(3600)).max(6).optional(),
       providerId: z.string().max(40).optional(),
     }), req.body);
     assertDiskAvailable(db, authUser(req).id);
-    const started = agent.start({ project, userId: authUser(req).id, text: body.message, attachmentIds: body.attachmentIds, providerId: body.providerId });
+    const started = agent.start({ project, userId: authUser(req).id, text: body.message, attachmentIds: body.attachmentIds, frames: body.frames, providerId: body.providerId });
     return reply.code(202).send(started);
   });
 
@@ -59,6 +62,7 @@ export async function agentRoutes(app: FastifyInstance, ctx: AppContext) {
     getOwnedProject(db, authUser(req).id, id);
     const msgs = db.select().from(messages).where(eq(messages.projectId, id)).all().filter((m) => m.role === 'user');
     const rs = db.select().from(runs).where(eq(runs.projectId, id)).all();
+    const ups = new Map(db.select().from(uploads).where(eq(uploads.projectId, id)).all().map((u) => [u.id, u]));
     return {
       messages: msgs
         .map((m) => {
@@ -66,7 +70,16 @@ export async function agentRoutes(app: FastifyInstance, ctx: AppContext) {
           // the model-facing text can carry the attachment note; the UI shows it too
           const text = typeof content === 'string' ? content : '';
           const run = rs.find((r) => r.messageId === m.id);
-          return { id: m.id, text, createdAt: m.createdAt, attachmentIds: m.attachmentsJson ? JSON.parse(m.attachmentsJson) : [], runId: run?.id ?? null, runStatus: run?.status ?? null };
+          // attachments_json: an array of upload ids, or { uploads, frames } when preview frames were attached
+          const aj = m.attachmentsJson ? JSON.parse(m.attachmentsJson) as string[] | { uploads: string[]; frames: Array<{ id: string; t: number }> } : [];
+          const attachmentIds: string[] = Array.isArray(aj) ? aj : aj.uploads;
+          const frames = Array.isArray(aj) ? [] : aj.frames.map((f) => ({ id: f.id, t: f.t, url: `/api/projects/${id}/frame-attachments/${f.id}`, ready: fs.existsSync(frameAttachFile(id, f.id)) }));
+          // the files that went out with the message (a file deleted later keeps its name, flagged missing)
+          const attachments = attachmentIds.map((aid) => {
+            const u = ups.get(aid);
+            return u ? { id: u.id, path: u.path, mime: u.mime, size: u.size } : { id: aid, path: null, mime: null, size: null, missing: true };
+          });
+          return { id: m.id, text, createdAt: m.createdAt, attachmentIds, attachments, frames, runId: run?.id ?? null, runStatus: run?.status ?? null };
         })
 ,
     };
@@ -146,6 +159,16 @@ export async function agentRoutes(app: FastifyInstance, ctx: AppContext) {
     const body = parse(z.object({ answer: z.string().trim().min(1).max(2000) }), req.body);
     if (!agent.answer(run.id, body.answer)) throw new HttpError(409, 'not_waiting', 'The agent is not waiting for an answer right now');
     return { ok: true };
+  });
+
+  /** The PNG of a frame the student attached to a message (kept outside the project). */
+  app.get('/projects/:id/frame-attachments/:fid', auth, async (req, reply) => {
+    const { id, fid } = req.params as { id: string; fid: string };
+    getOwnedProject(db, authUser(req).id, id);
+    if (!isFrameId(fid)) throw notFound();
+    const file = frameAttachFile(id, fid);
+    if (!fs.existsSync(file)) throw notFound();
+    return reply.header('Content-Type', 'image/png').header('Cache-Control', 'private, max-age=86400').header('X-Content-Type-Options', 'nosniff').send(fs.createReadStream(file));
   });
 
   /** Screenshots made by preview_frames (private to the owner; never served from the project's public/ folder). */

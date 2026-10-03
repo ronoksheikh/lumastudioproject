@@ -1,10 +1,12 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { Button, Select, Label, ListBox, Spinner, toast } from '@heroui/react';
-import { useRef, useState, type ClipboardEvent, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import type { ModelConfig, UploadRecord } from '../api/types';
 import { formatBytes } from '../lib/hooks';
 import { Icon } from './Icon';
+import type { FrameChip } from './preview-context';
 
 interface Attachment {
   key: string;
@@ -17,13 +19,16 @@ interface Attachment {
 
 const ACCEPT = '.svg,.png,.jpg,.jpeg,.webp,.pdf,image/svg+xml,image/png,image/jpeg,image/webp,application/pdf';
 
-export function Composer({ projectId, models, modelId, onModelChange, running, onSend, onStop }: {
+export function Composer({ projectId, frames = [], onRemoveFrame, models, modelId, onModelChange, running, onSend, onStop }: {
   projectId: string;
+  /** preview moments attached with "Attach this frame" (they go with the next message) */
+  frames?: FrameChip[];
+  onRemoveFrame?: (t: number) => void;
   models: ModelConfig[];
   modelId: string | undefined;
   onModelChange: (id: string) => void;
   running: boolean;
-  onSend: (text: string, attachmentIds: string[]) => Promise<void>;
+  onSend: (text: string, attachments: UploadRecord[]) => Promise<void>;
   onStop: () => void;
 }) {
   const [text, setText] = useState('');
@@ -32,6 +37,21 @@ export function Composer({ projectId, models, modelId, onModelChange, running, o
   const [drag, setDrag] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const area = useRef<HTMLTextAreaElement>(null);
+  const qc = useQueryClient();
+
+  // files are uploaded into the project as soon as they're attached; ones not sent yet come back after a reload
+  useEffect(() => {
+    let alive = true;
+    void api.uploads(projectId, true).then((r) => {
+      if (!alive) return;
+      setFiles((cur) => {
+        const have = new Set(cur.map((a) => a.record?.id));
+        const restored = r.uploads.filter((u) => !have.has(u.id)).map((u): Attachment => ({ key: u.id, name: u.path.split('/').pop() ?? u.path, size: u.size, state: 'ready', record: u }));
+        return [...restored, ...cur];
+      });
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [projectId]);
 
   const usable = models.filter((m) => m.supportsTools);
   const model = models.find((m) => m.id === modelId);
@@ -48,6 +68,7 @@ export function Composer({ projectId, models, modelId, onModelChange, running, o
       try {
         const r = await api.upload(projectId, [f]);
         setFiles((cur) => cur.map((a) => (a.key === entries[i]!.key ? { ...a, state: 'ready', record: r.uploads[0] } : a)));
+        void qc.invalidateQueries({ queryKey: ['tree', projectId] }); // it's in the Files tab right away
       } catch (e) {
         const message = e instanceof ApiError ? e.message : 'Upload failed';
         setFiles((cur) => cur.map((a) => (a.key === entries[i]!.key ? { ...a, state: 'error', error: message } : a)));
@@ -56,18 +77,30 @@ export function Composer({ projectId, models, modelId, onModelChange, running, o
     }));
   };
 
+  /**
+   * X = detach from this message. The file was uploaded but never sent, so nothing can be using it: the server
+   * removes that pending upload (and refuses for anything already sent — those stay in the project).
+   */
   const removeFile = async (a: Attachment) => {
     setFiles((cur) => cur.filter((x) => x.key !== a.key));
-    if (a.record) await api.deleteUpload(projectId, a.record.id).catch(() => {});
+    if (!a.record) return;
+    await api.deleteUpload(projectId, a.record.id).catch(() => {});
+    void qc.invalidateQueries({ queryKey: ['tree', projectId] });
   };
 
   const submit = async () => {
     if (!canSend) return;
     setSending(true);
     try {
-      await onSend(text.trim(), files.filter((f) => f.record).map((f) => f.record!.id));
+      const sent = files.filter((f) => f.record);
+      setFiles((cur) => cur.filter((f) => !sent.includes(f))); // chips move onto the sent message
+      try {
+        await onSend(text.trim(), sent.map((f) => f.record!));
+      } catch (e) {
+        setFiles((cur) => [...sent, ...cur]); // not sent: keep them pending
+        throw e;
+      }
       setText('');
-      setFiles([]);
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Could not start the agent');
     } finally {
@@ -100,14 +133,24 @@ export function Composer({ projectId, models, modelId, onModelChange, running, o
           {noModel ? 'Add a model first.' : 'This model hasn’t been tested yet.'} <Link to="/settings/models" className="font-semibold underline">Open Settings → Models</Link>
         </p>
       )}
-      {files.length > 0 && (
+      {(files.length > 0 || frames.length > 0) && (
         <ul className="mb-2 flex flex-wrap gap-1.5" aria-label="Attachments">
+          {frames.map((f) => (
+            <li key={`f-${f.t}`} className="flex items-center gap-1.5 rounded-lg border border-[#c9d9f7] bg-[#eff5ff] px-2 py-1 text-xs" data-testid="frame-chip">
+              <Icon name="target" size={13} className="text-[#2970ec]" />
+              <span className="mono">t={f.t.toFixed(2)}s</span>
+              {f.segment && <span className="text-[#8a97b5]">· {f.segment}</span>}
+              <button onClick={() => onRemoveFrame?.(f.t)} aria-label={`Detach frame at ${f.t.toFixed(2)} s`} className="text-[#5b6b8f] hover:text-[#b42318]"><Icon name="x" size={12} /></button>
+            </li>
+          ))}
           {files.map((a) => (
             <li key={a.key} className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs ${a.state === 'error' ? 'border-[#f3c5c5] bg-[#fdf2f2]' : 'border-[#c9d9f7] bg-[#eff5ff]'}`}>
-              {a.state === 'uploading' ? <Spinner size="sm" /> : <Icon name={a.name.toLowerCase().endsWith('.pdf') ? 'file' : 'image'} size={13} className="text-[#2970ec]" />}
+              {a.state === 'uploading' ? <Spinner size="sm" />
+                : a.record && /^image\/(png|jpeg|webp|svg)/.test(a.record.mime) ? <img src={api.rawUrl(projectId, a.record.path)} alt="" className="h-5 w-5 rounded object-cover" />
+                : <Icon name={a.name.toLowerCase().endsWith('.pdf') ? 'file' : 'image'} size={13} className="text-[#2970ec]" />}
               <span className="max-w-40 truncate">{a.name}</span>
               <span className="text-[#8a97b5]">{formatBytes(a.size)}</span>
-              <button onClick={() => void removeFile(a)} aria-label={`Remove ${a.name}`} className="text-[#5b6b8f] hover:text-[#b42318]"><Icon name="x" size={12} /></button>
+              <button onClick={() => void removeFile(a)} aria-label={`Detach ${a.name}`} title="Remove from this message (unsent files are deleted)" className="text-[#5b6b8f] hover:text-[#b42318]"><Icon name="x" size={12} /></button>
             </li>
           ))}
         </ul>

@@ -5,11 +5,11 @@ import type { AppContext } from '../app.js';
 import { authUser, requireAuth } from '../auth/plugin.js';
 import { config } from '../config.js';
 import { uploads } from '../db/schema.js';
-import { badRequest, notFound, tooLarge } from '../http/errors.js';
+import { badRequest, conflict, notFound, tooLarge } from '../http/errors.js';
 import { getOwnedProject, toRef, touchProject } from '../projects/service.js';
 import { sniffUpload, safeName } from './sniff.js';
 import { assertDiskAvailable } from '../quota/service.js';
-import { projectUploadBytes, removeUpload, saveUpload } from './service.js';
+import { pendingUploads, projectUploadBytes, removeUpload, saveUpload } from './service.js';
 
 export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
   const { db } = ctx;
@@ -19,6 +19,7 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
   app.get('/projects/:id/uploads', auth, async (req) => {
     const { id } = req.params as { id: string };
     getOwnedProject(db, authUser(req).id, id);
+    if ((req.query as { pending?: string }).pending) return { uploads: pendingUploads(db, id) };
     return { uploads: db.select().from(uploads).where(eq(uploads.projectId, id)).all() };
   });
 
@@ -50,10 +51,13 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
     return reply.code(201).send({ uploads: saved });
   });
 
+  /** The composer's X on a chip that was never sent: removes that pending upload only. Sent files stay (delete them in the Files tab). */
   app.delete('/projects/:id/uploads/:uploadId', auth, async (req) => {
     const { id, uploadId } = req.params as { id: string; uploadId: string };
     const project = getOwnedProject(db, authUser(req).id, id);
-    if (!removeUpload(db, toRef(project), uploadId)) throw notFound('Upload not found');
+    const r = removeUpload(db, toRef(project), uploadId, { onlyPending: true });
+    if (r === 'sent') throw conflict('This file was already sent to Luma. It stays in the project — delete it from the Files tab if you really want it gone.');
+    if (!r) throw notFound('Upload not found');
     return { ok: true };
   });
 }

@@ -101,6 +101,22 @@ describe('POST /projects/:id/uploads', () => {
     expect(after.some((p: string) => p.includes('brief'))).toBe(false);
   });
 
+  it('X before send removes only that pending upload; pending ones survive a reload', async () => {
+    const a = (await upload([{ name: 'keep.png', data: PNG }])).json.uploads[0];
+    const b = (await upload([{ name: 'drop.png', data: PNG }])).json.uploads[0];
+    const pending = (await c.get(`/api/projects/${projectId}/uploads`, { pending: '1' })).json.uploads.map((u: any) => u.path);
+    expect(pending).toEqual(expect.arrayContaining([a.path, b.path]));
+    const dir = toRef(t.db.select().from(projects).where(eq(projects.id, projectId)).get()!).dir;
+    expect((await c.del(`/api/projects/${projectId}/uploads/${b.id}`)).status).toBe(200);
+    expect(fs.existsSync(path.join(dir, b.path))).toBe(false);
+    expect(fs.existsSync(path.join(dir, a.path))).toBe(true);
+    // a PDF's derived text/pages are not listed as separate pending chips
+    const pdf = (await upload([{ name: 'brief2.pdf', data: PDF }])).json.uploads[0];
+    const after = (await c.get(`/api/projects/${projectId}/uploads`, { pending: '1' })).json.uploads.map((u: any) => u.path);
+    expect(after).toContain(pdf.path);
+    expect(after.some((p: string) => p.endsWith('.txt') || p.includes('-page-'))).toBe(false);
+  });
+
   it('rejects unsupported types, empty files and oversized files', async () => {
     expect((await upload([{ name: 'notes.html', data: Buffer.from('<script>alert(1)</script>') }])).status).toBe(400);
     expect((await upload([{ name: 'empty.png', data: Buffer.alloc(0) }])).status).toBe(400);

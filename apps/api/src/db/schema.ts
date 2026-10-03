@@ -146,6 +146,8 @@ export const uploads = sqliteTable(
     mime: text('mime').notNull(),
     size: integer('size').notNull(),
     createdAt: createdAt(),
+    /** set once the file went out with a chat message: from then on the composer's X can no longer delete it */
+    sentAt: integer('sent_at'),
   },
   (t) => [index('uploads_project_idx').on(t.projectId)],
 );
