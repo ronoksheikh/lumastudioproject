@@ -18,6 +18,7 @@ import type { RunBus } from './events.js';
 import { attachmentsSummary, brandSummary, projectFacts } from './facts.js';
 import { buildSystemPrompt } from './prompts.js';
 import { collectTurn, type AssistantTurn } from './stream.js';
+import { inc } from '../observability/metrics.js';
 import { runTool, type ImagePart, type RenderService } from './tools/index.js';
 
 export interface AgentDeps {
@@ -231,6 +232,7 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
           askUser: input.askUser,
         });
         bus.flushDeltas();
+        inc('luma_tool_calls_total', { tool: call.name, ok: result.ok ? 'true' : 'false' }, 1, 'Agent tool calls');
         const content = truncateMiddle(redactSecrets(result.content, input.secrets), 30_000);
         bus.emit('tool.result', { callId: call.id, ok: result.ok, summary: redactSecrets(result.summary, input.secrets), truncated: !!result.truncated || content.truncated });
         persist({ role: 'tool', tool_call_id: call.id, content: content.text });

@@ -10,7 +10,9 @@ import { runPristineScript } from '../agent/tools/scripts.js';
 import { fail, ok, type RenderService, type ToolResult } from '../agent/tools/types.js';
 import { config } from '../config.js';
 import { conflict } from '../http/errors.js';
+import { assertRenderAllowed } from '../quota/service.js';
 import { logger } from '../logger.js';
+import { inc, observe } from '../observability/metrics.js';
 import type { CpuBudget } from '../cpu/budget.js';
 import { toRef } from '../projects/service.js';
 import { newId } from '../util/id.js';
@@ -70,6 +72,7 @@ export class RenderQueue implements RenderService {
 
   /** Inserts a queued job (one active render per user). */
   enqueue(args: { projectId: string; userId: string; runId?: string | null; preset: Preset }): string {
+    assertRenderAllowed(this.db, args.userId);
     const busy = this.db
       .select({ id: renderJobs.id })
       .from(renderJobs)
@@ -150,6 +153,7 @@ export class RenderQueue implements RenderService {
     };
     const failJob = (message: string) => {
       this.db.update(renderJobs).set({ status: 'error', error: message, finishedAt: Date.now() }).where(eq(renderJobs.id, job.id)).run();
+      inc('luma_renders_total', { status: 'error', preset: job.preset }, 1, 'Renders by outcome');
       settle({ ok: false, error: message });
     };
     let slot: Awaited<ReturnType<CpuBudget['acquire']>> | null = null;
@@ -220,6 +224,8 @@ export class RenderQueue implements RenderService {
       };
       this.db.insert(renders).values(row).run();
       this.db.update(renderJobs).set({ status: 'done', progress: 1000, finishedAt: Date.now() }).where(eq(renderJobs.id, job.id)).run();
+      inc('luma_renders_total', { status: 'done', preset: job.preset }, 1, 'Renders by outcome');
+      observe('luma_render_seconds', result.seconds, 'Wall-clock seconds of successful renders');
       const saved = this.db.select().from(renders).where(eq(renders.id, row.id)).get()!;
       const base = `/api/projects/${job.projectId}/renders/${row.id}`;
       waiter()?.bus?.emit('render.done', { jobId: job.id, url: `${base}/file`, contactSheetUrl: `${base}/sheet`, durationS: result.duration });

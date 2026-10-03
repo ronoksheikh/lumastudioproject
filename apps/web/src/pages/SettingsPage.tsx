@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Card, Chip, Description, Input, Label, Skeleton, Spinner, Tabs, TextField, toast } from '@heroui/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertDialog, Button, Card, Chip, Description, Input, Label, ProgressBar, Skeleton, Spinner, Tabs, TextField, toast } from '@heroui/react';
 import { useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
@@ -223,12 +223,41 @@ function VoiceTab() {
   );
 }
 
+const fmtBytes = (b: number) => (b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 1024 ** 2))} MB`);
+
+function UsageCard() {
+  const q = useQuery({ queryKey: ['usage'], queryFn: () => api.usage().then((r) => r.usage), staleTime: 30_000 });
+  const u = q.data;
+  if (!u) return null;
+  const bar = (label: string, used: number, limit: number | null, text: string) => (
+    <div>
+      <div className="mb-1 flex justify-between text-sm"><span>{label}</span><span className="mono text-[#5b6b8f]">{text}</span></div>
+      {limit ? (
+        <ProgressBar value={Math.min(100, (used / limit) * 100)} aria-label={label} color={used / limit > 0.9 ? 'danger' : 'accent'}>
+          <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
+        </ProgressBar>
+      ) : null}
+    </div>
+  );
+  return (
+    <Card className="max-w-lg p-2">
+      <Card.Header><Card.Title>Your allowance</Card.Title><Card.Description>Projects, uploads and renders share one storage allowance. Render time refills over 24 hours.</Card.Description></Card.Header>
+      <Card.Content className="flex flex-col gap-4">
+        {bar('Storage', u.diskBytes, u.diskLimitBytes, `${fmtBytes(u.diskBytes)}${u.diskLimitBytes ? ` of ${fmtBytes(u.diskLimitBytes)}` : ''}`)}
+        {bar('Render time today', u.renderSecondsToday, u.renderSecondsLimit, `${Math.round(u.renderSecondsToday / 60)} min${u.renderSecondsLimit ? ` of ${Math.round(u.renderSecondsLimit / 60)} min` : ''}`)}
+      </Card.Content>
+    </Card>
+  );
+}
+
 function AccountTab() {
   const me = useMe();
   const [cur, setCur] = useState('');
   const [next, setNext] = useState('');
   const change = useMutation({ mutationFn: () => api.changePassword(cur, next), onSuccess: () => { toast.success('Password changed. Other devices were signed out.'); setCur(''); setNext(''); }, onError: (e) => toast.danger(msg(e)) });
   return (
+    <div className="flex flex-col gap-4">
+    <UsageCard />
     <Card className="max-w-lg p-2">
       <Card.Header><Card.Title>Account</Card.Title><Card.Description>Signed in as <b>{me.data?.user?.email}</b></Card.Description></Card.Header>
       <Card.Content className="flex flex-col gap-4">
@@ -237,6 +266,7 @@ function AccountTab() {
       </Card.Content>
       <Card.Footer className="justify-end"><Button variant="primary" isDisabled={!cur || next.length < 8 || change.isPending} onPress={() => change.mutate()}>Change password</Button></Card.Footer>
     </Card>
+    </div>
   );
 }
 

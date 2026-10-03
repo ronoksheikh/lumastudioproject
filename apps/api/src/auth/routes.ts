@@ -6,6 +6,7 @@ import { config } from '../config.js';
 import { users } from '../db/schema.js';
 import { HttpError, forbidden } from '../http/errors.js';
 import { parse } from '../http/validate.js';
+import { captchaEnabled, verifyCaptcha } from '../security/captcha.js';
 import { authUser, cookieOptions, requireAuth, SESSION_COOKIE } from './plugin.js';
 import {
   burnPasswordCheck, createSession, createUser, deleteSession, deleteUserSessions, findUserByEmail, hashPassword, normalizeEmail, SESSION_TTL_MS, verifyPassword,
@@ -26,12 +27,16 @@ export async function authRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.post('/auth/signup', { config: limited(5, '1 hour') }, async (req, reply) => {
     if (!config.signupEnabled) throw forbidden('Signup is closed right now');
-    const body = parse(z.object({ email, password }), req.body);
+    const body = parse(z.object({ email, password, captcha: z.string().max(4000).optional() }), req.body);
+    await verifyCaptcha(body.captcha, req.ip);
     if (findUserByEmail(db, body.email)) throw new HttpError(409, 'email_taken', 'An account with this email already exists');
     const id = createUser(db, body.email, await hashPassword(body.password));
     const s = startSession(reply, id);
     return reply.code(201).send({ user: { id, email: body.email }, csrfToken: s.csrfToken });
   });
+
+  /** What the sign-up form needs to know before the user is signed in. */
+  app.get('/auth/config', async () => ({ signupEnabled: config.signupEnabled, captchaSiteKey: captchaEnabled() ? config.hcaptchaSitekey : null }));
 
   app.post('/auth/login', { config: limited(10, '10 minutes') }, async (req, reply) => {
     const body = parse(z.object({ email, password: z.string().min(1).max(200) }), req.body);

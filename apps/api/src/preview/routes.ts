@@ -35,5 +35,7 @@ export async function previewRoutes(app: FastifyInstance, ctx: AppContext) {
     const q = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
     return reply.redirect(`${req.url.split('?')[0]}/${q}`, 301);
   });
-  app.get('/p/:projectId/:token/*', handler);
+  // per-IP cap on the preview origin: one video loads a few dozen files, a scraper loads thousands
+  const limit = config.rateLimitDisabled ? {} : { config: { rateLimit: { max: config.previewRatePerMin, timeWindow: '1 minute' } } };
+  app.get('/p/:projectId/:token/*', limit, handler);
 }

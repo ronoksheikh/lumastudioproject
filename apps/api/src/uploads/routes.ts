@@ -8,6 +8,7 @@ import { uploads } from '../db/schema.js';
 import { badRequest, notFound, tooLarge } from '../http/errors.js';
 import { getOwnedProject, toRef, touchProject } from '../projects/service.js';
 import { sniffUpload, safeName } from './sniff.js';
+import { assertDiskAvailable } from '../quota/service.js';
 import { projectUploadBytes, removeUpload, saveUpload } from './service.js';
 
 export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
@@ -24,6 +25,7 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
   app.post('/projects/:id/uploads', auth, async (req, reply) => {
     const { id } = req.params as { id: string };
     const project = getOwnedProject(db, authUser(req).id, id);
+    assertDiskAvailable(db, authUser(req).id);
     const ref = toRef(project);
     const saved = [];
     let used = projectUploadBytes(db, project.id);

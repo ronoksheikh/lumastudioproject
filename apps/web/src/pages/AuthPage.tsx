@@ -1,8 +1,9 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
-import { useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError, api, setCsrf } from '../api/client';
+import { Captcha } from '../components/Captcha';
 import { Logo } from '../components/Logo';
 
 export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
@@ -13,13 +14,17 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
   const qc = useQueryClient();
   const nav = useNavigate();
   const signup = mode === 'signup';
+  const cfg = useQuery({ queryKey: ['auth-config'], queryFn: api.authConfig, enabled: signup, staleTime: Infinity });
+  const siteKey = signup ? cfg.data?.captchaSiteKey ?? null : null;
+  const [captcha, setCaptcha] = useState('');
+  const onToken = useCallback((t: string) => setCaptcha(t), []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const r = signup ? await api.signup(email, password) : await api.login(email, password);
+      const r = signup ? await api.signup(email, password, captcha || undefined) : await api.login(email, password);
       setCsrf(r.csrfToken);
       qc.setQueryData(['me'], { user: r.user, csrfToken: r.csrfToken });
       nav('/');
@@ -52,10 +57,11 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
                 <Input placeholder={signup ? 'At least 8 characters' : 'Your password'} autoComplete={signup ? 'new-password' : 'current-password'} />
                 <FieldError>Use at least 8 characters.</FieldError>
               </TextField>
+              {siteKey && <Captcha siteKey={siteKey} onToken={onToken} />}
               {error && (
                 <p role="alert" className="rounded-lg bg-[#fdecec] px-3 py-2 text-sm text-[#7f1d1d]">{error}</p>
               )}
-              <Button type="submit" variant="primary" isDisabled={busy || !email || !password} className="w-full">
+              <Button type="submit" variant="primary" isDisabled={busy || !email || !password || (!!siteKey && !captcha)} className="w-full">
                 {busy ? <Spinner size="sm" color="current" /> : signup ? 'Create account' : 'Log in'}
               </Button>
             </form>

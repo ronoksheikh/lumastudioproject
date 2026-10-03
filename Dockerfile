@@ -24,7 +24,7 @@ RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund
 FROM mcr.microsoft.com/playwright:v1.56.1-noble AS runtime
 ENV NODE_ENV=production DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ffmpeg git poppler-utils curl jq ca-certificates bubblewrap util-linux \
+      ffmpeg git poppler-utils curl jq ca-certificates bubblewrap util-linux iptables \
       fonts-noto fonts-noto-core fonts-noto-color-emoji fonts-beng-extra fonts-inter \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf "$(find /ms-playwright -path '*chrome-linux*/chrome' -type f | head -n1)" /usr/local/bin/chromium
@@ -37,6 +37,7 @@ WORKDIR /app
 COPY --from=build /repo/apps/api/dist ./dist
 COPY --from=build /repo/apps/api/drizzle ./drizzle
 COPY --from=build /repo/apps/web/dist ./web
+COPY --chmod=755 docker/egress.sh docker/entrypoint.sh ./
 COPY template ./template
 COPY packages/prompts ./prompts
 
@@ -46,4 +47,5 @@ RUN mkdir -p /data && chmod 711 /data  # traversable, not listable: every projec
 VOLUME /data
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD curl -fsS http://localhost:8080/api/health || exit 1
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["node", "dist/index.js"]

@@ -6,6 +6,8 @@ import { RunRegistry } from './agent/registry.js';
 import { createCpuBudget } from './cpu/index.js';
 import { createDb, runMigrations } from './db/index.js';
 import { logger } from './logger.js';
+import { startMaintenance } from './maintenance/scheduler.js';
+import { installProcessHandlers } from './observability/errors.js';
 import { RenderQueue } from './render/service.js';
 import { effectiveSandbox } from './runner/sandbox.js';
 
@@ -26,6 +28,7 @@ async function listenPreviewPort(app: Awaited<ReturnType<typeof buildApp>>) {
 }
 
 async function main() {
+  installProcessHandlers();
   fs.mkdirSync(config.projectsDir, { recursive: true });
   const { db, sqlite } = createDb();
   runMigrations(db);
@@ -36,6 +39,7 @@ async function main() {
   const agent = new RunRegistry({ db, sqlite, cpu: cpu.budget, render }, sqlite);
   agent.resetStaleRuns();
   render.start();
+  const stopMaintenance = startMaintenance(db, sqlite);
   const app = await buildApp({ db, sqlite, cpu, agent, render });
   await app.listen({ port: config.port, host: '0.0.0.0' });
   const previewServer = await listenPreviewPort(app);
@@ -43,6 +47,7 @@ async function main() {
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'shutting down');
     previewServer?.close();
+    stopMaintenance();
     await render.stop();
     await agent.stopAll();
     await app.close();

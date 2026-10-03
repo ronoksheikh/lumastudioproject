@@ -16,6 +16,7 @@ import { previewRoutes } from './preview/routes.js';
 import { projectRoutes } from './projects/routes.js';
 import { providerRoutes } from './providers/routes.js';
 import { healthRoutes } from './routes/health.js';
+import { metricsRoutes } from './routes/metrics.js';
 import { settingsRoutes } from './settings/routes.js';
 import { uploadRoutes } from './uploads/routes.js';
 
@@ -69,6 +70,7 @@ export async function buildApp(ctx: AppContext) {
   await app.register(
     async (api) => {
       await healthRoutes(api, ctx);
+      await metricsRoutes(api, ctx);
       await authRoutes(api, ctx);
       await projectRoutes(api, ctx);
       await providerRoutes(api, ctx);

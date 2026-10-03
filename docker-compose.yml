@@ -1,4 +1,5 @@
-# One service, one container. Set CPUS to ~0.9 x host cores and MEM_LIMIT to most of the host RAM.
+# Luma Studio: the app is ONE container (api + SPA + agent runner + renderer); Caddy in front of it only
+# terminates TLS for the two hostnames. Set CPUS to ~0.9 x host cores and MEM_LIMIT to most of the host RAM.
 services:
   luma-studio:
     build: .
@@ -8,12 +9,44 @@ services:
     environment:
       DATA_DIR: /data
       DB_PATH: /data/luma.db
+    expose:
+      - "8080"
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080" # for local checks; Caddy reaches the app over the compose network
     volumes:
       - data:/data
     cpus: ${CPUS:-3.5}
     mem_limit: ${MEM_LIMIT:-12g}
     shm_size: "1gb" # Chromium needs a roomy /dev/shm
+    cap_add:
+      - NET_ADMIN # lets docker/egress.sh block private networks and cloud metadata for agent commands
+    security_opt:
+      - no-new-privileges:true
+    # bubblewrap needs unprivileged user namespaces; if your host forbids them, set SANDBOX=uid in .env
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - luma-studio
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_HOST: ${APP_HOST:?set APP_HOST, e.g. studio.example.com}
+      PREVIEW_HOST: ${PREVIEW_HOST:?set PREVIEW_HOST, e.g. preview.example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
 volumes:
   data:
+  caddy_data:
+  caddy_config:

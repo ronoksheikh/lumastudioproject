@@ -16,6 +16,7 @@ import { signPreviewToken } from '../security/crypto.js';
 import { loadSecrets } from '../security/secrets.js';
 import { assertSha, gitFileAt, gitLog, gitRestore, gitShow } from './git.js';
 import { capturePng } from './capture.js';
+import { assertDiskAvailable, forgetUsage, usageFor } from '../quota/service.js';
 import { sendExportFile } from '../render/serve.js';
 import { createProject, getOwnedProject, listProjects, publicProject, softDeleteProject, toRef, touchProject, updateProject } from './service.js';
 
@@ -30,7 +31,10 @@ export async function projectRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.get('/projects', auth, async (req) => ({ projects: listProjects(db, authUser(req).id).map(publicProject) }));
 
+  app.get('/usage', auth, async (req) => ({ usage: usageFor(db, authUser(req).id) }));
+
   app.post('/projects', auth, async (req, reply) => {
+    assertDiskAvailable(db, authUser(req).id);
     const body = parse(z.object({ title, aspect: z.enum(Object.keys(ASPECTS) as [string, ...string[]]).default('16:9') }), req.body);
     const row = createProject(db, authUser(req).id, { title: body.title, aspect: body.aspect as keyof typeof ASPECTS });
     return reply.code(201).send({ project: publicProject(row) });
@@ -153,6 +157,7 @@ export async function projectRoutes(app: FastifyInstance, ctx: AppContext) {
       } catch { /* already gone or outside: nothing to remove */ }
     }
     db.delete(renders).where(eq(renders.id, row.id)).run();
+    forgetUsage(authUser(req).id);
     return { ok: true };
   });
 

@@ -48,7 +48,9 @@ const qs = (o: Record<string, string | number | undefined>) => {
 export const api = {
   // ---- auth ----
   me: () => get<{ user: User | null; csrfToken?: string }>('/api/auth/me'),
-  signup: (email: string, password: string) => post<{ user: User; csrfToken: string }>('/api/auth/signup', { email, password }),
+  authConfig: () => get<{ signupEnabled: boolean; captchaSiteKey: string | null }>('/api/auth/config'),
+  signup: (email: string, password: string, captcha?: string) => post<{ user: User; csrfToken: string }>('/api/auth/signup', { email, password, captcha }),
+  usage: () => get<{ usage: { diskBytes: number; diskLimitBytes: number | null; renderSecondsToday: number; renderSecondsLimit: number | null } }>('/api/usage'),
   login: (email: string, password: string) => post<{ user: User; csrfToken: string }>('/api/auth/login', { email, password }),
   logout: () => post<{ ok: true }>('/api/auth/logout'),
   changePassword: (currentPassword: string, newPassword: string) => post<{ ok: true }>('/api/auth/password', { currentPassword, newPassword }),

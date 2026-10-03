@@ -35,6 +35,8 @@ Agent runs use a mock OpenAI-compatible server from `apps/api/src/test/helpers.t
 
 **Quality loop.** `preview_frames` (pristine `template/scripts/preview-frames.mjs`) also runs `scripts/lib/layout-probe.mjs` in the page at every captured time — overlapping text, text off the stage, tiny text, frames with no text, spoken words still hidden — and returns the sentences as `issues` (the model's only eyes when it has no vision). `evals/` holds the golden prompts, `rubric.md`, the scoring code (`score.mjs`, unit-tested with `pnpm evals:test`) and `run.mjs`, which drives a running Studio with a saved model.
 
+**Hardening.** Quotas live in `quota/service.ts` (disk per user, render seconds per day; checked at project create, upload, run start and render enqueue); `maintenance/` has the project purge and nightly SQLite backup (scheduled from `index.ts`); `security/captcha.ts` is the optional hCaptcha; `observability/` has the Prometheus-style metrics (`/api/metrics`, token-gated) and a Sentry-compatible error reporter; `cli/admin.ts` (`pnpm --filter @luma/api admin …`, `node dist/admin.js` in the image) bans users, purges, backs up and rotates `MASTER_KEY`. `docker/egress.sh` (run by `entrypoint.sh`) blocks private/metadata networks for project uids. Ops and deploy notes: `docs/deploy.md`; licences: `docs/licenses.md`.
+
 Configuration is via env (see `.env.example`, parsed in `apps/api/src/config.ts`). `docker compose up` builds the single `luma-studio` image (Dockerfile at the root).
 
 ## Reference ads: commands

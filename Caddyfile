@@ -1,0 +1,18 @@
+# Both hostnames go to the same upstream; the app tells them apart by Host (it honours X-Forwarded-Host,
+# which Caddy sets). Keep them on two different registrable origins' hostnames: the preview host runs
+# student JavaScript, so it must never share cookies with the app host.
+{$APP_HOST} {
+	encode zstd gzip
+	reverse_proxy luma-studio:8080 {
+		flush_interval -1 # server-sent events must not be buffered
+	}
+}
+
+{$PREVIEW_HOST} {
+	encode zstd gzip
+	reverse_proxy luma-studio:8080
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+	}
+}

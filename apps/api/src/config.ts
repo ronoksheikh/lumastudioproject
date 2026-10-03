@@ -50,6 +50,25 @@ const schema = z.object({
   MAX_RUNS_PER_USER: num(1),
   /** Set to 1 to allow signup (closed beta switch). */
   SIGNUP_ENABLED: z.enum(['0', '1']).default('1'),
+  /** Quotas. 0 turns a limit off. */
+  USER_QUOTA_MB: num(5120),
+  RENDER_MINUTES_PER_DAY: num(60),
+  /** Deleted projects are removed from disk after this many days. */
+  PURGE_AFTER_DAYS: num(7),
+  /** Nightly SQLite backups (online .backup) kept in BACKUP_DIR; BACKUP_KEEP newest files are retained. */
+  BACKUP_DIR: z.string().optional(),
+  BACKUP_KEEP: num(7),
+  BACKUP_HOUR: num(3),
+  /** hCaptcha on signup: both must be set to turn it on. */
+  HCAPTCHA_SITEKEY: z.string().optional(),
+  HCAPTCHA_SECRET: z.string().optional(),
+  HCAPTCHA_VERIFY_URL: z.string().default('https://api.hcaptcha.com/siteverify'),
+  /** Requests per minute and IP on the preview origin. */
+  PREVIEW_RATE_PER_MIN: num(1500),
+  /** Bearer token for GET /api/metrics (Prometheus text). Unset = the endpoint does not exist. */
+  METRICS_TOKEN: z.string().optional(),
+  /** Sentry/GlitchTip DSN for unhandled errors. Unset = errors only go to the logs. */
+  ERROR_TRACKING_DSN: z.string().optional(),
 });
 
 const env = schema.parse(process.env);
@@ -67,7 +86,7 @@ export const config = {
   appOrigin: env.APP_ORIGIN,
   previewOrigin: env.PREVIEW_ORIGIN,
   cpuBudget: env.CPU_BUDGET,
-  maxRenderWorkers: env.MAX_RENDER_WORKERS ?? Math.max(1, cores - 1),
+  maxRenderWorkers: env.MAX_RENDER_WORKERS || Math.max(1, cores - 1),
   renderTimeoutMin: env.RENDER_TIMEOUT_MIN,
   cmdTimeoutS: env.CMD_TIMEOUT_S,
   logLevel: env.LOG_LEVEL,
@@ -88,6 +107,18 @@ export const config = {
   agentMaxSteps: env.AGENT_MAX_STEPS,
   agentMaxOutputTokens: env.AGENT_MAX_OUTPUT_TOKENS,
   maxRunsPerUser: env.MAX_RUNS_PER_USER,
+  userQuotaBytes: env.USER_QUOTA_MB * 1024 * 1024,
+  renderSecondsPerDay: env.RENDER_MINUTES_PER_DAY * 60,
+  purgeAfterDays: env.PURGE_AFTER_DAYS,
+  backupDir: env.BACKUP_DIR ?? path.join(env.DATA_DIR, 'backups'),
+  backupKeep: env.BACKUP_KEEP,
+  backupHour: env.BACKUP_HOUR,
+  hcaptchaSitekey: env.HCAPTCHA_SITEKEY,
+  hcaptchaSecret: env.HCAPTCHA_SECRET,
+  hcaptchaVerifyUrl: env.HCAPTCHA_VERIFY_URL,
+  previewRatePerMin: env.PREVIEW_RATE_PER_MIN,
+  metricsToken: env.METRICS_TOKEN,
+  errorTrackingDsn: env.ERROR_TRACKING_DSN,
   elevenBase: env.ELEVENLABS_API_BASE.replace(/\/$/, ''),
   cores,
 };

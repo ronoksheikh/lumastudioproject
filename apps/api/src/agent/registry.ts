@@ -8,6 +8,8 @@ import { providerApiKey, getProvider } from '../providers/service.js';
 import { getSecret } from '../settings/service.js';
 import { toRef, touchProject, type ProjectRow } from '../projects/service.js';
 import { config } from '../config.js';
+import { reportError } from '../observability/errors.js';
+import { inc } from '../observability/metrics.js';
 import { logger } from '../logger.js';
 import { newId } from '../util/id.js';
 import { buildUserContent } from './attachments.js';
@@ -101,6 +103,7 @@ export class RunRegistry {
         status = out.stopReason === 'stopped' ? 'stopped' : out.stopReason === 'error' ? 'error' : 'finished';
       } catch (e) {
         logger.error({ err: e, runId }, 'agent run crashed');
+        void reportError(e, { runId, kind: 'agent run' });
         bus.emit('run.error', { message: 'Something went wrong on our side while running the agent.', retryable: true });
         status = 'error';
         stopReason = 'error';
@@ -110,6 +113,9 @@ export class RunRegistry {
         touchProject(this.db, project.id);
         this.active.delete(project.id);
         bus.emit('run.finished', { usage, stopReason });
+        inc('luma_runs_total', { stop_reason: stopReason }, 1, 'Agent runs by how they ended');
+        inc('luma_tokens_total', { direction: 'input' }, usage.input, 'Model tokens used by agent runs');
+        inc('luma_tokens_total', { direction: 'output' }, usage.output);
       }
     })();
     return { runId, messageId: userRow.id };

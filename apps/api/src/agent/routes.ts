@@ -9,6 +9,7 @@ import { authUser, requireAuth } from '../auth/plugin.js';
 import { messages, runs } from '../db/schema.js';
 import { HttpError, notFound } from '../http/errors.js';
 import { parse } from '../http/validate.js';
+import { assertDiskAvailable } from '../quota/service.js';
 import { getOwnedProject, toRef } from '../projects/service.js';
 import { loadEvents } from './events.js';
 import { FRAMES_DIR } from './tools/frames.js';
@@ -33,6 +34,7 @@ export async function agentRoutes(app: FastifyInstance, ctx: AppContext) {
       attachmentIds: z.array(z.string().max(40)).max(12).optional(),
       providerId: z.string().max(40).optional(),
     }), req.body);
+    assertDiskAvailable(db, authUser(req).id);
     const started = agent.start({ project, userId: authUser(req).id, text: body.message, attachmentIds: body.attachmentIds, providerId: body.providerId });
     return reply.code(202).send(started);
   });
