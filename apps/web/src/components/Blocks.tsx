@@ -26,6 +26,7 @@ const TOOL_META: Record<string, { icon: IconName; label: string }> = {
   web_fetch: { icon: 'globe', label: 'Fetch page' },
   read_guide: { icon: 'guide', label: 'Guide' },
   list_voices: { icon: 'mic', label: 'Voices' },
+  compact_context: { icon: 'brain', label: 'Tidy memory' },
 };
 
 const argOf = (b: ToolBlock, key: string): string | undefined => {
@@ -217,11 +218,12 @@ export function ToolCard({ block }: { block: ToolBlock }) {
 }
 
 export function Thinking({ text, live }: { text: string; live: boolean }) {
-  const [open, setOpen] = useState(false);
-  const shown = live || open;
+  // open while live, closed when finished — unless the student toggled it themselves (then their choice sticks)
+  const [choice, setChoice] = useState<boolean | null>(null);
+  const shown = choice ?? live;
   return (
     <div className="rounded-xl border border-dashed border-[var(--border)] bg-[#fafcff] px-3 py-2">
-      <button className="flex w-full items-center gap-2 text-left text-xs text-[#5b6b8f]" onClick={() => setOpen(!open)} aria-expanded={shown}>
+      <button className="flex w-full items-center gap-2 text-left text-xs text-[#5b6b8f]" onClick={() => setChoice(!shown)} aria-expanded={shown}>
         <Icon name="brain" size={14} className={live ? 'pulse' : ''} />
         <span className="font-medium">{live ? 'Thinking…' : 'Thought process'}</span>
         <Icon name={shown ? 'down' : 'chevron'} size={12} className="ml-auto" />

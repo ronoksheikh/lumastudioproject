@@ -62,7 +62,7 @@ export class RunRegistry {
     const { project, userId } = opts;
     if (this.active.has(project.id)) throw conflict('The agent is already working on this project. Stop it or wait for it to finish.');
     const userRuns = [...this.active.values()].filter((a) => a.userId === userId).length;
-    if (userRuns >= config.maxRunsPerUser) throw conflict('Another one of your projects is being worked on. Stop it or wait for it to finish.');
+    if (userRuns >= config.maxRunsPerUser) throw conflict(`Luma is already working on ${userRuns} of your projects at once (the limit). Wait for one to finish or stop it.`);
 
     // which model? the one asked for, else the user's default
     const providers = this.db.query.providerConfigs.findMany({ where: (t, { eq }) => eq(t.userId, userId) }).sync();

@@ -23,6 +23,25 @@ try {
   throw err;
 }
 
+/**
+ * The video's time base: the voice's word timings (audio/timing.json), or — for a video without a voice —
+ * project.json "timeline": [{ "id": "logo", "duration": 3.5 }, …] (scenes back to back, no words).
+ */
+async function loadTiming(project) {
+  const r = await fetch('audio/timing.json', { cache: 'no-store' }).catch(() => null);
+  if (r?.ok) return r.json();
+  if (Array.isArray(project.timeline) && project.timeline.length) {
+    let t = 0;
+    const segments = project.timeline.map((s) => {
+      const seg = { id: s.id, text: s.text ?? '', start: t, end: t + Number(s.duration), words: [] };
+      t += Number(s.duration);
+      return seg;
+    });
+    return { duration: t, silent: true, segments };
+  }
+  throw new Error('No time base: generate a voice (audio/timing.json) or, for a video without a voice, add "timeline": [{ "id": "intro", "duration": 3 }, …] to project.json — read_guide("engine").');
+}
+
 /** A brand-new project has no scenes yet: show a calm placeholder instead of an error. */
 function showEmpty() {
   window.adEmpty = true;
@@ -70,7 +89,9 @@ async function boot() {
     root.setProperty('--font-mono', `'${brand.fonts.mono}', monospace`);
   }
 
-  const timing = await getJson('audio/timing.json', 'generate the voice first (generate_voice).');
+  const timing = await loadTiming(project);
+  if (timing.silent) audio.removeAttribute('src');
+  else audio.src = 'audio/voiceover.mp3';
   // fonts must be ready before any layout is measured or text is sampled (pitfall #9)
   await Promise.all([
     ...[400, 500, 600, 700, 800].map((w) => document.fonts.load(`${w} 100px "Anek Bangla"`, 'আ')),
@@ -82,6 +103,7 @@ async function boot() {
   const world = await createWorld(document.getElementById('gl'), { W, H, brand, features: project.features });
   const { tl, cues, frameHooks, END, segments } = await buildTimeline({ timing, world, scenesRoot, fxRoot, project, brand, size });
   const sfx = new Sfx();
+  await Sfx.prefetch(cues); // audio files used by cueFile()
 
   // ---------- layout ----------
   const maxPR = Number(params.get('pr')) || 1.5;
@@ -123,10 +145,13 @@ async function boot() {
     base = gsap.utils.clamp(0, END, t);
     perf0 = performance.now();
     lastT = base;
-    if (base < audio.duration) audio.currentTime = base;
-    if (playing && base < (audio.duration || timing.duration)) audio.play().catch(() => {});
+    if (hasAudio() && base < audio.duration) audio.currentTime = base;
+    if (playing && hasAudio() && base < audio.duration) audio.play().catch(() => {});
+    if (playing) sfx.syncFiles(cues, base);
     if (!playing) draw(base);
   }
+
+  const hasAudio = () => !timing.silent && Number.isFinite(audio.duration);
 
   async function play() {
     sfx.init();
@@ -135,7 +160,8 @@ async function boot() {
     playing = true;
     perf0 = performance.now();
     lastT = base;
-    if (base < (audio.duration || timing.duration)) {
+    sfx.syncFiles(cues, base); // music / sound files already under way at this time
+    if (hasAudio() && base < audio.duration) {
       audio.currentTime = base;
       try {
         await audio.play();
@@ -150,6 +176,7 @@ async function boot() {
     base = now();
     playing = false;
     audio.pause();
+    sfx.stopFiles();
   }
 
   // film grain jumps in steps, as a pure function of t
@@ -173,7 +200,7 @@ async function boot() {
     let t = now();
 
     // keep the clock locked to the audio
-    if (!audio.paused && !audio.ended) {
+    if (hasAudio() && !audio.paused && !audio.ended) {
       const drift = audio.currentTime - t;
       if (Math.abs(drift) > 0.06) {
         base = audio.currentTime;
@@ -189,7 +216,7 @@ async function boot() {
 
     // fire sound cues that the playhead crossed this frame
     if (t > lastT && t - lastT < 0.5) {
-      for (const c of cues) if (c.t > lastT && c.t <= t) sfx.play(c.type, c.gain);
+      for (const c of cues) if (c.t > lastT && c.t <= t) sfx.play(c.type, c.gain, undefined, c);
     }
     lastT = t;
     draw(t);
@@ -227,7 +254,7 @@ async function boot() {
   });
 
   // Poster frame behind the play button (or a specific time via ?t=12.5)
-  seek(params.has('t') ? Number(params.get('t')) : timing.segments.at(-1).start + 2.6);
+  seek(params.has('t') ? Number(params.get('t')) : Math.min(END, (timing.segments.at(-1)?.start ?? 0) + 2.6));
   document.body.classList.add('ready');
 
   // Deterministic hook for frame-by-frame capture tools and the Studio's preview iframe.

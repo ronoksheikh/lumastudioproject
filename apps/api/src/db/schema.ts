@@ -133,9 +133,48 @@ export const renderJobs = sqliteTable(
     createdAt: createdAt(),
     startedAt: integer('started_at'),
     finishedAt: integer('finished_at'),
+    /** 'local' = this server (daily allowance); 'remote' = a fast render worker (paid render hours) */
+    pool: text('pool').notNull().default('local'),
+    /** remote jobs: the worker that claimed it and until when its lease runs (renewed by progress reports) */
+    workerId: text('worker_id'),
+    leaseUntil: integer('lease_until'),
+    /** the paid render-hours pack this job is billed to (remote jobs) */
+    boostId: text('boost_id'),
   },
   (t) => [index('render_jobs_status_idx').on(t.status, t.createdAt)],
 );
+
+/**
+ * Paid render hours ("boosts"): 1 hour on the fast render workers for 100 BDT. Created 'pending' when the
+ * student asks to buy; marked 'paid' by the payment provider (to be added) or an admin. A paid boost also resets
+ * the daily allowance on this server.
+ */
+export const renderBoosts = sqliteTable(
+  'render_boosts',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    seconds: integer('seconds').notNull(),
+    usedSeconds: integer('used_seconds').notNull().default(0),
+    priceBdt: integer('price_bdt').notNull(),
+    status: text('status').notNull().default('pending'), // pending | paid | cancelled
+    paymentRef: text('payment_ref'),
+    createdAt: createdAt(),
+    paidAt: integer('paid_at'),
+  },
+  (t) => [index('render_boosts_user_idx').on(t.userId, t.status)],
+);
+
+/** Machines (a VPS, any computer) that render "remote" jobs; they authenticate with a bearer token. */
+export const renderWorkers = sqliteTable('render_workers', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  tokenHash: text('token_hash').notNull().unique(),
+  maxJobs: integer('max_jobs').notNull().default(1),
+  disabled: integer('disabled', { mode: 'boolean' }).notNull().default(false),
+  createdAt: createdAt(),
+  lastSeenAt: integer('last_seen_at'),
+});
 
 export const uploads = sqliteTable(
   'uploads',

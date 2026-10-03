@@ -260,24 +260,107 @@ function UsageCard() {
   const q = useQuery({ queryKey: ['usage'], queryFn: () => api.usage().then((r) => r.usage), staleTime: 30_000 });
   const u = q.data;
   if (!u) return null;
-  const bar = (label: string, used: number, limit: number | null, text: string) => (
-    <div>
-      <div className="mb-1 flex justify-between text-sm"><span>{label}</span><span className="mono text-[#5b6b8f]">{text}</span></div>
-      {limit ? (
-        <ProgressBar value={Math.min(100, (used / limit) * 100)} aria-label={label} color={used / limit > 0.9 ? 'danger' : 'accent'}>
-          <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
-        </ProgressBar>
-      ) : null}
-    </div>
-  );
   return (
     <Card className="max-w-lg p-2">
-      <Card.Header><Card.Title>Your allowance</Card.Title><Card.Description>Projects, uploads and renders share one storage allowance. Render time refills over 24 hours.</Card.Description></Card.Header>
+      <Card.Header><Card.Title>Your storage</Card.Title><Card.Description>Projects, uploads and renders share one storage allowance.</Card.Description></Card.Header>
       <Card.Content className="flex flex-col gap-4">
-        {bar('Storage', u.diskBytes, u.diskLimitBytes, `${fmtBytes(u.diskBytes)}${u.diskLimitBytes ? ` of ${fmtBytes(u.diskLimitBytes)}` : ''}`)}
-        {bar('Render time today', u.renderSecondsToday, u.renderSecondsLimit, `${Math.round(u.renderSecondsToday / 60)} min${u.renderSecondsLimit ? ` of ${Math.round(u.renderSecondsLimit / 60)} min` : ''}`)}
+        <div>
+          <div className="mb-1 flex justify-between text-sm"><span>Storage</span><span className="mono text-[#5b6b8f]">{fmtBytes(u.diskBytes)}{u.diskLimitBytes ? ` of ${fmtBytes(u.diskLimitBytes)}` : ''}</span></div>
+          {u.diskLimitBytes ? (
+            <ProgressBar value={Math.min(100, (u.diskBytes / u.diskLimitBytes) * 100)} aria-label="Storage" color={u.diskBytes / u.diskLimitBytes > 0.9 ? 'danger' : 'accent'}>
+              <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
+            </ProgressBar>
+          ) : null}
+        </div>
       </Card.Content>
     </Card>
+  );
+}
+
+/** Paid hours on the fast render servers. Payment processing comes later: a purchase is saved as pending. */
+function FastRenderCard() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['usage'], queryFn: () => api.usage().then((r) => r.usage), staleTime: 30_000 });
+  const buy = useMutation({
+    mutationFn: () => api.buyRenderHour(),
+    onSuccess: (r) => { toast.success(r.message); void qc.invalidateQueries({ queryKey: ['usage'] }); },
+    onError: (e) => toast.danger(msg(e)),
+  });
+  const u = q.data;
+  if (!u) return null;
+  const f = u.fastRender;
+  const left = Math.ceil(f.secondsLeft / 60);
+  return (
+    <Card className="max-w-lg p-2">
+      <Card.Header>
+        <Card.Title className="flex items-center gap-2"><Icon name="lightning" /> Fast render hours</Card.Title>
+        <Card.Description>
+          Rendering here is free every day. {u.renderLimitReached ? <b>You have used today’s free render time.</b> : 'When today’s free time runs out,'} {u.renderLimitReached ? 'Get' : 'get'} {f.packMinutes} minutes on our super-fast render servers for ৳{f.priceBdt} — it also resets your daily free time.
+        </Card.Description>
+      </Card.Header>
+      <Card.Content className="flex flex-col gap-2 text-sm">
+        {f.secondsLeft > 0 && <p><Chip size="sm" color="success"><Chip.Label>Active</Chip.Label></Chip> {left} min of fast rendering left — your renders go to the fast servers.</p>}
+        {f.pendingPurchase && <p className="text-[#5b6b8f]">Your purchase is waiting for payment. Online payment is coming soon; the Lumademy team activates it once paid.</p>}
+      </Card.Content>
+      <Card.Footer className="justify-end">
+        <Button variant="primary" isDisabled={buy.isPending || f.pendingPurchase} onPress={() => buy.mutate()}>
+          {f.pendingPurchase ? 'Payment pending' : `Buy ${f.packMinutes} min · ৳${f.priceBdt}`}
+        </Button>
+      </Card.Footer>
+    </Card>
+  );
+}
+
+/** Settings → Agent: the student's own instructions for Luma — added to Luma's prompt, or replacing it. */
+function AgentTab() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['agent-prompt'], queryFn: () => api.agentPrompt() });
+  const [draft, setDraft] = useState<{ mode: 'append' | 'replace'; text: string } | null>(null);
+  const [showDefault, setShowDefault] = useState(false);
+  const save = useMutation({
+    mutationFn: (p: { mode: 'append' | 'replace'; text: string } | null) => api.saveAgentPrompt(p),
+    onSuccess: (r) => { qc.setQueryData(['agent-prompt'], r); setDraft(null); toast.success(r.prompt ? 'Saved — used from the next message on' : 'Back to Luma’s own prompt'); },
+    onError: (e) => toast.danger(msg(e)),
+  });
+  if (!q.data) return <Skeleton className="h-40 max-w-2xl rounded-2xl" />;
+  const cur = draft ?? q.data.prompt ?? { mode: 'append' as const, text: '' };
+  const set = (patch: Partial<typeof cur>) => setDraft({ ...cur, ...patch });
+  const modeBtn = (m: 'append' | 'replace', label: string) => (
+    <Button size="sm" variant={cur.mode === m ? 'primary' : 'tertiary'} onPress={() => set({ mode: m })}>{label}</Button>
+  );
+  return (
+    <div className="flex flex-col gap-4">
+      <Card className="max-w-2xl p-2">
+        <Card.Header>
+          <Card.Title className="flex items-center gap-2"><Icon name="robot" /> Your instructions for Luma</Card.Title>
+          <Card.Description>Tell Luma how you like to work: your style, language, brand habits, things to always or never do. Applies to all your projects from the next message on.</Card.Description>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2">{modeBtn('append', 'Add to Luma’s prompt')}{modeBtn('replace', 'Replace Luma’s prompt')}</div>
+          {cur.mode === 'replace' && <p className="text-sm text-[#5b6b8f]">Your text becomes the whole system prompt. The project facts, tools and engine guides are still provided. Start from Luma’s prompt below if you only want to change parts. Placeholders {'{aspect} {width} {height} {brand_summary} {attachments_summary}'} are filled in.</p>}
+          <textarea
+            className="mono min-h-56 w-full rounded-xl border border-[#d6e2f5] bg-white p-3 text-[13px] leading-relaxed outline-none focus:border-[#2970EC] max-md:text-base"
+            placeholder={cur.mode === 'append' ? 'e.g. Always make 9:16 reels. Write on-screen text in English, voice in Bengali. Prefer white stages with blue type.' : 'Your full system prompt…'}
+            value={cur.text}
+            onChange={(e) => set({ text: e.target.value })}
+            aria-label="Your instructions for Luma"
+          />
+        </Card.Content>
+        <Card.Footer className="flex-wrap justify-end gap-2">
+          {cur.mode === 'replace' && !cur.text.trim() && <Button variant="tertiary" onPress={() => set({ text: q.data.defaultPrompt })}>Start from Luma’s prompt</Button>}
+          {q.data.prompt && <Button variant="tertiary" isDisabled={save.isPending} onPress={() => save.mutate(null)}>Reset to Luma’s prompt</Button>}
+          <Button variant="primary" isDisabled={save.isPending || !draft} onPress={() => save.mutate(cur.text.trim() ? cur : null)}>Save</Button>
+        </Card.Footer>
+      </Card>
+      <Card className="max-w-2xl p-2">
+        <Card.Header>
+          <button type="button" className="flex items-center gap-2 text-left font-semibold" onClick={() => setShowDefault((v) => !v)} aria-expanded={showDefault}>
+            <Icon name={showDefault ? 'down' : 'chevron'} /> Luma’s built-in prompt
+          </button>
+        </Card.Header>
+        {showDefault && <Card.Content><pre className="mono max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-xl bg-[#f5f8fe] p-3 text-xs">{q.data.defaultPrompt}</pre></Card.Content>}
+      </Card>
+    </div>
   );
 }
 
@@ -289,6 +372,7 @@ function AccountTab() {
   return (
     <div className="flex flex-col gap-4">
     <UsageCard />
+    <FastRenderCard />
     <Card className="max-w-lg p-2">
       <Card.Header><Card.Title>Account</Card.Title><Card.Description>Signed in as <b>{me.data?.user?.email}</b></Card.Description></Card.Header>
       <Card.Content className="flex flex-col gap-4">
@@ -304,6 +388,7 @@ function AccountTab() {
 const TABS: Array<[string, string, ReactNode]> = [
   ['models', 'Models', <ModelsTab key="m" />],
   ['voice', 'Voice', <VoiceTab key="v" />],
+  ['agent', 'Agent', <AgentTab key="g" />],
   ['account', 'Account', <AccountTab key="a" />],
 ];
 
@@ -312,11 +397,11 @@ export function SettingsPage() {
   const nav = useNavigate();
   return (
     <div className="scroll-y h-full">
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-3xl px-4 py-6 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-8">
         <Link to="/" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-[#5b6b8f] hover:text-[#2970ec]"><Icon name="chevron" size={14} className="rotate-180" /> Your videos</Link>
         <h1 className="mb-4 text-2xl font-bold text-[#1557d1]">Settings</h1>
         <Tabs selectedKey={tab} onSelectionChange={(k) => nav(`/settings/${String(k)}`)} variant="secondary">
-          <Tabs.ListContainer>
+          <Tabs.ListContainer className="scroll-x overflow-x-auto">
             <Tabs.List aria-label="Settings sections">
               {TABS.map(([id, label]) => <Tabs.Tab key={id} id={id}>{label}<Tabs.Indicator /></Tabs.Tab>)}
             </Tabs.List>

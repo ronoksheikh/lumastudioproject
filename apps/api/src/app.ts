@@ -19,6 +19,8 @@ import { healthRoutes } from './routes/health.js';
 import { metricsRoutes } from './routes/metrics.js';
 import { settingsRoutes } from './settings/routes.js';
 import { uploadRoutes } from './uploads/routes.js';
+import { billingRoutes } from './billing/routes.js';
+import { workerRoutes } from './render/workers.js';
 
 export interface AppContext {
   db: DB;
@@ -76,6 +78,8 @@ export async function buildApp(ctx: AppContext) {
       await providerRoutes(api, ctx);
       await settingsRoutes(api, ctx);
       await uploadRoutes(api, ctx);
+      await billingRoutes(api, ctx);
+      await workerRoutes(api, ctx);
       if (ctx.agent) await agentRoutes(api, ctx);
     },
     { prefix: '/api' },

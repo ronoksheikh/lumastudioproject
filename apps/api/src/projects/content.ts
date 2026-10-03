@@ -17,12 +17,24 @@ export function projectContent(dir: string): ProjectContent {
   return { scenes: has('public/js/scenes/index.js'), script: has('script.json'), voice: has('public/audio/timing.json') };
 }
 
+/** project.json "timeline" — a video without a voice times its scenes with it. */
+export function hasTimeline(dir: string): boolean {
+  try {
+    const pj = JSON.parse(fs.readFileSync(path.join(dir, 'project.json'), 'utf8')) as { timeline?: unknown };
+    return Array.isArray(pj.timeline) && pj.timeline.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 /** Why the video cannot be played/previewed/rendered yet, or null. (Same wording as template/scripts/lib/common.mjs.) */
 export function notPlayableReason(dir: string): string | null {
   const c = projectContent(dir);
   if (!c.scenes) {
     return 'This project has no scenes yet (public/js/scenes/index.js does not exist). Write script.json, generate the voice, then create the scene files and public/js/scenes/index.js — see read_guide("engine").';
   }
-  if (!c.voice) return 'This project has no voice timing yet (public/audio/timing.json is missing). Generate the voice first (generate_voice; placeholder:true works without a key).';
+  if (!c.voice && !hasTimeline(dir)) {
+    return 'This project has no time base yet: generate a voice (generate_voice, or import one from another provider with $LUMA_ENGINE/scripts/import-voice.mjs) — or, for a video without a voice, add "timeline": [{ "id": "intro", "duration": 3 }, …] to project.json.';
+  }
   return null;
 }

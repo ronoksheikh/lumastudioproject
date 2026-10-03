@@ -38,8 +38,11 @@ bundled example — only when the student asks for it).
    frame, then `onFrame(t)` hooks run, then WebGL renders. Never use `setTimeout`, `setInterval`,
    `requestAnimationFrame`, `Date.now()`, `Math.random()` (use `rand(i, k)`), or CSS `animation`/`transition`.
    `npm run check` rejects them.
-2. **Every beat lands on a word.** `ctx.w('seg', i)` = start time (s) of word `i` of segment `seg` (negative `i`
-   counts from the end), `ctx.wEnd('seg', i)` = its end. Plan against the real times `generate_voice` returned.
+2. **Every beat lands on a word — or on the timeline when there is no voice.** With a voice: `ctx.w('seg', i)` =
+   start time (s) of word `i` of segment `seg` (negative `i` counts from the end), `ctx.wEnd('seg', i)` = its end;
+   plan against the real times `generate_voice` returned. Without a voice (logo stings, music-only, silent reels):
+   `project.json` `"timeline": [{ "id": "intro", "duration": 3 }, …]` gives the scenes back to back, and
+   `ctx.at('intro', 1.2)` = 1.2 s into `intro`. See `read_guide("sound")` and `read_guide("logo")`.
 3. **Scene = segment.** `ctx.range('seg')` → `[start, end]` (end = next segment's start, or the video end).
 4. **Layer stack** inside the stage (1920×1080, or 1080×1920 for 9:16): WebGL canvas (brand gradient background,
    particles, 3D logo) → `#scenes` (your DOM) → `#fx` (flash, grain, vignette) → captions.
@@ -99,7 +102,9 @@ pick Inter / Anek Bangla / JetBrains Mono. CSS variables: `--sky --blue --royal 
 brand.json colours.
 
 **project.json** — already exists: `{ title, aspect: "16:9"|"9:16", fps: 60, tail: 2.4 }`. `tail` = seconds after
-the last word. Optional `features: { particles, logo3d, bloom }` (all default true; turn off what you don't use).
+the last word (default 2.4 with a voice, 0 with a timeline). Optional `features: { particles, logo3d, bloom }` (all
+default true; turn off what you don't use). Optional `timeline: [{ id, duration }]` = the time base for a video
+without a voice (used when there is no `public/audio/timing.json`). script.json is only needed for a voice.
 
 ## 4. `ctx` reference
 
@@ -112,7 +117,10 @@ the last word. Optional `features: { particles, logo3d, bloom }` (all default tr
 | `add(html)` → node, `show(node, from, to)` | create DOM in `#scenes`; toggle its `visibility` |
 | `wordIn(span, t)`, `reveal(spans, id, offset)`, `wordsOut(node, t)` | masked word reveal on a time / on spoken words / exit |
 | `flash(t, peak=0.85, dur=0.45)`, `shake(t, amount=1, dur=0.45)` | white flash; camera + scene shake |
-| `cue(t, type, gain)` | sound effect: `impact whoosh pop tick click riser shimmer glitch`; gain 0–1 (keep under the voice) |
+| `at(id, s)` | `s` seconds into segment `id` (works with and without a voice) |
+| `cue(t, type, gain)` | sound effect: `impact whoosh pop tick click riser shimmer glitch`, or a name from `sound()`; gain 0–1 |
+| `sound(name, fn(audioCtx, dest, t, gain))` | register your own WebAudio sound (deterministic), then `cue(t, name)` — `read_guide("sound")` |
+| `cueFile(t, url, { gain, offset })` | play an audio file (music, a recorded sting) from `t`; mixed into renders too |
 | `onFrame(fn(t))` | per-frame hook — deterministic code only |
 | `setStage(t, 'white'\|'blue', dur=0.5)` | switch the stage at `t`: white (and no vignette) or the brand-blue gradient |
 | `BG.uNight`, `BG.uWarm` | other background uniforms (deep-blue night, brighter glow) — tween with `tl.to(ctx.BG.uWarm, { value: 1 }, t)` |

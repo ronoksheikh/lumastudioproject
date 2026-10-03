@@ -7,7 +7,8 @@
 //   - no nondeterminism (setTimeout, Math.random, requestAnimationFrame, CSS animations) in scenes
 //   - every assets/… referenced exists
 //   - --page: the page builds without errors and the timeline is at least as long as the audio
-// Exit code 1 if any error; warnings do not fail. --json prints a machine-readable report.
+// Exit code 1 if any error; warnings do not fail. Errors are only for things that break the video (the page
+// can't build, a word reference that doesn't exist, nondeterminism); an imperfect project is a warning. --json prints a machine-readable report.
 
 import { readFile, readdir, access } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
@@ -32,8 +33,13 @@ let project;
 let brand;
 let script;
 let timing;
+let timeline = null; // project.json "timeline": a video without a voice
 try {
   project = await readJson(path.join(root, 'project.json'));
+  if (Array.isArray(project.timeline) && project.timeline.length) {
+    timeline = project.timeline;
+    for (const s of timeline) if (!s.id || !(Number(s.duration) > 0)) err(`project.json timeline: every entry needs an "id" and a positive "duration" (got ${JSON.stringify(s)})`);
+  }
   if (!['16:9', '9:16'].includes(project.aspect) && !(project.width && project.height)) err('project.json: aspect must be "16:9" or "9:16"');
   if (project.fps && ![24, 25, 30, 50, 60].includes(project.fps)) warn(`project.json: unusual fps ${project.fps}`);
 } catch (e) {
@@ -41,11 +47,11 @@ try {
 }
 try {
   brand = await readJson(path.join(root, project?.brand ?? 'brand.json'));
-  for (const k of ['sky', 'blue', 'royal', 'deep', 'nightA', 'nightB', 'off']) if (!brand.colors?.[k]) err(`brand.json: colors.${k} is missing`);
+  for (const k of ['sky', 'blue', 'royal', 'deep', 'nightA', 'nightB', 'off']) if (!brand.colors?.[k]) warn(`brand.json: colors.${k} is missing (the background shader uses it)`);
   for (const k of ['icon', 'lockup']) {
-    if (brand.logo?.[k] && !existsRel(brand.logo[k])) err(`brand.json: logo.${k} file not found: ${brand.logo[k]}`);
+    if (brand.logo?.[k] && !existsRel(brand.logo[k])) warn(`brand.json: logo.${k} file not found: ${brand.logo[k]}`);
   }
-  if (!brand.logo?.icon) err('brand.json: logo.icon is required (particles and the 3D logo use it)');
+  if (!brand.logo?.icon) warn('brand.json: no logo.icon (the particle logo and the 3D logo need one)');
 } catch (e) {
   err(`brand.json: ${e.message}`);
 }
@@ -54,34 +60,35 @@ try {
   validateScript(script, { requireVoice: false }).forEach(err);
   if (!script.voice?.voice_id || !script.voice?.model_id) warn('script.json: no voice chosen yet (voice.voice_id / voice.model_id) — call list_voices, set them, then generate the real voice');
 } catch (e) {
-  err(e.code === 'ENOENT' ? 'script.json does not exist yet — write the voiceover script first (voice settings + one segment per scene)' : `script.json: ${e.message}`);
+  if (e.code !== 'ENOENT') err(`script.json: ${e.message}`);
+  else if (!timeline) warn('no script.json — fine for a video without a voice (then give project.json a "timeline")');
 }
 try {
   timing = await readJson(path.join(root, 'public/audio/timing.json'));
 } catch {
-  err('public/audio/timing.json is missing — generate the voice first (the generate_voice tool; placeholder:true works without an ElevenLabs key)');
+  if (!timeline) err('no time base: generate a voice (public/audio/timing.json) or, for a video without a voice, add "timeline": [{ "id": "intro", "duration": 3 }, …] to project.json');
 }
 
 // ---------- timing vs script ----------
 if (script && timing) {
   const sIds = script.segments.map((s) => s.id);
   const tIds = timing.segments.map((s) => s.id);
-  if (sIds.join() !== tIds.join()) err(`timing.json segments (${tIds.join(', ')}) do not match script.json (${sIds.join(', ')}) — generate the voice again (generate_voice)`);
+  if (sIds.join() !== tIds.join()) warn(`timing.json segments (${tIds.join(', ')}) do not match script.json (${sIds.join(', ')}) — generate the voice again (generate_voice)`);
   else {
     for (const s of script.segments) {
       const t = timing.segments.find((x) => x.id === s.id);
-      if (t.text !== s.text) err(`segment "${s.id}": script.json text changed since the voice was generated — re-record it with patch_voice "${s.id}" (one line) or generate_voice`);
+      if (t.text !== s.text) warn(`segment "${s.id}": script.json text changed since the voice was generated — re-record it with patch_voice "${s.id}" (one line) or generate_voice`);
     }
   }
   if (timing.placeholder) warn('timing.json is a PLACEHOLDER (silent voice) — generate the real voice before the final render');
-  for (const s of timing.segments) if (!s.words.length) err(`segment "${s.id}" has no words in timing.json`);
+  for (const s of timing.segments) if (!s.words.length) warn(`segment "${s.id}" has no words in timing.json`);
 }
 const audioFile = path.join(root, 'public/audio/voiceover.mp3');
-if (!(await exists(audioFile))) { if (timing) err('public/audio/voiceover.mp3 is missing — generate the voice again'); }
+if (!(await exists(audioFile))) { if (timing) warn('public/audio/voiceover.mp3 is missing — the video will play without its voice'); }
 else if (timing) {
   try {
     const d = Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', audioFile], { encoding: 'utf8' }));
-    if (Math.abs(d - timing.duration) > 0.4) err(`voiceover.mp3 is ${d.toFixed(2)}s but timing.json says ${timing.duration}s — regenerate the voice`);
+    if (Math.abs(d - timing.duration) > 0.4) warn(`voiceover.mp3 is ${d.toFixed(2)}s but timing.json says ${timing.duration}s — regenerate the voice`);
   } catch {
     warn('ffprobe not available — skipped audio length check');
   }
@@ -91,8 +98,11 @@ else if (timing) {
 const scenesDir = path.join(root, 'public/js/scenes');
 const sceneFiles = (await readdir(scenesDir).catch(() => [])).filter((f) => f.endsWith('.js'));
 if (!sceneFiles.includes('index.js')) err('no scenes yet: public/js/scenes/index.js is missing — create the scene files and list them in public/js/scenes/index.js (read_guide "engine")');
-const segIds = new Set(timing?.segments.map((s) => s.id));
-const segWords = Object.fromEntries((timing?.segments ?? []).map((s) => [s.id, s.words.length]));
+// segments come from the voice timing, or from project.json "timeline" (no words) for a video without a voice
+const baseSegs = timing?.segments ?? (timeline ?? []).map((s) => ({ id: s.id, words: [] }));
+const segIds = new Set(baseSegs.map((s) => s.id));
+const segWords = Object.fromEntries(baseSegs.map((s) => [s.id, s.words.length]));
+const hasBase = Boolean(timing || timeline);
 
 const FORBIDDEN = [
   [/\bsetTimeout\s*\(/, 'setTimeout — use timeline times (tl.… , t)'],
@@ -109,16 +119,17 @@ for (const f of sceneFiles) {
   // static w('id', n) / wEnd / reveal-style references
   for (const m of src.matchAll(/\b(?:w|wEnd)\(\s*['"]([\w-]+)['"]\s*(?:,\s*(-?\d+)\s*)?\)/g)) {
     const [, id, n] = m;
-    if (timing && !segIds.has(id)) err(`${rel(file)}:${lineOf(src, m.index)}: segment "${id}" is not in timing.json (have: ${[...segIds].join(', ')})`);
+    if (hasBase && !segIds.has(id)) err(`${rel(file)}:${lineOf(src, m.index)}: segment "${id}" does not exist (have: ${[...segIds].join(', ')})`);
+    else if (hasBase && !timing) err(`${rel(file)}:${lineOf(src, m.index)}: ${m[0]} — this video has no voice, so there are no words: use at('${id}', seconds) or range('${id}')`);
     else if (timing && n !== undefined) {
       const i = Number(n);
       const count = segWords[id];
       if (i >= count || i < -count) err(`${rel(file)}:${lineOf(src, m.index)}: ${m[0]} — segment "${id}" only has ${count} words (0-${count - 1})`);
     }
   }
-  for (const m of src.matchAll(/\bS\.([A-Za-z_]\w*)|\bS\[\s*['"]([\w-]+)['"]\s*\]|\brange\(\s*['"]([\w-]+)['"]\s*\)/g)) {
+  for (const m of src.matchAll(/\bS\.([A-Za-z_]\w*)|\bS\[\s*['"]([\w-]+)['"]\s*\]|\b(?:range|at)\(\s*['"]([\w-]+)['"]/g)) {
     const id = m[1] ?? m[2] ?? m[3];
-    if (timing && !segIds.has(id)) err(`${rel(file)}:${lineOf(src, m.index)}: segment "${id}" is not in timing.json`);
+    if (hasBase && !segIds.has(id)) err(`${rel(file)}:${lineOf(src, m.index)}: segment "${id}" does not exist (have: ${[...segIds].join(', ')})`);
   }
   for (const [re, what] of FORBIDDEN) {
     const m = src.match(re);
@@ -172,7 +183,7 @@ if (opts.page && errors.length === 0) {
     if (error) err(`the video failed to build:\n${error}`);
     else {
       const d = await page.evaluate(() => window.ad.duration);
-      if (timing && d < timing.duration) err(`timeline is ${d.toFixed(2)}s but the audio is ${timing.duration}s`);
+      if (timing && d < timing.duration) warn(`timeline is ${d.toFixed(2)}s but the audio is ${timing.duration}s`);
       else ok.push(`page builds: ${d.toFixed(2)}s timeline`);
     }
     for (const l of logs) warn(l);

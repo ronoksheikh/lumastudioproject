@@ -64,6 +64,9 @@ export const toolSchemas = {
   web_fetch: z.object({
     url: z.string().url().describe('http(s) URL to fetch; HTML is converted to readable text'),
   }),
+  compact_context: z.object({
+    keep: z.string().max(2000).optional().describe('What the summary must keep (decisions, word indices, open problems) — optional'),
+  }),
 } as const;
 
 export type ToolName = keyof typeof toolSchemas;
@@ -84,6 +87,7 @@ const descriptions: Record<ToolName, string> = {
   render_video: 'Queue an MP4 render (draft or final). The student sees live progress; returns when the render is done.',
   ask_user: 'Ask the student a question and wait for the answer. Use only when you are genuinely blocked; otherwise choose sensible defaults.',
   web_fetch: 'Fetch a web page or text file (HTML converted to readable text, truncated).',
+  compact_context: 'Fold the older part of this conversation into a short project memory to free context, e.g. after a long debugging session, before a big new phase, or when your earlier messages are no longer needed. The last few messages stay verbatim. Happens automatically near the context limit; call it yourself to stay sharp earlier.',
   read_guide: 'Read Luma\'s reference docs (engine API, recipes, design rules, voice, pitfalls, 9:16, icons) or the source of an engine file / example scene. The engine and examples are not in the project folder; this is how you read them. Call without a topic for the index.',
 };
 

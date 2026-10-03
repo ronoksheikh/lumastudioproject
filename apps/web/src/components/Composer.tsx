@@ -124,7 +124,7 @@ export function Composer({ projectId, frames = [], onRemoveFrame, models, modelI
 
   return (
     <div
-      className={`border-t border-[var(--border)] bg-white p-3 ${drag ? 'ring-2 ring-inset ring-[#2970ec]' : ''}`}
+      className={`border-t border-[var(--border)] bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${drag ? 'ring-2 ring-inset ring-[#2970ec]' : ''}`}
       onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
       onDragLeave={() => setDrag(false)}
       onDrop={onDrop}
@@ -162,17 +162,17 @@ export function Composer({ projectId, frames = [], onRemoveFrame, models, modelI
         onChange={(e) => setText(e.target.value)}
         onPaste={onPaste}
         onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey || (!e.shiftKey && !e.nativeEvent.isComposing))) { e.preventDefault(); void submit(); } }}
-        rows={3}
+        rows={typeof window !== 'undefined' && window.innerWidth < 768 ? 2 : 3}
         placeholder={running ? 'Luma is working — you can stop it any time…' : 'Describe the video, or ask for a change…  (Enter to send, Shift+Enter for a new line)'}
         aria-label="Message to Luma"
         className="block max-h-56 min-h-[4.5rem] w-full resize-y rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none transition-colors placeholder:text-[#8a97b5] focus:border-[#2970ec]"
       />
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <input ref={input} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) void addFiles([...e.target.files]); e.target.value = ''; }} />
         <Button size="sm" variant="tertiary" onPress={() => input.current?.click()} aria-label="Attach files"><Icon name="clip" size={15} /> Attach</Button>
         <div className="ml-auto flex items-center gap-2">
           {models.length > 0 && (
-            <Select aria-label="Model" value={modelId ?? null} onChange={(k) => k && onModelChange(String(k))} className="w-44" isDisabled={running}>
+            <Select aria-label="Model" value={modelId ?? null} onChange={(k) => k && onModelChange(String(k))} className="w-36 sm:w-44" isDisabled={running}>
               <Label className="sr-only">Model</Label>
               <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
               <Select.Popover>
