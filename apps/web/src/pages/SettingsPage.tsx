@@ -397,11 +397,11 @@ export function SettingsPage() {
   const nav = useNavigate();
   return (
     <div className="scroll-y h-full">
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-3xl px-4 py-6 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-8">
         <Link to="/" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-[#5b6b8f] hover:text-[#2970ec]"><Icon name="chevron" size={14} className="rotate-180" /> Your videos</Link>
         <h1 className="mb-4 text-2xl font-bold text-[#1557d1]">Settings</h1>
         <Tabs selectedKey={tab} onSelectionChange={(k) => nav(`/settings/${String(k)}`)} variant="secondary">
-          <Tabs.ListContainer>
+          <Tabs.ListContainer className="scroll-x overflow-x-auto">
             <Tabs.List aria-label="Settings sections">
               {TABS.map(([id, label]) => <Tabs.Tab key={id} id={id}>{label}<Tabs.Indicator /></Tabs.Tab>)}
             </Tabs.List>

@@ -9,7 +9,8 @@ import { AskCard, AssistantText, CommitLine, Notice, Thinking, ToolCard } from '
 import { Icon } from './Icon';
 
 export function PlanCard({ items }: { items: PlanItem[] }) {
-  const [open, setOpen] = useState(true);
+  // open on desktop; on a phone it starts folded so the chat stays visible
+  const [open, setOpen] = useState(() => typeof window === 'undefined' || !window.matchMedia || window.matchMedia('(min-width: 1024px)').matches);
   const done = items.filter((i) => i.status === 'done').length;
   return (
     <section className="rounded-xl border border-[#c9d9f7] bg-[#eff5ff]" aria-label="Plan">

@@ -181,8 +181,8 @@ export function FilesPane({ projectId, tick }: { projectId: string; tick: number
   useEffect(() => { if (!selected && tree.data?.some((e) => e.path === 'script.json')) setSelected('script.json'); }, [tree.data, selected]);
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[minmax(160px,34%)_1fr]">
-      <nav className="scroll-y border-r border-[var(--border)] p-2" aria-label="Project files">
+    <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,38%)_minmax(0,1fr)] md:grid-cols-[minmax(160px,34%)_1fr] md:grid-rows-1">
+      <nav className="scroll-y border-b border-[var(--border)] p-2 md:border-b-0 md:border-r" aria-label="Project files">
         {tree.isLoading ? <Skeleton className="h-40 rounded-lg" /> : <ul role="tree">{nodes.map((n) => <Row key={n.path} n={n} depth={0} open={open} toggle={toggle} selected={selected} onSelect={setSelected} />)}</ul>}
       </nav>
       <div className="min-h-0 min-w-0">

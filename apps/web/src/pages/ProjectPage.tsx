@@ -147,7 +147,7 @@ export function ProjectPage() {
         <div className="flex h-12 min-w-0 flex-none items-center gap-2 border-b border-[var(--border)] bg-white px-3 sm:gap-3">
           <Link to="/" aria-label="Back to projects" className="grid h-8 w-8 place-items-center rounded-lg text-[#5b6b8f] hover:bg-[#eff5ff]"><Icon name="chevron" size={16} className="rotate-180" /></Link>
           <Title id={id} title={p.title} />
-          <Chip size="sm" color="accent"><Chip.Label>{p.aspect}</Chip.Label></Chip>
+          <span className="hidden sm:inline-flex"><Chip size="sm" color="accent"><Chip.Label>{p.aspect}</Chip.Label></Chip></span>
           {running && <Chip size="sm" color="warning"><Chip.Label>{awaiting ? 'waiting for you' : 'working'}</Chip.Label></Chip>}
           <div className="ml-auto flex rounded-lg bg-[#eff5ff] p-0.5 text-xs font-medium lg:hidden" role="tablist" aria-label="Pane">
             {(['chat', 'work'] as const).map((k) => (
