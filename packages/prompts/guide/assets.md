@@ -47,3 +47,10 @@ name doesn't exist. Size icons with `font-size` (the svg is 1em) and colour with
 `three`, `gsap` (+ DrawSVG, CustomEase), `d3-geo`, `topojson-client`, `world-atlas` are preinstalled. For more:
 `npm install <pkg>` (lands in the project), then copy the engine's `public/index.html` into the project
 (`cp "$LUMA_ENGINE/public/index.html" public/`) and add `"<pkg>": "./vendor/<pkg>/<entry>.js"` to its import map.
+
+## Shared library (all projects)
+Your prompt lists the shared library: fonts, sounds, data and snippets earlier runs added. `use_asset(id)` copies
+one into `assets/library/` (or `to`). Fonts: then add an `@font-face` for it in scenes.css. When you download a
+font or a sound, or build a reusable file (a country map from `npm run map`, a reusable effect), `share_asset` it
+— the next project gets it without downloading or rebuilding. Skip the student's own logo, photos and personal
+content.

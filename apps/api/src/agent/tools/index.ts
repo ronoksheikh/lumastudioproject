@@ -1,5 +1,7 @@
 import { toolSchemas, type ToolArgs, type ToolName } from '@luma/shared';
 import { saveLesson } from '../lessons.js';
+import { shareAsset, useAsset } from '../library.js';
+import { ToolError } from '../../runner/files.js';
 import { bash } from './bash.js';
 import { editFile, listFiles, readFile, writeFile } from './files.js';
 import { previewFrames } from './frames.js';
@@ -9,6 +11,16 @@ import { fail, ok, type ToolContext, type ToolResult } from './types.js';
 import { generateVoice, listVoices, patchVoice } from './voice.js';
 
 export * from './types.js';
+
+/** A tool whose ToolError is a normal, explained failure (not a crash). */
+const plain = (fn: () => string): ToolResult => {
+  try {
+    return ok(fn());
+  } catch (e) {
+    if (e instanceof ToolError) return fail(e.message);
+    throw e;
+  }
+};
 
 type Handler<N extends ToolName> = (ctx: ToolContext, args: ToolArgs<N>) => ToolResult | Promise<ToolResult>;
 const handlers: { [N in ToolName]: Handler<N> } = {
@@ -30,6 +42,8 @@ const handlers: { [N in ToolName]: Handler<N> } = {
     const r = saveLesson(ctx.db, { ...args, userId: ctx.userId, projectId: ctx.projectId, runId: ctx.runId, secrets: ctx.secrets });
     return r.ok ? ok(r.message, r.message) : fail(r.message);
   },
+  share_asset: (ctx, args) => plain(() => shareAsset(ctx.db, ctx.project, ctx.userId, args)),
+  use_asset: (ctx, args) => plain(() => useAsset(ctx.db, ctx.project, args.id, args.to)),
   compact_context: (ctx, args) => {
     if (!ctx.requestCompaction) return fail('Context compaction is not available here.');
     ctx.requestCompaction(args.keep);

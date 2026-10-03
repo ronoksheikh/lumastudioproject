@@ -36,6 +36,7 @@ async function request<T>(method: string, url: string, body?: unknown, form?: Fo
 const get = <T>(url: string) => request<T>('GET', url);
 export interface AgentPromptSettings {
   prompt: { mode: 'append' | 'replace'; text: string } | null;
+  prefs: { frameChecks: 'full' | 'light' | 'off' };
   defaultPrompt: string;
 }
 
@@ -123,6 +124,7 @@ export const api = {
   saveVoice: (v: { apiKey?: string; prefs?: Partial<VoicePrefs> }) => put<VoiceSettings>('/api/settings/voice', v),
   deleteVoiceKey: () => del<{ ok: true }>('/api/settings/voice/key'),
   agentPrompt: () => get<AgentPromptSettings>('/api/settings/agent'),
+  saveAgentPrefs: (p: { frameChecks: 'full' | 'light' | 'off' }) => put<AgentPromptSettings>('/api/settings/agent/prefs', p),
   saveAgentPrompt: (p: { mode: 'append' | 'replace'; text: string } | null) => put<AgentPromptSettings>('/api/settings/agent', p),
   testVoice: () => post<{ ok: boolean; error?: string; tier?: string | null; charactersUsed?: number | null; characterLimit?: number | null; note?: string }>('/api/settings/voice/test'),
 };

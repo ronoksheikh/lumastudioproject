@@ -233,3 +233,26 @@ export const agentLessons = sqliteTable(
   },
   (t) => [index('agent_lessons_status_idx').on(t.status)],
 );
+
+/**
+ * Shared library: reusable files one run downloaded or made (a font, a sound, a map json, a snippet) that any
+ * later project copies in with use_asset instead of downloading or building it again. Files live in
+ * DATA_DIR/library/<kind>/.
+ */
+export const sharedAssets = sqliteTable(
+  'shared_assets',
+  {
+    id: text('id').primaryKey(),
+    kind: text('kind').notNull(), // font | image | audio | data | snippet | other
+    name: text('name').notNull(),
+    file: text('file').notNull(), // path inside the library dir
+    sha256: text('sha256').notNull(),
+    size: integer('size').notNull(),
+    description: text('description'),
+    status: text('status').notNull().default('active'), // active | removed
+    sourceUserId: text('source_user_id'),
+    uses: integer('uses').notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index('shared_assets_status_idx').on(t.status), index('shared_assets_sha_idx').on(t.sha256)],
+);

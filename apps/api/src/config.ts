@@ -50,6 +50,8 @@ const schema = z.object({
   MAX_RUNS_PER_USER: num(4),
   /** shared agent lessons: auto = saved lessons are used at once, review = an operator approves them, off */
   AGENT_LESSONS: z.enum(['auto', 'review', 'off']).default('auto'),
+  /** shared asset library (share_asset/use_asset): 1 = on, 0 = off */
+  SHARED_LIBRARY: z.enum(['0', '1']).default('1'),
   /** Set to 1 to allow signup (closed beta switch). */
   SIGNUP_ENABLED: z.enum(['0', '1']).default('1'),
   /** Quotas. 0 turns a limit off. */
@@ -117,6 +119,7 @@ export const config = {
   agentMaxOutputTokens: env.AGENT_MAX_OUTPUT_TOKENS,
   maxRunsPerUser: env.MAX_RUNS_PER_USER,
   agentLessons: env.AGENT_LESSONS,
+  sharedLibrary: env.SHARED_LIBRARY === '1',
   userQuotaBytes: env.USER_QUOTA_MB * 1024 * 1024,
   renderSecondsPerDay: env.RENDER_MINUTES_PER_DAY * 60,
   renderBoostPriceBdt: env.RENDER_BOOST_PRICE_BDT,

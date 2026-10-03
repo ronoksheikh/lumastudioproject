@@ -2,7 +2,7 @@
 // until the model answers without tools, the student presses Stop, or a limit is hit.
 import fs from 'node:fs';
 import OpenAI from 'openai';
-import { toolDefinitions, type StopReason } from '@luma/shared';
+import { TOOL_NAMES, toolDefinitions, type StopReason } from '@luma/shared';
 import type BetterSqlite3 from 'better-sqlite3';
 import { config } from '../config.js';
 import type { CpuBudget } from '../cpu/budget.js';
@@ -17,11 +17,19 @@ import { ConvoStore, type ChatMessage, type StoredMessage } from './convo.js';
 import type { RunBus } from './events.js';
 import { attachmentsSummary, brandSummary, projectFacts } from './facts.js';
 import { forgetRun, lessonsForPrompt } from './lessons.js';
+import { libraryForPrompt } from './library.js';
+
+/** What the student chose in Settings → Agent → Frame checks, said to the model (full = the normal workflow). */
+const FRAME_CHECKS: Record<AgentPrefs['frameChecks'], string> = {
+  full: '',
+  light: '## Frame checks: LIGHT (the student\'s setting, to save tokens)\nYou may call preview_frames ONCE per message: pick the ≤ 8 most important moments. Rely on `npm run check -- --page` for the rest.',
+  off: '## Frame checks: OFF (the student\'s setting, to save tokens)\npreview_frames is not available. Verify with `npm run check -- --page` (cheap: build errors, console errors, static checks), then ask the student to watch the Preview tab and tell you what looks wrong — they can use "Attach this frame" to point at a moment. List the 2–4 moments most worth watching (times + what should happen there).',
+};
 import { buildSystemPrompt, fillPromptVars } from './prompts.js';
-import { describeOverrides, getVoicePrefs, getAgentPrompt } from '../settings/service.js';
+import { describeOverrides, getVoicePrefs, getAgentPrefs, getAgentPrompt, type AgentPrefs } from '../settings/service.js';
 import { collectTurn, type AssistantTurn } from './stream.js';
 import { inc } from '../observability/metrics.js';
-import { runTool, type ImagePart, type RenderService } from './tools/index.js';
+import { fail, runTool, type ImagePart, type RenderService } from './tools/index.js';
 
 export interface AgentDeps {
   db: DB;
@@ -104,6 +112,7 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
   const live = new Map<number, ChatMessage>();
   if (input.userMessage.parts) live.set(input.userMessage.rowid, { role: 'user', content: input.userMessage.parts });
 
+  const prefs = getAgentPrefs(db, input.userId);
   const systemFor = (mem: string | null): ChatMessage => {
     const custom = getAgentPrompt(db, input.userId);
     const vars = { aspect: input.aspect, brandSummary: brandSummary(project), attachmentsSummary: attachmentsSummary(db, input.projectId) };
@@ -116,12 +125,15 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
     const overrides = describeOverrides(getVoicePrefs(db, input.userId));
     const voiceLine = `\nVoice settings from the student: ${overrides ? `${overrides} (these override your choice automatically)` : 'none — you choose the voice and model (list_voices)'}. ElevenLabs key: ${input.elevenKey() ? 'saved' : 'NOT saved — use generate_voice placeholder:true and tell the student to add it in Settings → Voice'}.`;
     const lessons = lessonsForPrompt(db);
-    return { role: 'system', content: `${base}${lessons ? `\n\n${lessons}` : ''}\n\n## Current project state\n${projectFacts(db, project)}${voiceLine}${mem ? `\n\n## Project memory (summary of earlier work)\n${mem}` : ''}` };
+    const library = libraryForPrompt(db);
+    const checks = FRAME_CHECKS[prefs.frameChecks];
+    return { role: 'system', content: `${base}${checks ? `\n\n${checks}` : ''}${lessons ? `\n\n${lessons}` : ''}${library ? `\n\n${library}` : ''}\n\n## Current project state\n${projectFacts(db, project)}${voiceLine}${mem ? `\n\n## Project memory (summary of earlier work)\n${mem}` : ''}` };
   };
   let system = systemFor(memory?.summary ?? null);
   const messages = () => [system, ...rows.map((r) => live.get(r.rowid) ?? r.msg)];
 
-  const tools = toolDefinitions();
+  const tools = toolDefinitions(prefs.frameChecks === 'off' ? TOOL_NAMES.filter((n) => n !== 'preview_frames') : TOOL_NAMES);
+  let frameCalls = 0;
   const maxSteps = input.maxSteps ?? config.agentMaxSteps;
   const delays = deps.retryDelaysMs ?? [1000, 4000, 12000];
   let stopReason: StopReason = 'completed';
@@ -229,7 +241,12 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
           continue;
         }
         bus.emit('tool.call', { callId: call.id, name: call.name, args: safeJson(redactSecrets(call.arguments, input.secrets)) });
-        const { result } = await runTool(call.name, call.arguments, {
+        // the student's Settings → Agent → Frame checks: off = never, light = once per message
+        const framesBlocked = call.name === 'preview_frames' && (prefs.frameChecks === 'off' || (prefs.frameChecks === 'light' && frameCalls >= 1));
+        if (call.name === 'preview_frames' && !framesBlocked) frameCalls++;
+        const { result } = framesBlocked
+          ? { result: fail(`frame checks are ${prefs.frameChecks === 'off' ? 'turned off' : 'limited to one call per message'} by the student (Settings → Agent). Use \`npm run check -- --page\` and ask the student to watch the preview.`) }
+          : await runTool(call.name, call.arguments, {
           db,
           runId: input.runId,
           projectId: input.projectId,

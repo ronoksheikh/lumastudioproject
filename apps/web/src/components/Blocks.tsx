@@ -28,6 +28,8 @@ const TOOL_META: Record<string, { icon: IconName; label: string }> = {
   list_voices: { icon: 'mic', label: 'Voices' },
   compact_context: { icon: 'brain', label: 'Tidy memory' },
   save_lesson: { icon: 'brain', label: 'Learned' },
+  share_asset: { icon: 'folder', label: 'Shared to library' },
+  use_asset: { icon: 'folder', label: 'From library' },
 };
 
 const argOf = (b: ToolBlock, key: string): string | undefined => {
