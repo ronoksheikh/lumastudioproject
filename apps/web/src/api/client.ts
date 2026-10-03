@@ -34,6 +34,13 @@ async function request<T>(method: string, url: string, body?: unknown, form?: Fo
   return (text ? JSON.parse(text) : undefined) as T;
 }
 const get = <T>(url: string) => request<T>('GET', url);
+export interface FastRender {
+  priceBdt: number;
+  packMinutes: number;
+  secondsLeft: number;
+  pendingPurchase: boolean;
+}
+
 const post = <T>(url: string, body: unknown = {}) => request<T>('POST', url, body);
 const patch = <T>(url: string, body: unknown) => request<T>('PATCH', url, body);
 const put = <T>(url: string, body: unknown) => request<T>('PUT', url, body);
@@ -50,7 +57,8 @@ export const api = {
   me: () => get<{ user: User | null; csrfToken?: string }>('/api/auth/me'),
   authConfig: () => get<{ signupEnabled: boolean; captchaSiteKey: string | null }>('/api/auth/config'),
   signup: (email: string, password: string, captcha?: string) => post<{ user: User; csrfToken: string }>('/api/auth/signup', { email, password, captcha }),
-  usage: () => get<{ usage: { diskBytes: number; diskLimitBytes: number | null; renderSecondsToday: number; renderSecondsLimit: number | null } }>('/api/usage'),
+  usage: () => get<{ usage: { diskBytes: number; diskLimitBytes: number | null; renderLimitReached: boolean; fastRender: FastRender } }>('/api/usage'),
+  buyRenderHour: () => post<{ id: string; status: 'pending'; priceBdt: number; message: string }>('/api/billing/render-boost'),
   login: (email: string, password: string) => post<{ user: User; csrfToken: string }>('/api/auth/login', { email, password }),
   logout: () => post<{ ok: true }>('/api/auth/logout'),
   changePassword: (currentPassword: string, newPassword: string) => post<{ ok: true }>('/api/auth/password', { currentPassword, newPassword }),

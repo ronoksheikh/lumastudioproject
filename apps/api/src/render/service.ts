@@ -2,15 +2,15 @@
 // queued jobs (oldest first), each waits for a CPU-budget slot, then runs the pristine render.mjs as
 // the project's unix user. Progress lines become render.* events and DB progress.
 import path from 'node:path';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lt } from 'drizzle-orm';
 import type { DB } from '../db/index.js';
-import { projects, renderJobs, renders } from '../db/schema.js';
+import { projects, renderJobs, renders, renderWorkers } from '../db/schema.js';
 import { RunBus } from '../agent/events.js';
 import { runPristineScript } from '../agent/tools/scripts.js';
 import { fail, ok, type RenderService, type ToolResult } from '../agent/tools/types.js';
 import { config } from '../config.js';
 import { conflict } from '../http/errors.js';
-import { assertRenderAllowed } from '../quota/service.js';
+import { assertRenderAllowed, chargeBoost } from '../quota/service.js';
 import { logger } from '../logger.js';
 import { inc, observe } from '../observability/metrics.js';
 import type { CpuBudget } from '../cpu/budget.js';
@@ -70,19 +70,100 @@ export class RenderQueue implements RenderService {
     for (const c of this.handling.values()) c.abort();
   }
 
-  /** Inserts a queued job (one active render per user). */
+  /**
+   * Inserts a queued job: one active render per PROJECT (students work on several projects at once). Paid
+   * render hours route it to the fast remote workers, otherwise it renders here within the daily allowance.
+   */
   enqueue(args: { projectId: string; userId: string; runId?: string | null; preset: Preset }): string {
-    assertRenderAllowed(this.db, args.userId);
+    const route = assertRenderAllowed(this.db, args.userId);
     const busy = this.db
       .select({ id: renderJobs.id })
       .from(renderJobs)
-      .where(and(eq(renderJobs.userId, args.userId), inArray(renderJobs.status, [...ACTIVE])))
+      .where(and(eq(renderJobs.projectId, args.projectId), inArray(renderJobs.status, [...ACTIVE])))
       .get();
-    if (busy) throw conflict('You already have a render in progress. Wait for it to finish first.');
+    if (busy) throw conflict('This project already has a render in progress. Wait for it to finish first.');
     const id = newId();
-    this.db.insert(renderJobs).values({ id, projectId: args.projectId, userId: args.userId, runId: args.runId ?? null, preset: args.preset }).run();
+    this.db.insert(renderJobs).values({ id, projectId: args.projectId, userId: args.userId, runId: args.runId ?? null, preset: args.preset, pool: route.pool, boostId: route.boostId }).run();
     this.tick();
     return id;
+  }
+
+  /** Is any remote render worker online (called in recently)? Without one, paid renders run here. */
+  workersOnline(now = Date.now()): boolean {
+    return !!this.db.select({ id: renderWorkers.id }).from(renderWorkers)
+      .where(and(eq(renderWorkers.disabled, false), gte(renderWorkers.lastSeenAt, now - config.workerOnlineS * 1000))).get();
+  }
+
+  // ---------------- remote workers (see render/workers.ts for the HTTP side) ----------------
+
+  /** A worker asks for work: the oldest queued remote job becomes its job (with a lease it renews by reporting progress). */
+  claimRemote(workerId: string): typeof renderJobs.$inferSelect | null {
+    const now = Date.now();
+    const job = this.db.select().from(renderJobs).where(and(eq(renderJobs.status, 'queued'), eq(renderJobs.pool, 'remote')))
+      .orderBy(asc(renderJobs.createdAt), asc(renderJobs.id)).get();
+    if (!job || this.handling.has(job.id)) return null;
+    const claimed = this.db.update(renderJobs)
+      .set({ status: 'running', startedAt: now, workerId, leaseUntil: now + config.workerLeaseS * 1000 })
+      .where(and(eq(renderJobs.id, job.id), eq(renderJobs.status, 'queued'))).run().changes;
+    if (!claimed) return null;
+    this.waiters.get(job.id)?.bus?.emit('render.progress', { jobId: job.id, frame: 0, total: 0, position: 0 });
+    return this.db.select().from(renderJobs).where(eq(renderJobs.id, job.id)).get() ?? null;
+  }
+
+  /** The worker's job, if it still owns it (null = cancelled, expired or someone else's). */
+  ownedRemote(jobId: string, workerId: string) {
+    const job = this.db.select().from(renderJobs).where(and(eq(renderJobs.id, jobId), eq(renderJobs.workerId, workerId))).get();
+    return job && job.status === 'running' ? job : null;
+  }
+
+  remoteProgress(jobId: string, workerId: string, frame: number, total: number, eta?: number): boolean {
+    const job = this.ownedRemote(jobId, workerId);
+    if (!job) return false;
+    this.db.update(renderJobs).set({ leaseUntil: Date.now() + config.workerLeaseS * 1000, progress: Math.round((frame / Math.max(1, total)) * 1000) }).where(eq(renderJobs.id, jobId)).run();
+    this.waiters.get(jobId)?.bus?.emit('render.progress', { jobId, frame, total, ...(eta != null ? { eta } : {}) });
+    return true;
+  }
+
+  /** The worker uploaded the MP4 + contact sheet into the project's export/ (rel paths) and its result JSON. */
+  remoteDone(jobId: string, workerId: string, rel: string, result: RenderResult): boolean {
+    const job = this.ownedRemote(jobId, workerId);
+    if (!job) return false;
+    this.complete(job, rel, result);
+    return true;
+  }
+
+  remoteFail(jobId: string, workerId: string, message: string): boolean {
+    const job = this.ownedRemote(jobId, workerId);
+    if (!job) return false;
+    this.db.update(renderJobs).set({ status: 'error', error: message, finishedAt: Date.now() }).where(eq(renderJobs.id, jobId)).run();
+    inc('luma_renders_total', { status: 'error', preset: job.preset }, 1, 'Renders by outcome');
+    this.waiters.get(jobId)?.resolve({ ok: false, error: `The render failed on the render server: ${message}` });
+    this.waiters.delete(jobId);
+    return true;
+  }
+
+  /** Remote jobs whose worker went quiet go back to the queue (another worker — or this server — takes them). */
+  private requeueExpired(now = Date.now()) {
+    const n = this.db.update(renderJobs).set({ status: 'queued', workerId: null, leaseUntil: null, startedAt: null, progress: 0 })
+      .where(and(eq(renderJobs.status, 'running'), eq(renderJobs.pool, 'remote'), lt(renderJobs.leaseUntil, now))).run().changes;
+    if (n) logger.warn({ count: n }, 'requeued remote renders whose worker stopped reporting');
+  }
+
+  /** Shared ending of a successful render (here or on a worker): store it, bill it, tell the run. */
+  private complete(job: typeof renderJobs.$inferSelect, rel: string, result: RenderResult) {
+    const row = { id: newId(), projectId: job.projectId, jobId: job.id, preset: job.preset, path: rel, duration: Math.round(result.duration * 1000), size: result.size };
+    this.db.insert(renders).values(row).run();
+    const finishedAt = Date.now();
+    this.db.update(renderJobs).set({ status: 'done', progress: 1000, finishedAt }).where(eq(renderJobs.id, job.id)).run();
+    if (job.boostId) chargeBoost(this.db, job.boostId, (finishedAt - (job.startedAt ?? finishedAt)) / 1000);
+    inc('luma_renders_total', { status: 'done', preset: job.preset }, 1, 'Renders by outcome');
+    observe('luma_render_seconds', result.seconds, 'Wall-clock seconds of successful renders');
+    const saved = this.db.select().from(renders).where(eq(renders.id, row.id)).get()!;
+    const base = `/api/projects/${job.projectId}/renders/${row.id}`;
+    const w = this.waiters.get(job.id);
+    w?.bus?.emit('render.done', { jobId: job.id, url: `${base}/file`, contactSheetUrl: `${base}/sheet`, durationS: result.duration });
+    w?.resolve({ ok: true, render: saved, result });
+    this.waiters.delete(job.id);
   }
 
   /** The render_video tool: queue, stream progress to the run, and wait for the result. */
@@ -123,7 +204,10 @@ export class RenderQueue implements RenderService {
       .set({ status: 'error', error: reason, finishedAt: Date.now() })
       .where(and(eq(renderJobs.id, jobId), eq(renderJobs.status, 'queued')))
       .run().changes;
-    if (n) this.waiters.get(jobId)?.resolve({ ok: false, error: reason });
+    // a job running on a remote worker: mark it, the worker learns at its next report and stops
+    const r = n ? 0 : this.db.update(renderJobs).set({ status: 'error', error: reason, finishedAt: Date.now() })
+      .where(and(eq(renderJobs.id, jobId), eq(renderJobs.status, 'running'), eq(renderJobs.pool, 'remote'))).run().changes;
+    if (n || r) this.waiters.get(jobId)?.resolve({ ok: false, error: reason });
     this.waiters.delete(jobId);
   }
 
@@ -135,9 +219,12 @@ export class RenderQueue implements RenderService {
 
   tick() {
     if (this.stopped) return;
+    this.requeueExpired();
     const queued = this.db.select().from(renderJobs).where(eq(renderJobs.status, 'queued')).orderBy(asc(renderJobs.createdAt), asc(renderJobs.id)).all();
+    const remoteOnline = queued.some((j) => j.pool === 'remote') && this.workersOnline();
     for (const job of queued) {
       if (this.handling.has(job.id)) continue;
+      if (job.pool === 'remote' && remoteOnline) continue; // a fast worker will claim it
       const ctl = new AbortController();
       this.handling.set(job.id, ctl);
       void this.handle(job, ctl).finally(() => this.handling.delete(job.id));
@@ -217,24 +304,8 @@ export class RenderQueue implements RenderService {
         return failJob(`The render failed: ${reason}${details && details !== reason ? `\n${details}` : ''}`);
       }
       const result = (JSON.parse(line) as { render: RenderResult }).render;
-
-      const row = {
-        id: newId(),
-        projectId: job.projectId,
-        jobId: job.id,
-        preset: job.preset,
-        path: rel,
-        duration: Math.round(result.duration * 1000),
-        size: result.size,
-      };
-      this.db.insert(renders).values(row).run();
-      this.db.update(renderJobs).set({ status: 'done', progress: 1000, finishedAt: Date.now() }).where(eq(renderJobs.id, job.id)).run();
-      inc('luma_renders_total', { status: 'done', preset: job.preset }, 1, 'Renders by outcome');
-      observe('luma_render_seconds', result.seconds, 'Wall-clock seconds of successful renders');
-      const saved = this.db.select().from(renders).where(eq(renders.id, row.id)).get()!;
-      const base = `/api/projects/${job.projectId}/renders/${row.id}`;
-      waiter()?.bus?.emit('render.done', { jobId: job.id, url: `${base}/file`, contactSheetUrl: `${base}/sheet`, durationS: result.duration });
-      settle({ ok: true, render: saved, result });
+      const fresh = this.db.select().from(renderJobs).where(eq(renderJobs.id, job.id)).get() ?? job;
+      this.complete(fresh, rel, result);
     } catch (e) {
       if ((e as Error).name === 'AbortError') failJob(String((ctl.signal.reason as Error | undefined)?.message ?? 'Stopped.'));
       else {

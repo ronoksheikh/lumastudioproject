@@ -260,23 +260,53 @@ function UsageCard() {
   const q = useQuery({ queryKey: ['usage'], queryFn: () => api.usage().then((r) => r.usage), staleTime: 30_000 });
   const u = q.data;
   if (!u) return null;
-  const bar = (label: string, used: number, limit: number | null, text: string) => (
-    <div>
-      <div className="mb-1 flex justify-between text-sm"><span>{label}</span><span className="mono text-[#5b6b8f]">{text}</span></div>
-      {limit ? (
-        <ProgressBar value={Math.min(100, (used / limit) * 100)} aria-label={label} color={used / limit > 0.9 ? 'danger' : 'accent'}>
-          <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
-        </ProgressBar>
-      ) : null}
-    </div>
-  );
   return (
     <Card className="max-w-lg p-2">
-      <Card.Header><Card.Title>Your allowance</Card.Title><Card.Description>Projects, uploads and renders share one storage allowance. Render time refills over 24 hours.</Card.Description></Card.Header>
+      <Card.Header><Card.Title>Your storage</Card.Title><Card.Description>Projects, uploads and renders share one storage allowance.</Card.Description></Card.Header>
       <Card.Content className="flex flex-col gap-4">
-        {bar('Storage', u.diskBytes, u.diskLimitBytes, `${fmtBytes(u.diskBytes)}${u.diskLimitBytes ? ` of ${fmtBytes(u.diskLimitBytes)}` : ''}`)}
-        {bar('Render time today', u.renderSecondsToday, u.renderSecondsLimit, `${Math.round(u.renderSecondsToday / 60)} min${u.renderSecondsLimit ? ` of ${Math.round(u.renderSecondsLimit / 60)} min` : ''}`)}
+        <div>
+          <div className="mb-1 flex justify-between text-sm"><span>Storage</span><span className="mono text-[#5b6b8f]">{fmtBytes(u.diskBytes)}{u.diskLimitBytes ? ` of ${fmtBytes(u.diskLimitBytes)}` : ''}</span></div>
+          {u.diskLimitBytes ? (
+            <ProgressBar value={Math.min(100, (u.diskBytes / u.diskLimitBytes) * 100)} aria-label="Storage" color={u.diskBytes / u.diskLimitBytes > 0.9 ? 'danger' : 'accent'}>
+              <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
+            </ProgressBar>
+          ) : null}
+        </div>
       </Card.Content>
+    </Card>
+  );
+}
+
+/** Paid hours on the fast render servers. Payment processing comes later: a purchase is saved as pending. */
+function FastRenderCard() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['usage'], queryFn: () => api.usage().then((r) => r.usage), staleTime: 30_000 });
+  const buy = useMutation({
+    mutationFn: () => api.buyRenderHour(),
+    onSuccess: (r) => { toast.success(r.message); void qc.invalidateQueries({ queryKey: ['usage'] }); },
+    onError: (e) => toast.danger(msg(e)),
+  });
+  const u = q.data;
+  if (!u) return null;
+  const f = u.fastRender;
+  const left = Math.ceil(f.secondsLeft / 60);
+  return (
+    <Card className="max-w-lg p-2">
+      <Card.Header>
+        <Card.Title className="flex items-center gap-2"><Icon name="lightning" /> Fast render hours</Card.Title>
+        <Card.Description>
+          Rendering here is free every day. {u.renderLimitReached ? <b>You have used today’s free render time.</b> : 'When today’s free time runs out,'} {u.renderLimitReached ? 'Get' : 'get'} {f.packMinutes} minutes on our super-fast render servers for ৳{f.priceBdt} — it also resets your daily free time.
+        </Card.Description>
+      </Card.Header>
+      <Card.Content className="flex flex-col gap-2 text-sm">
+        {f.secondsLeft > 0 && <p><Chip size="sm" color="success"><Chip.Label>Active</Chip.Label></Chip> {left} min of fast rendering left — your renders go to the fast servers.</p>}
+        {f.pendingPurchase && <p className="text-[#5b6b8f]">Your purchase is waiting for payment. Online payment is coming soon; the Lumademy team activates it once paid.</p>}
+      </Card.Content>
+      <Card.Footer className="justify-end">
+        <Button variant="primary" isDisabled={buy.isPending || f.pendingPurchase} onPress={() => buy.mutate()}>
+          {f.pendingPurchase ? 'Payment pending' : `Buy ${f.packMinutes} min · ৳${f.priceBdt}`}
+        </Button>
+      </Card.Footer>
     </Card>
   );
 }
@@ -289,6 +319,7 @@ function AccountTab() {
   return (
     <div className="flex flex-col gap-4">
     <UsageCard />
+    <FastRenderCard />
     <Card className="max-w-lg p-2">
       <Card.Header><Card.Title>Account</Card.Title><Card.Description>Signed in as <b>{me.data?.user?.email}</b></Card.Description></Card.Header>
       <Card.Content className="flex flex-col gap-4">

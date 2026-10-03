@@ -53,6 +53,13 @@ const schema = z.object({
   /** Quotas. 0 turns a limit off. */
   USER_QUOTA_MB: num(5120),
   RENDER_MINUTES_PER_DAY: num(60),
+  /** Paid render hours on the fast remote workers: price (BDT) and length of one pack. */
+  RENDER_BOOST_PRICE_BDT: num(100),
+  RENDER_BOOST_MINUTES: num(60),
+  /** A remote worker's claim on a job expires without a progress report for this long (it goes back to the queue). */
+  WORKER_LEASE_S: num(120),
+  /** A worker counts as online if it called in within this many seconds; with none online, paid renders run here. */
+  WORKER_ONLINE_S: num(90),
   /** Deleted projects are removed from disk after this many days. */
   PURGE_AFTER_DAYS: num(7),
   /** Nightly SQLite backups (online .backup) kept in BACKUP_DIR; BACKUP_KEEP newest files are retained. */
@@ -109,6 +116,10 @@ export const config = {
   maxRunsPerUser: env.MAX_RUNS_PER_USER,
   userQuotaBytes: env.USER_QUOTA_MB * 1024 * 1024,
   renderSecondsPerDay: env.RENDER_MINUTES_PER_DAY * 60,
+  renderBoostPriceBdt: env.RENDER_BOOST_PRICE_BDT,
+  renderBoostSeconds: env.RENDER_BOOST_MINUTES * 60,
+  workerLeaseS: env.WORKER_LEASE_S,
+  workerOnlineS: env.WORKER_ONLINE_S,
   purgeAfterDays: env.PURGE_AFTER_DAYS,
   backupDir: env.BACKUP_DIR ?? path.join(env.DATA_DIR, 'backups'),
   backupKeep: env.BACKUP_KEEP,
