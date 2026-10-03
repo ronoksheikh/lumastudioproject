@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { ASPECTS } from '@luma/shared';
 import { z } from 'zod';
@@ -33,7 +33,17 @@ export async function projectRoutes(app: FastifyInstance, ctx: AppContext) {
   const { db } = ctx;
   const auth = { preHandler: requireAuth };
 
-  app.get('/projects', auth, async (req) => ({ projects: listProjects(db, authUser(req).id).map((p) => publicProject(p)) }));
+  app.get('/projects', auth, async (req) => {
+    const list = listProjects(db, authUser(req).id);
+    // thumbnail = the latest render's contact sheet (its first tile is shown on the card)
+    const latest = new Map<string, string>();
+    if (list.length) {
+      const rows = db.select({ id: renders.id, projectId: renders.projectId, createdAt: renders.createdAt }).from(renders)
+        .where(inArray(renders.projectId, list.map((p) => p.id))).orderBy(desc(renders.createdAt)).all();
+      for (const r of rows) if (!latest.has(r.projectId)) latest.set(r.projectId, `/api/projects/${r.projectId}/renders/${r.id}/sheet`);
+    }
+    return { projects: list.map((p) => ({ ...publicProject(p), thumbnailUrl: latest.get(p.id) ?? null })) };
+  });
 
   app.get('/usage', auth, async (req) => ({ usage: usageFor(db, authUser(req).id) }));
 

@@ -1,15 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, Dropdown } from '@heroui/react';
 import type { ReactNode } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api, setCsrf } from '../api/client';
 import type { User } from '../api/types';
+import { Icon } from './Icon';
 import { Logo } from './Logo';
 
-const link = ({ isActive }: { isActive: boolean }) =>
-  `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${isActive ? 'bg-[#eff5ff] text-[#1557d1]' : 'text-[#5b6b8f] hover:text-[#2970ec]'}`;
-
-export function AppShell({ user, children }: { user: User; children: ReactNode }) {
+/** Account + settings, small and out of the way (home and settings pages only). */
+export function AccountMenu({ user }: { user: User }) {
   const qc = useQueryClient();
   const nav = useNavigate();
   const logout = async () => {
@@ -20,32 +19,45 @@ export function AppShell({ user, children }: { user: User; children: ReactNode }
     window.location.reload();
   };
   return (
+    <div className="flex items-center gap-1">
+      <Link to="/settings" aria-label="Settings" title="Settings" className="grid h-9 w-9 place-items-center rounded-full text-[#5b6b8f] transition-colors hover:bg-[#eff5ff] hover:text-[#2970ec]">
+        <Icon name="settings" size={18} />
+      </Link>
+      <Dropdown>
+        <Dropdown.Trigger aria-label="Account menu" className="rounded-full outline-none">
+          <Avatar size="sm" color="accent">
+            <Avatar.Fallback>{user.email.slice(0, 2).toUpperCase()}</Avatar.Fallback>
+          </Avatar>
+        </Dropdown.Trigger>
+        <Dropdown.Popover>
+          <Dropdown.Menu onAction={(key) => (key === 'logout' ? void logout() : nav(key === 'settings' ? '/settings/models' : '/settings/account'))}>
+            <Dropdown.Item id="who" textValue={user.email} isDisabled><span className="text-xs text-[#5b6b8f]">{user.email}</span></Dropdown.Item>
+            <Dropdown.Item id="account" textValue="Account">Account</Dropdown.Item>
+            <Dropdown.Item id="settings" textValue="Settings">Models &amp; voice</Dropdown.Item>
+            <Dropdown.Item id="logout" textValue="Log out">Log out</Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      </Dropdown>
+    </div>
+  );
+}
+
+/**
+ * Home and Settings get a slim top bar (logo + account). Inside a project there is no global header at all:
+ * the project page shows only project-level UI (back, title, tabs, run status).
+ */
+export function AppShell({ user, children }: { user: User; children: ReactNode }) {
+  const { pathname } = useLocation();
+  if (pathname.startsWith('/projects/')) return <main className="h-full overflow-hidden">{children}</main>;
+  return (
     <div className="flex h-full flex-col">
-      <header className="flex h-14 flex-none items-center gap-6 border-b border-[var(--border)] bg-white px-4 sm:px-6">
-        <Link to="/" aria-label="Luma Studio home" className="flex items-center gap-3">
+      <header className="mx-auto flex h-16 w-full max-w-5xl flex-none items-center gap-3 bg-white px-4 sm:px-8">
+        <Link to="/" aria-label="Luma Studio home" className="flex items-center gap-2.5">
           <Logo className="h-6" />
-          <span className="hidden text-sm font-semibold text-[#2970ec] sm:inline">Luma Studio</span>
+          <span className="h-5 w-px bg-[var(--border)]" aria-hidden="true" />
+          <span className="text-sm font-semibold tracking-tight text-[#2970ec]">Luma Studio</span>
         </Link>
-        <nav className="flex items-center gap-1" aria-label="Main">
-          <NavLink to="/" end className={link}>Projects</NavLink>
-          <NavLink to="/settings" className={link}>Settings</NavLink>
-        </nav>
-        <div className="ml-auto">
-          <Dropdown>
-            <Dropdown.Trigger aria-label="Account menu" className="flex items-center gap-2 rounded-full outline-none">
-              <Avatar size="sm" color="accent">
-                <Avatar.Fallback>{user.email.slice(0, 2).toUpperCase()}</Avatar.Fallback>
-              </Avatar>
-              <span className="hidden max-w-48 truncate text-sm text-[#5b6b8f] md:inline">{user.email}</span>
-            </Dropdown.Trigger>
-            <Dropdown.Popover>
-              <Dropdown.Menu onAction={(key) => (key === 'logout' ? void logout() : nav('/settings/account'))}>
-                <Dropdown.Item id="account" textValue="Account">Account</Dropdown.Item>
-                <Dropdown.Item id="logout" textValue="Log out">Log out</Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown.Popover>
-          </Dropdown>
-        </div>
+        <div className="ml-auto"><AccountMenu user={user} /></div>
       </header>
       <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
     </div>

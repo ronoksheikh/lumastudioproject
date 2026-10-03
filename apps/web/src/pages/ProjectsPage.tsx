@@ -1,11 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Card, Chip, Dropdown, Input, Label, Modal, Skeleton, TextField, toast } from '@heroui/react';
+import { AlertDialog, Button, Dropdown, Input, Label, Modal, Skeleton, TextField, toast } from '@heroui/react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import type { Project } from '../api/types';
 import { Icon } from '../components/Icon';
-import { timeAgo, useProjects } from '../lib/hooks';
+import { timeAgo, useModels, useProjects, useVoice } from '../lib/hooks';
 
 function NewProjectModal({ isOpen, onOpenChange }: { isOpen: boolean; onOpenChange: (o: boolean) => void }) {
   const [title, setTitle] = useState('');
@@ -28,12 +28,12 @@ function NewProjectModal({ isOpen, onOpenChange }: { isOpen: boolean; onOpenChan
         <Modal.Dialog className="sm:max-w-md">
           <Modal.CloseTrigger />
           <Modal.Header>
-            <Modal.Heading>New project</Modal.Heading>
+            <Modal.Heading>New video</Modal.Heading>
           </Modal.Header>
           <Modal.Body>
             <form id="new-project" className="flex flex-col gap-5" onSubmit={(e) => { e.preventDefault(); if (title.trim()) create.mutate(); }}>
               <TextField value={title} onChange={setTitle} autoFocus isRequired>
-                <Label>Project title</Label>
+                <Label>Title</Label>
                 <Input placeholder="e.g. Lumademy course ad" />
               </TextField>
               <fieldset className="flex flex-col gap-2">
@@ -53,7 +53,7 @@ function NewProjectModal({ isOpen, onOpenChange }: { isOpen: boolean; onOpenChan
           </Modal.Body>
           <Modal.Footer>
             <Button slot="close" variant="tertiary">Cancel</Button>
-            <Button type="submit" form="new-project" variant="primary" isDisabled={!title.trim() || create.isPending}>Create project</Button>
+            <Button type="submit" form="new-project" variant="primary" isDisabled={!title.trim() || create.isPending}>Create</Button>
           </Modal.Footer>
         </Modal.Dialog>
       </Modal.Container>
@@ -61,29 +61,40 @@ function NewProjectModal({ isOpen, onOpenChange }: { isOpen: boolean; onOpenChan
   );
 }
 
+/** The latest render's first frame (top-left tile of its 2×2 contact sheet), else a calm brand tile. */
+function Thumb({ project }: { project: Project }) {
+  const portrait = project.aspect === '9:16';
+  const [broken, setBroken] = useState(false);
+  return (
+    <div className="relative grid aspect-video place-items-center overflow-hidden rounded-xl bg-[#eff5ff]">
+      {project.thumbnailUrl && !broken ? (
+        <div className={`relative h-full ${portrait ? 'aspect-[9/16]' : 'w-full'} overflow-hidden`}>
+          <img src={project.thumbnailUrl} alt="" onError={() => setBroken(true)} className="absolute left-0 top-0 h-[200%] w-[200%] max-w-none object-cover" />
+        </div>
+      ) : (
+        <div className={`luma-gradient grid place-items-center rounded-lg text-white/90 shadow-sm ${portrait ? 'h-[72%] aspect-[9/16]' : 'h-[62%] aspect-video'}`}>
+          <Icon name="film" size={22} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProjectCard({ project, onDelete }: { project: Project; onDelete: () => void }) {
   const nav = useNavigate();
-  const portrait = project.aspect === '9:16';
   return (
-    <Card className="group overflow-hidden p-0 transition-shadow hover:shadow-lg" variant="default">
-      <button onClick={() => nav(`/projects/${project.id}`)} className="block w-full text-left" aria-label={`Open ${project.title}`}>
-        <div className="luma-gradient relative grid h-40 place-items-center">
-          <div className={`rounded-md bg-white/15 ring-1 ring-white/50 backdrop-blur-sm ${portrait ? 'h-28 w-16' : 'h-24 w-44'}`}>
-            <div className="grid h-full place-items-center text-white/90"><Icon name="film" size={28} /></div>
-          </div>
-        </div>
-        <div className="p-4">
-          <h3 className="truncate text-base font-semibold">{project.title}</h3>
-          <div className="mt-2 flex items-center gap-2 text-xs text-[#5b6b8f]">
-            <Chip size="sm" color="accent"><Chip.Label>{project.aspect}</Chip.Label></Chip>
-            <span>Edited {timeAgo(project.updatedAt)}</span>
-          </div>
+    <div className="group relative">
+      <button onClick={() => nav(`/projects/${project.id}`)} className="block w-full rounded-2xl p-2 text-left transition-colors hover:bg-[#f5f8ff] focus-visible:outline-2 focus-visible:outline-[#2970ec]" aria-label={`Open ${project.title}`}>
+        <Thumb project={project} />
+        <div className="px-1 pb-1 pt-3">
+          <h3 className="truncate text-[15px] font-semibold text-[#1f2937]">{project.title}</h3>
+          <p className="mt-0.5 text-xs text-[#5b6b8f]">{project.aspect === '9:16' ? 'Portrait' : 'Landscape'} · edited {timeAgo(project.updatedAt)}</p>
         </div>
       </button>
-      <div className="absolute right-2 top-2">
+      <div className="absolute right-4 top-4 opacity-100 transition-opacity sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
         <Dropdown>
-          <Dropdown.Trigger aria-label={`Actions for ${project.title}`} className="grid h-8 w-8 place-items-center rounded-full bg-white/90 text-[#2970ec] shadow outline-none">
-            <Icon name="list" size={16} />
+          <Dropdown.Trigger aria-label={`Actions for ${project.title}`} className="grid h-8 w-8 place-items-center rounded-full bg-white/95 text-[#5b6b8f] shadow-sm outline-none hover:text-[#2970ec]">
+            <Icon name="more" size={18} weight="bold" />
           </Dropdown.Trigger>
           <Dropdown.Popover>
             <Dropdown.Menu onAction={(k) => k === 'delete' && onDelete()}>
@@ -92,7 +103,30 @@ function ProjectCard({ project, onDelete }: { project: Project; onDelete: () => 
           </Dropdown.Popover>
         </Dropdown>
       </div>
-    </Card>
+    </div>
+  );
+}
+
+/** Shown until the student has a model and a voice key: three small steps, not a wall of text. */
+function GettingStarted() {
+  const models = useModels();
+  const voice = useVoice();
+  if (models.isLoading || voice.isLoading) return null;
+  const steps = [
+    { done: (models.data ?? []).some((m) => m.supportsTools), label: 'Add your AI model', to: '/settings/models' },
+    { done: !!voice.data?.hasKey, label: 'Add your ElevenLabs key', to: '/settings/voice' },
+  ];
+  if (steps.every((x) => x.done)) return null;
+  return (
+    <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-[var(--border)] bg-[#fafcff] px-5 py-3.5 text-sm" role="note">
+      <span className="font-semibold text-[#1557d1]">Before your first video</span>
+      {steps.map((x, i) => (
+        <Link key={x.to} to={x.to} className={`flex items-center gap-2 ${x.done ? 'text-[#5b6b8f] line-through' : 'font-medium text-[#2970ec] hover:underline'}`}>
+          <span className={`grid h-5 w-5 place-items-center rounded-full text-[11px] ${x.done ? 'bg-[#2970ec] text-white' : 'border border-[#2970ec]'}`}>{x.done ? <Icon name="check" size={11} weight="bold" /> : i + 1}</span>
+          {x.label}
+        </Link>
+      ))}
+    </div>
   );
 }
 
@@ -109,37 +143,40 @@ export function ProjectsPage() {
     },
     onError: (e) => toast.danger(e instanceof ApiError ? e.message : 'Could not delete the project'),
   });
+  const list = projects.data ?? [];
 
   return (
     <div className="scroll-y h-full">
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <div className="mb-6 flex items-end justify-between gap-4">
+      <div className="mx-auto max-w-5xl px-4 pb-16 pt-6 sm:px-8 sm:pt-10">
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-[#1557d1]">Your projects</h1>
-            <p className="text-sm text-[#5b6b8f]">Describe a video, watch Luma build it, download the MP4.</p>
+            <h1 className="text-3xl font-bold tracking-tight text-[#1f2937]">Your videos</h1>
+            <p className="mt-1 text-[15px] text-[#5b6b8f]">Describe a video, watch Luma build it, download the MP4.</p>
           </div>
-          <Button variant="primary" onPress={() => setCreating(true)}>
-            <Icon name="plus" /> New project
+          <Button variant="primary" size="lg" onPress={() => setCreating(true)}>
+            <Icon name="plus" weight="bold" /> New video
           </Button>
         </div>
 
+        <GettingStarted />
+
         {projects.isLoading && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-60 rounded-2xl" />)}</div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="aspect-[4/3] rounded-2xl" />)}</div>
         )}
-        {projects.data && projects.data.length === 0 && (
-          <div className="luma-gradient rounded-3xl p-10 text-center text-white">
-            <h2 className="text-2xl font-bold">Make your first motion-graphics video</h2>
-            <p className="mx-auto mt-2 max-w-md text-white/90">Add your model and ElevenLabs key in Settings, then create a project and tell Luma what to make.</p>
-            <Button variant="secondary" className="mt-5" onPress={() => setCreating(true)}>Create a project</Button>
-          </div>
+        {projects.data && list.length === 0 && (
+          <button onClick={() => setCreating(true)} className="group grid w-full place-items-center rounded-3xl border-2 border-dashed border-[#c9d9f7] bg-[#fafcff] px-6 py-16 text-center transition-colors hover:border-[#2970ec]">
+            <span className="luma-gradient mb-4 grid h-14 w-14 place-items-center rounded-2xl text-white shadow-lg shadow-[#2970ec]/25"><Icon name="spark" size={26} /></span>
+            <span className="text-xl font-semibold text-[#1557d1]">Make your first motion-graphics video</span>
+            <span className="mt-1 max-w-md text-sm text-[#5b6b8f]">Start a project, tell Luma what you want — a script, a topic, a style — and it writes, voices, animates and renders it.</span>
+            <span className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-[#2970ec] px-4 py-2 text-sm font-semibold text-white group-hover:bg-[#1557d1]"><Icon name="plus" weight="bold" /> New video</span>
+          </button>
         )}
-        {projects.data && projects.data.length > 0 && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.data.map((p) => <div key={p.id} className="relative"><ProjectCard project={p} onDelete={() => setDeleting(p)} /></div>)}
+        {list.length > 0 && (
+          <div className="grid gap-x-3 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+            {list.map((p) => <ProjectCard key={p.id} project={p} onDelete={() => setDeleting(p)} />)}
           </div>
         )}
       </div>
-
       <NewProjectModal isOpen={creating} onOpenChange={setCreating} />
       <AlertDialog.Backdrop isOpen={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialog.Container>

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, Button, Card, Chip, Description, Input, Label, ProgressBar, Skeleton, Spinner, Tabs, TextField, toast } from '@heroui/react';
 import { useState, type ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import type { ModelConfig, TestResult, VoicePrefs } from '../api/types';
 import { Icon } from '../components/Icon';
@@ -282,6 +282,7 @@ export function SettingsPage() {
   return (
     <div className="scroll-y h-full">
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+        <Link to="/" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-[#5b6b8f] hover:text-[#2970ec]"><Icon name="chevron" size={14} className="rotate-180" /> Your videos</Link>
         <h1 className="mb-4 text-2xl font-bold text-[#1557d1]">Settings</h1>
         <Tabs selectedKey={tab} onSelectionChange={(k) => nav(`/settings/${String(k)}`)} variant="secondary">
           <Tabs.ListContainer>

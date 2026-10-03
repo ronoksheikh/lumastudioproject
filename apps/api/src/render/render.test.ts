@@ -110,6 +110,9 @@ describe('render_video', () => {
 
     const list = (await c.get(`/api/projects/${projectId}/renders`)).json.renders;
     expect(list).toHaveLength(1);
+    // the project card on the home page shows the latest render's contact sheet
+    const card = (await c.get('/api/projects')).json.projects.find((p: { id: string }) => p.id === projectId);
+    expect(card.thumbnailUrl).toBe(list[0].contactSheetUrl);
     expect(list[0].preset).toBe('draft');
     expect(list[0].duration).toBe(3000);
     expect(t.db.select().from(renderJobs).get()).toMatchObject({ status: 'done', progress: 1000 });

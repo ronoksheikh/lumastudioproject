@@ -132,13 +132,16 @@ async function main() {
     // ---------- create a project ----------
     log('create a project');
     await page.goto(stack.appUrl, { waitUntil: 'networkidle0' });
-    await clickText(page, 'button', 'New project');
+    await clickText(page, 'button', 'New video');
     await type(page, 'input[placeholder="e.g. Lumademy course ad"]', 'E2E explainer');
     await shot(page, 'new-project');
-    await clickText(page, 'button', 'Create project');
+    await clickText(page, 'button[type="submit"]', 'Create');
     await text(page, 'What should we make?');
     await page.waitForFunction(() => /\/projects\/[a-f0-9]+/.test(location.pathname));
     const projectUrl = page.url();
+    // inside a project: no global header (account, settings links), only project-level UI
+    if (await page.$('button[aria-label="Account menu"], a[aria-label="Settings"]')) fail('the global header is shown inside a project');
+    await page.waitForSelector('a[aria-label="Back to projects"]');
     await shot(page, 'project-empty');
 
     // a new project is empty: the preview says so instead of showing a demo or a broken frame
@@ -300,9 +303,27 @@ async function main() {
     await page.waitForSelector('button[aria-label="Send message"]', { timeout: 15_000 });
     await shot(page, 'stopped');
 
-    // ---------- the finished flow is reachable from the project list ----------
+    // ---------- a real draft render: the Renders tab and the home card thumbnail ----------
+    log('draft render');
+    stack.turns.push({ toolCalls: [{ name: 'render_video', args: { preset: 'draft' } }] }, { content: 'Your draft is ready.' });
+    await page.click('textarea[aria-label="Message to Luma"]');
+    await page.type('textarea[aria-label="Message to Luma"]', 'Render a draft please.');
+    await clickText(page, 'button', 'Send');
+    await text(page, '%', 60_000);
+    await shot(page, 'render-progress');
+    // poll: a single waitForFunction this long would hit puppeteer's protocol timeout
+    for (const t0 = Date.now(); !(await page.evaluate(() => document.body.innerText.includes('Your draft is ready.'))); ) {
+      if (Date.now() - t0 > 900_000) await text(page, 'Your draft is ready.', 1);
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    await clickText(page, '[role="tab"]', 'Renders');
+    await page.waitForSelector('video', { timeout: 20_000 });
+    await shot(page, 'renders');
+
+    // ---------- home: minimal dashboard with the thumbnail ----------
     await page.goto(stack.appUrl, { waitUntil: 'networkidle0' });
     await text(page, 'E2E explainer');
+    await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>('img')].some((i) => i.src.includes('/sheet') && i.complete && i.naturalWidth > 0), { timeout: 15_000 });
     await shot(page, 'projects');
 
     // ---------- phone width: nothing overflows, the two panes are reachable ----------
@@ -322,6 +343,11 @@ async function main() {
     await clickText(page, '[role="tab"]', 'Video');
     await page.waitForSelector('iframe[title="Video preview"]');
     await shot(page, 'mobile-video');
+    await page.goto(stack.appUrl, { waitUntil: 'networkidle0' });
+    await text(page, 'E2E explainer');
+    const overflowHome = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    if (overflowHome > 1) fail(`horizontal overflow on the mobile home page: ${overflowHome}px`);
+    await shot(page, 'mobile-home');
     await page.goto(`${stack.appUrl}/settings/models`, { waitUntil: 'networkidle0' });
     const overflow2 = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     if (overflow2 > 1) fail(`horizontal overflow on mobile settings: ${overflow2}px`);

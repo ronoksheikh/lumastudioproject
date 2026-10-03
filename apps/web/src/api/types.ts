@@ -13,6 +13,8 @@ export interface Project {
   status: string;
   createdAt: number;
   updatedAt: number;
+  /** the latest render's contact sheet (list only), shown as the card thumbnail */
+  thumbnailUrl?: string | null;
   /** what the project holds so far (GET /projects/:id only); new projects are empty */
   content?: { scenes: boolean; script: boolean; voice: boolean };
 }
