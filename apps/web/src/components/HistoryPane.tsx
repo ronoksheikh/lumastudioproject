@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Chip, Skeleton, Spinner, toast } from '@heroui/react';
+import { AlertDialog, Chip, Skeleton, Spinner, toast } from '@heroui/react';
+import { Button } from './Button';
 import { useState } from 'react';
 import { api, ApiError } from '../api/client';
 import { timeAgo, useInvalidateOn } from '../lib/hooks';

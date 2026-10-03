@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Skeleton, toast } from '@heroui/react';
+import { AlertDialog, Skeleton, toast } from '@heroui/react';
+import { Button } from './Button';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../api/client';
 import type { TreeEntry } from '../api/types';

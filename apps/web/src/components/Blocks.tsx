@@ -1,4 +1,5 @@
-import { Button, Chip, Modal, ProgressBar, Spinner } from '@heroui/react';
+import { Chip, Modal, ProgressBar, Spinner } from '@heroui/react';
+import { Button } from './Button';
 import { useState, type ReactNode } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';

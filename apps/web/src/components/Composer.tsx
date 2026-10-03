@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, Select, Label, ListBox, Spinner, toast } from '@heroui/react';
+import { Select, Label, ListBox, Spinner, toast } from '@heroui/react';
+import { Button } from './Button';
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api/client';

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Dropdown, Input, Label, Modal, Skeleton, TextField, toast } from '@heroui/react';
+import { AlertDialog, Dropdown, Input, Label, Modal, Skeleton, TextField, toast } from '@heroui/react';
+import { Button } from '../components/Button';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api/client';

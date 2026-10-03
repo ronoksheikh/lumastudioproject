@@ -1,4 +1,5 @@
-import { Button, Spinner, Tooltip, toast } from '@heroui/react';
+import { Spinner, Tooltip, toast } from '@heroui/react';
+import { Button } from './Button';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../api/client';
 import { Icon } from './Icon';

@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Card, FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Button } from '../components/Button';
 import { useCallback, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError, api, setCsrf } from '../api/client';

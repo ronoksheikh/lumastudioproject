@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, Button, Card, Chip, Description, Input, Label, ProgressBar, Skeleton, Spinner, Tabs, TextField, toast } from '@heroui/react';
+import { AlertDialog, Card, Chip, Description, Input, Label, ProgressBar, Skeleton, Spinner, Tabs, TextField, toast } from '@heroui/react';
+import { Button } from '../components/Button';
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client';

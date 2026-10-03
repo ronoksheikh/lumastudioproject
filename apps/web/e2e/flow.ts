@@ -132,6 +132,14 @@ async function main() {
     // ---------- create a project ----------
     log('create a project');
     await page.goto(stack.appUrl, { waitUntil: 'networkidle0' });
+    // HeroUI's ripple (@heroui/ripple) on a real click
+    const nv = await page.evaluateHandle(() => [...document.querySelectorAll<HTMLElement>('button')].find((b) => b.innerText.includes('New video'))!);
+    const box = (await (nv as import('puppeteer-core').ElementHandle<Element>).boundingBox())!;
+    await page.mouse.click(box.x + box.width * 0.3, box.y + box.height / 2);
+    await page.waitForFunction(() => !!document.querySelector('.heroui-ripple'), { timeout: 2_000 }).catch(() => fail('no ripple on button click'));
+    await page.screenshot({ path: path.join(OUT, 'ripple.png'), clip: { x: box.x - 20, y: box.y - 20, width: box.width + 40, height: box.height + 40 } });
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), { timeout: 5_000 });
     await clickText(page, 'button', 'New video');
     await type(page, 'input[placeholder="e.g. Lumademy course ad"]', 'E2E explainer');
     await shot(page, 'new-project');
