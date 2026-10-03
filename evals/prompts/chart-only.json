@@ -1,0 +1,16 @@
+{
+  "id": "chart-only",
+  "title": "Growth chart, 20 s",
+  "aspect": "16:9",
+  "target_seconds": [
+    15,
+    30
+  ],
+  "prompt": "Make a 20-second English video about channel growth: monthly views grow from 2.2M in January to 9.2M in June (+320%). Show an animated bar chart with a trend line, count the headline number up, and finish with a one-line call to action to enrol at lumademy.com.",
+  "expects": {
+    "recipes": [
+      "bar-chart",
+      "counter"
+    ]
+  }
+}

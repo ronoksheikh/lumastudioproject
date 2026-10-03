@@ -9,12 +9,13 @@ import { useMe, useModels, useVoice } from '../lib/hooks';
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Something went wrong');
 
-const PRESETS: Array<{ name: string; baseUrl: string; model: string }> = [
-  { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'anthropic/claude-sonnet-4.5' },
-  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4.1' },
-  { name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', model: 'openai/gpt-oss-120b' },
-  { name: 'Together', baseUrl: 'https://api.together.xyz/v1', model: 'Qwen/Qwen3-235B-A22B-Instruct-2507-tput' },
-  { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+/** Starting points, best first. Model ids change often: "Test connection" tells you right away if one is gone. */
+const PRESETS: Array<{ name: string; baseUrl: string; model: string; vision: boolean; note: string }> = [
+  { name: 'Claude Sonnet · OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'anthropic/claude-sonnet-4.5', vision: true, note: 'Best all-round choice: reliable tool calling, sees its own screenshots, strong at motion design.' },
+  { name: 'GPT-4.1 · OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4.1', vision: true, note: 'Good tool calling and vision. A solid second choice.' },
+  { name: 'gpt-oss-120b · Groq', baseUrl: 'https://api.groq.com/openai/v1', model: 'openai/gpt-oss-120b', vision: false, note: 'Very fast and cheap but cannot look at screenshots — Luma relies on its automatic layout checks, so expect more polish passes.' },
+  { name: 'Qwen3 · Together', baseUrl: 'https://api.together.xyz/v1', model: 'Qwen/Qwen3-235B-A22B-Instruct-2507-tput', vision: false, note: 'Capable open model, no vision.' },
+  { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', vision: false, note: 'Cheapest option, no vision. Fine for simple videos; check the result closely.' },
 ];
 
 function Caps({ m }: { m: Pick<ModelConfig, 'supportsTools' | 'supportsVision' | 'supportsReasoningStream'> }) {
@@ -42,6 +43,7 @@ function AddModel({ onDone }: { onDone: () => void }) {
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
   const [result, setResult] = useState<TestResult | null>(null);
+  const [preset, setPreset] = useState<(typeof PRESETS)[number] | null>(null);
   const qc = useQueryClient();
   const ready = baseUrl && apiKey && model;
 
@@ -67,10 +69,18 @@ function AddModel({ onDone }: { onDone: () => void }) {
         <Card.Description>Any OpenAI-compatible endpoint works: OpenRouter, OpenAI, Together, Groq, DeepSeek, a self-hosted vLLM… It must support tool calling.</Card.Description>
       </Card.Header>
       <Card.Content className="flex flex-col gap-4">
-        <div className="flex flex-wrap gap-2" aria-label="Presets">
-          {PRESETS.map((p) => (
-            <Button key={p.name} size="sm" variant="secondary" onPress={() => { setName(p.name); setBaseUrl(p.baseUrl); setModel(p.model); setResult(null); }}>{p.name}</Button>
-          ))}
+        <div>
+          <p className="mb-2 text-sm font-semibold text-[#1557d1]">Recommended starting points</p>
+          <div className="flex flex-wrap gap-2" aria-label="Presets">
+            {PRESETS.map((p) => (
+              <Button key={p.name} size="sm" variant={preset === p ? 'primary' : 'secondary'} onPress={() => { setPreset(p); setName(p.name); setBaseUrl(p.baseUrl); setModel(p.model); setResult(null); }}>{p.name}</Button>
+            ))}
+          </div>
+          {preset && (
+            <p className="mt-2 text-sm text-[#5b6b8f]" role="note">
+              <b>{preset.vision ? 'Sees images.' : 'No vision.'}</b> {preset.note}
+            </p>
+          )}
         </div>
         <TextField value={name} onChange={setName}><Label>Name</Label><Input placeholder="My OpenRouter model" /></TextField>
         <TextField value={baseUrl} onChange={(v) => { setBaseUrl(v); setResult(null); }} isRequired>

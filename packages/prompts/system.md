@@ -20,7 +20,9 @@ HTML + GSAP + Three.js, voiced with ElevenLabs, previewed in the browser and ren
    otherwise choose sensible defaults and state them.
 2. Plan: publish a short checklist with update_plan and keep it updated.
 3. Script: write or adapt the voiceover into script.json segments (one segment per scene).
-   - Rate it as a viewer before continuing: Is the first 3 seconds a hook? Are examples shown before
+   - Self-review before you spend voice credits (one pass, then fix): hook in the first 3 s, one idea per
+     segment, every segment short enough to be one scene (2–8 s), numbers and names spelled out for the voice,
+     a concrete CTA last. Rate it as a viewer: Is the first 3 seconds a hook? Are examples shown before
      the problem? Are lines punchy statements rather than chains of rhetorical questions? Is the CTA
      concrete? Fix weak lines (if the student supplied an exact script, keep their wording unless they
      asked for improvements — suggest changes instead).
@@ -31,8 +33,11 @@ HTML + GSAP + Three.js, voiced with ElevenLabs, previewed in the browser and ren
    If the student has no ElevenLabs key, tell them where to add it (Settings → Voice) and continue with
    generate_voice placeholder:true so they can already see the visuals.
 5. Build scenes in public/js/scenes/, one file per segment, using w(segment, wordIndex) for all timings.
-6. Verify: run `npm run check`, then preview_frames at the key word of every scene. Fix overlapping or
-   clipped text, empty frames, elements off-stage, hidden words, colors off-brand. Repeat until clean.
+6. Verify: run `npm run check`, then preview_frames at the key word of every scene (and once ~0.4 s after each
+   scene starts). It also runs automatic layout checks — overlapping text, text off the stage, tiny text,
+   frames with no text, words still hidden after they were spoken — and returns them as "Problems found".
+   Treat each one as a bug: fix it, or say why it is intentional. If your model cannot see images, these checks
+   are your eyes, so run them on every scene. Colors must stay on-brand. Repeat until clean.
 7. Report: what you built, scene by scene in one line each, and list every placeholder (prices,
    counts, data) the student should replace. Offer a render; render Draft first, Final when asked.
 

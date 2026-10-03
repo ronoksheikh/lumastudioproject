@@ -33,6 +33,8 @@ Agent runs use a mock OpenAI-compatible server from `apps/api/src/test/helpers.t
 
 **Rendering.** `render_video` inserts a `render_jobs` row (one active per user) and waits; `render/service.ts` polls it, waits for a CPU-budget slot, then runs the pristine `template/scripts/render.mjs` as the project's uid. That script splits the frames into chunks (one Chromium + `export-mp4.mjs --from/--to` each), joins them, mixes voice + SFX, runs ffprobe checks and writes a 2×2 contact sheet; progress comes back as `[luma] frame i/total` lines. MP4s live in `<project>/export/` (gitignored) and are served by `render/serve.ts` (Range support, `O_NOFOLLOW`, owner-only). Timings and the CPU-vs-chunk findings are in `docs/rendering.md`. `render/render.test.ts` swaps `config.templateDir` for a stub `render.mjs`.
 
+**Quality loop.** `preview_frames` (pristine `template/scripts/preview-frames.mjs`) also runs `scripts/lib/layout-probe.mjs` in the page at every captured time — overlapping text, text off the stage, tiny text, frames with no text, spoken words still hidden — and returns the sentences as `issues` (the model's only eyes when it has no vision). `evals/` holds the golden prompts, `rubric.md`, the scoring code (`score.mjs`, unit-tested with `pnpm evals:test`) and `run.mjs`, which drives a running Studio with a saved model.
+
 Configuration is via env (see `.env.example`, parsed in `apps/api/src/config.ts`). `docker compose up` builds the single `luma-studio` image (Dockerfile at the root).
 
 ## Reference ads: commands

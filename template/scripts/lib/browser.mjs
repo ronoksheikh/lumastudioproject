@@ -3,7 +3,7 @@ import { access } from 'node:fs/promises';
 import { importPkg } from './common.mjs';
 import { createServer } from '../../server.mjs';
 
-async function findChrome() {
+export async function findChrome() {
   const candidates = [
     process.env.CHROME_PATH,
     '/usr/local/bin/chromium',

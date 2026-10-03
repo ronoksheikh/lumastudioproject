@@ -7,7 +7,7 @@ import path from 'node:path';
 export const scriptsDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 /** Flags that never take a value (so a positional argument after them stays positional). */
-const BOOLEAN_FLAGS = new Set(['placeholder', 'key-stdin', 'no-env', 'video-only', 'page', 'json', 'list', 'help']);
+const BOOLEAN_FLAGS = new Set(['placeholder', 'key-stdin', 'no-env', 'video-only', 'page', 'json', 'list', 'help', 'no-checks']);
 
 /** `--key value` and `--flag` options plus positional arguments. */
 export function parseArgs(argv = process.argv.slice(2)) {
