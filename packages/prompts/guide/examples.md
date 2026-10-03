@@ -1,6 +1,8 @@
-# Examples — copy these patterns
+# Examples — how the API fits together (not a look to copy)
 
-All three are tested: `npm run check -- --page` passes and `preview_frames` reports no problems.
+These show WIRING: file layout, imports, timing calls, a recipe in use. They are deliberately plain. Your video
+should look like the student's idea, not like these: invent the layout, the motion concept, the transitions and
+the sound for each request. All three are tested: `npm run check -- --page` passes and `preview_frames` reports no problems.
 The finished example projects that ship with the engine are listed at the end.
 
 ## A. A full minimal 16:9 video (hook → word-synced counter → white end card)

@@ -51,6 +51,8 @@ export interface CompactDeps {
   store: ConvoStore;
   project: ProjectRef;
   signal?: AbortSignal;
+  /** compact now regardless of size (the compact_context tool); `keep` = the agent's note on what matters */
+  force?: { keep?: string };
 }
 
 /**
@@ -64,8 +66,8 @@ export async function compactIfNeeded(
   deps: CompactDeps,
 ): Promise<{ memory: string; rows: StoredMessage[] } | null> {
   const tokens = estimateTokens([system, ...rows.map((r) => r.msg)]) + (memory ? Math.ceil(memory.length / 3.2) : 0);
-  if (tokens < deps.contextWindow * COMPACT_AT) return null;
-  const cut = chooseCut(rows);
+  if (!deps.force && tokens < deps.contextWindow * COMPACT_AT) return null;
+  const cut = chooseCut(rows, deps.force ? 4 : KEEP_RECENT);
   if (cut <= 0) return null; // nothing old enough to fold away
   const old = rows.slice(0, cut);
   const keep = rows.slice(cut);
@@ -78,7 +80,7 @@ export async function compactIfNeeded(
         max_tokens: 1800,
         messages: [
           { role: 'system', content: SUMMARY_PROMPT },
-          { role: 'user', content: `${memory ? `Previous memory:\n${memory}\n\n` : ''}Messages to fold in:\n${renderForSummary(old)}`.slice(0, Math.floor(deps.contextWindow * 3.2 * 0.6)) },
+          { role: 'user', content: `${memory ? `Previous memory:\n${memory}\n\n` : ''}${deps.force?.keep ? `The agent asked to keep especially: ${deps.force.keep}\n\n` : ''}Messages to fold in:\n${renderForSummary(old)}`.slice(0, Math.floor(deps.contextWindow * 3.2 * 0.6)) },
         ],
       },
       { signal: deps.signal },

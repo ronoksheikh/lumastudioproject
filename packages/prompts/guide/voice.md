@@ -1,5 +1,8 @@
 # Voice — script.json, choosing a voice, ElevenLabs
 
+A voice is optional. Logo stings, intros, music-only or silent videos use a `project.json` timeline instead, and
+a voice from another TTS provider or the student's own recording goes in with `import-voice`: `read_guide("sound")`.
+
 ## 1. Write script.json
 ```json
 {

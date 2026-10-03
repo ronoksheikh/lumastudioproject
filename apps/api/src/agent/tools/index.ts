@@ -4,7 +4,7 @@ import { editFile, listFiles, readFile, writeFile } from './files.js';
 import { previewFrames } from './frames.js';
 import { readGuide } from './guide.js';
 import { askUser, renderVideo, updatePlan, webFetch } from './misc.js';
-import { fail, type ToolContext, type ToolResult } from './types.js';
+import { fail, ok, type ToolContext, type ToolResult } from './types.js';
 import { generateVoice, listVoices, patchVoice } from './voice.js';
 
 export * from './types.js';
@@ -25,6 +25,11 @@ const handlers: { [N in ToolName]: Handler<N> } = {
   ask_user: askUser,
   web_fetch: webFetch,
   read_guide: readGuide,
+  compact_context: (ctx, args) => {
+    if (!ctx.requestCompaction) return fail('Context compaction is not available here.');
+    ctx.requestCompaction(args.keep);
+    return ok('The older messages will be folded into the project memory before your next step. Continue with the task.', 'Compacting context');
+  },
 };
 
 export const isToolName = (n: string): n is ToolName => n in toolSchemas;

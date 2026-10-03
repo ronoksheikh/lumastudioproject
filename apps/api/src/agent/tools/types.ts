@@ -40,6 +40,8 @@ export interface ToolContext {
   render?: RenderService;
   elevenKey: () => string | null;
   askUser: (question: string, options: string[]) => Promise<string>;
+  /** compact_context: fold older messages into the project memory before the next model call */
+  requestCompaction?: (keep?: string) => void;
 }
 
 export const ok = (content: string, summary = content.split('\n')[0]!.slice(0, 160), extra: Partial<ToolResult> = {}): ToolResult => ({ ok: true, content, summary, ...extra });

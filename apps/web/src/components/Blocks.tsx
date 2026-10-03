@@ -26,6 +26,7 @@ const TOOL_META: Record<string, { icon: IconName; label: string }> = {
   web_fetch: { icon: 'globe', label: 'Fetch page' },
   read_guide: { icon: 'guide', label: 'Guide' },
   list_voices: { icon: 'mic', label: 'Voices' },
+  compact_context: { icon: 'brain', label: 'Tidy memory' },
 };
 
 const argOf = (b: ToolBlock, key: string): string | undefined => {

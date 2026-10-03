@@ -14,6 +14,16 @@
 - PDFs come with `<name>.txt` (extracted text) and `<name>-page-N.png` (page images) next to them.
 - Never delete or rename a student's file unless asked.
 
+## "Use this as a reference"
+Uploads are either **material** (put it in the video: their logo, product screenshot, photo) or a **reference**
+(match its style: a moodboard, a competitor ad frame, a brand book PDF, a storyboard sketch). If unclear, decide
+from the wording ("use this logo" = material; "make it look like this" / "use as reference" = reference) and say
+which you assumed. For a reference, look (read_file the image if you have vision; the PDF's text + page images
+otherwise) and write down what to borrow in 3–5 concrete points — palette, type weight/scale, layout grid, motion
+energy, transitions, texture — then build your own scenes in that spirit. Don't trace it. A brand book's colours,
+fonts and logo go into brand.json (the student's brand wins over Lumademy's for their own videos).
+A logo the student wants animated: `read_guide("logo")`.
+
 ## Icons (Phosphor)
 The engine bundles the Phosphor icon set (MIT). In an **async** scene:
 ```js

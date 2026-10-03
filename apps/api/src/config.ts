@@ -47,7 +47,7 @@ const schema = z.object({
   /** Agent limits. */
   AGENT_MAX_STEPS: num(80),
   AGENT_MAX_OUTPUT_TOKENS: num(400_000),
-  MAX_RUNS_PER_USER: num(1),
+  MAX_RUNS_PER_USER: num(4),
   /** Set to 1 to allow signup (closed beta switch). */
   SIGNUP_ENABLED: z.enum(['0', '1']).default('1'),
   /** Quotas. 0 turns a limit off. */

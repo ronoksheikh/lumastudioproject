@@ -16,8 +16,8 @@ import { compactIfNeeded } from './compact.js';
 import { ConvoStore, type ChatMessage, type StoredMessage } from './convo.js';
 import type { RunBus } from './events.js';
 import { attachmentsSummary, brandSummary, projectFacts } from './facts.js';
-import { buildSystemPrompt } from './prompts.js';
-import { describeOverrides, getVoicePrefs } from '../settings/service.js';
+import { buildSystemPrompt, fillPromptVars } from './prompts.js';
+import { describeOverrides, getVoicePrefs, getAgentPrompt } from '../settings/service.js';
 import { collectTurn, type AssistantTurn } from './stream.js';
 import { inc } from '../observability/metrics.js';
 import { runTool, type ImagePart, type RenderService } from './tools/index.js';
@@ -104,7 +104,14 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
   if (input.userMessage.parts) live.set(input.userMessage.rowid, { role: 'user', content: input.userMessage.parts });
 
   const systemFor = (mem: string | null): ChatMessage => {
-    const base = buildSystemPrompt({ aspect: input.aspect, brandSummary: brandSummary(project), attachmentsSummary: attachmentsSummary(db, input.projectId) });
+    const custom = getAgentPrompt(db, input.userId);
+    const vars = { aspect: input.aspect, brandSummary: brandSummary(project), attachmentsSummary: attachmentsSummary(db, input.projectId) };
+    const luma = buildSystemPrompt(vars);
+    const base = !custom
+      ? luma
+      : custom.mode === 'replace'
+        ? `${fillPromptVars(custom.text, vars)}\n\n(You work inside Luma Studio. Your tools are listed in the tool definitions; read_guide gives the engine docs and API.)`
+        : `${luma}\n\n## The student's own instructions (from Settings → Agent; follow them unless they break the engine contract)\n${custom.text}`;
     const overrides = describeOverrides(getVoicePrefs(db, input.userId));
     const voiceLine = `\nVoice settings from the student: ${overrides ? `${overrides} (these override your choice automatically)` : 'none — you choose the voice and model (list_voices)'}. ElevenLabs key: ${input.elevenKey() ? 'saved' : 'NOT saved — use generate_voice placeholder:true and tell the student to add it in Settings → Voice'}.`;
     return { role: 'system', content: `${base}\n\n## Current project state\n${projectFacts(db, project)}${voiceLine}${mem ? `\n\n## Project memory (summary of earlier work)\n${mem}` : ''}` };
@@ -118,6 +125,7 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
   let stopReason: StopReason = 'completed';
   let finalText = '';
   let nudges = 0;
+  let forceCompact: { keep?: string } | null = null;
 
   const persist = (msg: ChatMessage, stored: ChatMessage = msg, internal = false): StoredMessage => {
     const row = store.add(stored, null, internal);
@@ -134,7 +142,8 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
       }
 
       // ---- keep the context inside the model's window ----
-      const compacted = await compactIfNeeded(system, rows, memory?.summary ?? null, { client, model: input.provider.model, contextWindow: input.provider.contextWindow, store, project, signal });
+      const compacted = await compactIfNeeded(system, rows, memory?.summary ?? null, { client, model: input.provider.model, contextWindow: input.provider.contextWindow, store, project, signal, ...(forceCompact ? { force: forceCompact } : {}) });
+      forceCompact = null;
       if (compacted) {
         rows = compacted.rows;
         memory = { summary: compacted.memory, uptoRowid: 0 };
@@ -233,6 +242,7 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
           render: deps.render,
           elevenKey: input.elevenKey,
           askUser: input.askUser,
+          requestCompaction: (keep) => { forceCompact = { keep }; },
         });
         bus.flushDeltas();
         inc('luma_tool_calls_total', { tool: call.name, ok: result.ok ? 'true' : 'false' }, 1, 'Agent tool calls');

@@ -311,6 +311,59 @@ function FastRenderCard() {
   );
 }
 
+/** Settings → Agent: the student's own instructions for Luma — added to Luma's prompt, or replacing it. */
+function AgentTab() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['agent-prompt'], queryFn: () => api.agentPrompt() });
+  const [draft, setDraft] = useState<{ mode: 'append' | 'replace'; text: string } | null>(null);
+  const [showDefault, setShowDefault] = useState(false);
+  const save = useMutation({
+    mutationFn: (p: { mode: 'append' | 'replace'; text: string } | null) => api.saveAgentPrompt(p),
+    onSuccess: (r) => { qc.setQueryData(['agent-prompt'], r); setDraft(null); toast.success(r.prompt ? 'Saved — used from the next message on' : 'Back to Luma’s own prompt'); },
+    onError: (e) => toast.danger(msg(e)),
+  });
+  if (!q.data) return <Skeleton className="h-40 max-w-2xl rounded-2xl" />;
+  const cur = draft ?? q.data.prompt ?? { mode: 'append' as const, text: '' };
+  const set = (patch: Partial<typeof cur>) => setDraft({ ...cur, ...patch });
+  const modeBtn = (m: 'append' | 'replace', label: string) => (
+    <Button size="sm" variant={cur.mode === m ? 'primary' : 'tertiary'} onPress={() => set({ mode: m })}>{label}</Button>
+  );
+  return (
+    <div className="flex flex-col gap-4">
+      <Card className="max-w-2xl p-2">
+        <Card.Header>
+          <Card.Title className="flex items-center gap-2"><Icon name="robot" /> Your instructions for Luma</Card.Title>
+          <Card.Description>Tell Luma how you like to work: your style, language, brand habits, things to always or never do. Applies to all your projects from the next message on.</Card.Description>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2">{modeBtn('append', 'Add to Luma’s prompt')}{modeBtn('replace', 'Replace Luma’s prompt')}</div>
+          {cur.mode === 'replace' && <p className="text-sm text-[#5b6b8f]">Your text becomes the whole system prompt. The project facts, tools and engine guides are still provided. Start from Luma’s prompt below if you only want to change parts. Placeholders {'{aspect} {width} {height} {brand_summary} {attachments_summary}'} are filled in.</p>}
+          <textarea
+            className="mono min-h-56 w-full rounded-xl border border-[#d6e2f5] bg-white p-3 text-[13px] leading-relaxed outline-none focus:border-[#2970EC] max-md:text-base"
+            placeholder={cur.mode === 'append' ? 'e.g. Always make 9:16 reels. Write on-screen text in English, voice in Bengali. Prefer white stages with blue type.' : 'Your full system prompt…'}
+            value={cur.text}
+            onChange={(e) => set({ text: e.target.value })}
+            aria-label="Your instructions for Luma"
+          />
+        </Card.Content>
+        <Card.Footer className="flex-wrap justify-end gap-2">
+          {cur.mode === 'replace' && !cur.text.trim() && <Button variant="tertiary" onPress={() => set({ text: q.data.defaultPrompt })}>Start from Luma’s prompt</Button>}
+          {q.data.prompt && <Button variant="tertiary" isDisabled={save.isPending} onPress={() => save.mutate(null)}>Reset to Luma’s prompt</Button>}
+          <Button variant="primary" isDisabled={save.isPending || !draft} onPress={() => save.mutate(cur.text.trim() ? cur : null)}>Save</Button>
+        </Card.Footer>
+      </Card>
+      <Card className="max-w-2xl p-2">
+        <Card.Header>
+          <button type="button" className="flex items-center gap-2 text-left font-semibold" onClick={() => setShowDefault((v) => !v)} aria-expanded={showDefault}>
+            <Icon name={showDefault ? 'down' : 'chevron'} /> Luma’s built-in prompt
+          </button>
+        </Card.Header>
+        {showDefault && <Card.Content><pre className="mono max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-xl bg-[#f5f8fe] p-3 text-xs">{q.data.defaultPrompt}</pre></Card.Content>}
+      </Card>
+    </div>
+  );
+}
+
 function AccountTab() {
   const me = useMe();
   const [cur, setCur] = useState('');
@@ -335,6 +388,7 @@ function AccountTab() {
 const TABS: Array<[string, string, ReactNode]> = [
   ['models', 'Models', <ModelsTab key="m" />],
   ['voice', 'Voice', <VoiceTab key="v" />],
+  ['agent', 'Agent', <AgentTab key="g" />],
   ['account', 'Account', <AccountTab key="a" />],
 ];
 

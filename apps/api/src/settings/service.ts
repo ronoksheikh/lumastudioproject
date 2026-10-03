@@ -5,7 +5,7 @@ import { decrypt, encrypt, keyHint } from '../security/crypto.js';
 import { loadSecrets } from '../security/secrets.js';
 import { newId } from '../util/id.js';
 
-export type SecretKind = 'elevenlabs' | 'voice_prefs';
+export type SecretKind = 'elevenlabs' | 'voice_prefs' | 'agent_prompt';
 
 export function getSecret(db: DB, userId: string, kind: SecretKind): { value: string; hint: string } | null {
   const row = db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.kind, kind))).get();
@@ -84,4 +84,30 @@ export function voiceOverrides(p: VoicePrefs): { voice?: Record<string, unknown>
 export function describeOverrides(p: VoicePrefs): string | null {
   const parts = Object.entries(p).filter(([, v]) => v != null).map(([k, v]) => `${k}=${v}`);
   return parts.length ? parts.join(', ') : null;
+}
+
+/**
+ * The student's own instructions for the agent (Settings → Agent). 'append' adds them to Luma's system prompt
+ * (the usual case: style, language, habits); 'replace' swaps Luma's prompt for theirs — the project facts, tools
+ * and engine guides are still provided.
+ */
+export interface AgentPrompt {
+  mode: 'append' | 'replace';
+  text: string;
+}
+
+export function getAgentPrompt(db: DB, userId: string): AgentPrompt | null {
+  const s = getSecret(db, userId, 'agent_prompt');
+  if (!s) return null;
+  try {
+    const p = JSON.parse(s.value) as AgentPrompt;
+    return p.text?.trim() ? { mode: p.mode === 'replace' ? 'replace' : 'append', text: p.text } : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setAgentPrompt(db: DB, userId: string, p: AgentPrompt | null) {
+  if (!p || !p.text.trim()) return deleteSecret(db, userId, 'agent_prompt');
+  setSecret(db, userId, 'agent_prompt', JSON.stringify({ mode: p.mode, text: p.text }));
 }

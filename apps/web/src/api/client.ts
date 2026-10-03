@@ -34,6 +34,11 @@ async function request<T>(method: string, url: string, body?: unknown, form?: Fo
   return (text ? JSON.parse(text) : undefined) as T;
 }
 const get = <T>(url: string) => request<T>('GET', url);
+export interface AgentPromptSettings {
+  prompt: { mode: 'append' | 'replace'; text: string } | null;
+  defaultPrompt: string;
+}
+
 export interface FastRender {
   priceBdt: number;
   packMinutes: number;
@@ -117,6 +122,8 @@ export const api = {
   voice: () => get<VoiceSettings>('/api/settings/voice'),
   saveVoice: (v: { apiKey?: string; prefs?: Partial<VoicePrefs> }) => put<VoiceSettings>('/api/settings/voice', v),
   deleteVoiceKey: () => del<{ ok: true }>('/api/settings/voice/key'),
+  agentPrompt: () => get<AgentPromptSettings>('/api/settings/agent'),
+  saveAgentPrompt: (p: { mode: 'append' | 'replace'; text: string } | null) => put<AgentPromptSettings>('/api/settings/agent', p),
   testVoice: () => post<{ ok: boolean; error?: string; tier?: string | null; charactersUsed?: number | null; characterLimit?: number | null; note?: string }>('/api/settings/voice/test'),
 };
 
