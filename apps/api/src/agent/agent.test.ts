@@ -332,5 +332,6 @@ describe('restart safety', () => {
   it('persists user messages with their role in the messages table', () => {
     const roles = new Set(t.db.select().from(messages).where(eq(messages.projectId, projectId)).all().map((m) => m.role));
     expect(roles).toEqual(new Set(['user', 'assistant', 'tool']));
+    expect(roles.has('internal')).toBe(false); // none were needed in this file
   });
 });

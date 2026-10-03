@@ -120,7 +120,7 @@ function writeBytes(abs: string, content: string) {
   }
 }
 
-export function writeProjectFile(project: FileProject, p: string, content: string): ChangeResult {
+export function writeProjectFile(project: FileProject, p: string, content: string): ChangeResult & { diff: string } {
   const { abs, rel } = resolve(project, p);
   if (!rel) throw new ToolError('Cannot write to the project root itself');
   const existed = fs.existsSync(abs);
@@ -128,7 +128,7 @@ export function writeProjectFile(project: FileProject, p: string, content: strin
   const before = existed ? fs.readFileSync(abs, 'utf8') : '';
   writeBytes(abs, content);
   ensureOwned(project, abs);
-  return { path: rel, change: existed ? 'modified' : 'created', ...countDiff(before, content) };
+  return { path: rel, change: existed ? 'modified' : 'created', ...countDiff(before, content), diff: unifiedDiff(before, content) };
 }
 
 export function editProjectFile(project: FileProject, p: string, oldString: string, newString: string, replaceAll = false): ChangeResult & { diff: string } {

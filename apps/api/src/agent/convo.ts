@@ -17,9 +17,10 @@ export class ConvoStore {
   constructor(private readonly sqlite: BetterSqlite3.Database, private readonly projectId: string) {}
 
   /** `stored` = what is persisted (images replaced by text); the in-memory message may carry the real image parts. */
-  add(stored: ChatMessage, attachmentsJson: string | null = null): StoredMessage {
+  add(stored: ChatMessage, attachmentsJson: string | null = null, internal = false): StoredMessage {
     const id = newId();
-    const role = (stored as { role: string }).role;
+    // `internal` marks messages the agent loop wrote itself (image hand-overs, nudges): the model sees them, the chat UI does not
+    const role = internal ? 'internal' : (stored as { role: string }).role;
     const info = this.sqlite
       .prepare('insert into messages (id, project_id, role, content_json, attachments_json, created_at) values (?, ?, ?, ?, ?, ?)')
       .run(id, this.projectId, role, JSON.stringify(stored), attachmentsJson, Date.now());

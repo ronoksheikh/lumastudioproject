@@ -4,6 +4,7 @@ import { ASPECTS, type Aspect } from '@luma/shared';
 import type { DB } from '../db/index.js';
 import { projects } from '../db/schema.js';
 import { notFound } from '../http/errors.js';
+import { getVoicePrefs } from '../settings/service.js';
 import type { ProjectRef } from '../runner/exec.js';
 import { allocateUid, initProjectDir, newProjectId, projectRef } from './dirs.js';
 
@@ -33,6 +34,7 @@ export function listProjects(db: DB, userId: string): ProjectRow[] {
 }
 
 export function createProject(db: DB, userId: string, input: { title: string; aspect: Aspect }): ProjectRow {
+  const voice = getVoicePrefs(db, userId);
   const id = newProjectId();
   // allocate the uid and insert in one synchronous transaction so two creates cannot share a uid
   const row = db.transaction((tx) => {
@@ -41,7 +43,7 @@ export function createProject(db: DB, userId: string, input: { title: string; as
     return tx.select().from(projects).where(eq(projects.id, id)).get()!;
   });
   try {
-    initProjectDir(toRef(row), { title: input.title, aspect: input.aspect });
+    initProjectDir(toRef(row), { title: input.title, aspect: input.aspect, voice });
   } catch (err) {
     db.delete(projects).where(eq(projects.id, id)).run();
     fs.rmSync(toRef(row).dir, { recursive: true, force: true });

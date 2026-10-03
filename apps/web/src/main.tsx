@@ -1,27 +1,22 @@
-import { StrictMode, useEffect, useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { APP_NAME } from '@luma/shared';
+import { BrowserRouter } from 'react-router-dom';
+import { Toast } from '@heroui/react';
+import { App } from './App';
 import './styles.css';
 
-function App() {
-  const [health, setHealth] = useState<string>('checking…');
-  useEffect(() => {
-    fetch('/api/health')
-      .then((r) => r.json())
-      .then((j) => setHealth(j.ok ? 'API online' : 'API error'))
-      .catch(() => setHealth('API unreachable'));
-  }, []);
-  return (
-    <main className="hero">
-      <h1>{APP_NAME}</h1>
-      <p>AI motion graphics, by Lumademy.</p>
-      <span className="chip">{health}</span>
-    </main>
-  );
-}
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false, staleTime: 10_000 } },
+});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+      <Toast.Provider />
+    </QueryClientProvider>
   </StrictMode>,
 );

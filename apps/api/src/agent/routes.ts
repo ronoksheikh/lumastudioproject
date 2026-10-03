@@ -65,7 +65,7 @@ export async function agentRoutes(app: FastifyInstance, ctx: AppContext) {
           const run = rs.find((r) => r.messageId === m.id);
           return { id: m.id, text, createdAt: m.createdAt, attachmentIds: m.attachmentsJson ? JSON.parse(m.attachmentsJson) : [], runId: run?.id ?? null, runStatus: run?.status ?? null };
         })
-        .filter((m) => !m.text.startsWith('Your last reply was empty')),
+,
     };
   });
 

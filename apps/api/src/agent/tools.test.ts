@@ -171,6 +171,20 @@ describe('screenshots (preview_frames) and vision', () => {
     expect(stored.every((r) => !r.content_json.includes('base64'))).toBe(true);
   }, 120_000);
 
+  it('captures one full-size frame as a PNG for the preview button', async () => {
+    const r = await c.post(`/api/projects/${projectId}/capture`, { t: 1.5 });
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    const png = await c.get(r.json.url);
+    expect(png.status).toBe(200);
+    expect(png.raw.rawPayload.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+    expect(png.raw.rawPayload.length).toBeGreaterThan(20_000); // a real 1920-wide frame, not a stub
+    const bob = new Client(t.app);
+    await bob.signup('bob-capture@example.com');
+    expect((await bob.post(`/api/projects/${projectId}/capture`, { t: 1 })).status).toBe(404);
+    expect((await c.post(`/api/projects/${projectId}/capture`, { t: -1 })).status).toBe(400);
+    expect((await c.get(`/api/projects/${projectId}/renders`)).json.renders).toEqual([]);
+  }, 120_000);
+
   it('reports a broken video instead of a blank screenshot', async () => {
     fs.writeFileSync(path.join(dir(), 'public/js/scenes/00-title.js'), "export default function t(ctx) { ctx.w('title', 99); }\n");
     turns = [{ toolCalls: [{ name: 'preview_frames', args: { times: [1] } }] }, { content: 'ok' }];

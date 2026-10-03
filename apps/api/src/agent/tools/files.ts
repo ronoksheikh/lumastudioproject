@@ -27,7 +27,7 @@ export function readFile(ctx: ToolContext, a: ToolArgs<'read_file'>): ToolResult
 export function writeFile(ctx: ToolContext, a: ToolArgs<'write_file'>): ToolResult {
   try {
     const r = writeProjectFile(ctx.project, a.path, a.content);
-    changed(ctx, r);
+    changed(ctx, r, r.diff);
     return ok(`${r.change === 'created' ? 'Created' : 'Overwrote'} ${r.path} (+${r.additions} −${r.deletions})`);
   } catch (e) {
     return fail(e instanceof ToolError ? e.message : (e as Error).message);

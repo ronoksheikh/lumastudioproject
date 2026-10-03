@@ -19,7 +19,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: #02060f; overflow: hidden; }
+html, body { margin: 0; height: 100%; background: var(--deep); overflow: hidden; }
 body { font-family: var(--font-display); -webkit-font-smoothing: antialiased; }
 
 #stage {
@@ -86,7 +86,7 @@ body.ready #stage { opacity: 1; }
   position: fixed;
   inset: 0;
   border: 0;
-  background: radial-gradient(circle at 50% 45%, rgba(7, 23, 56, 0.35), rgba(2, 6, 15, 0.82));
+  background: radial-gradient(circle at 50% 45%, rgba(93, 174, 255, 0.3), rgba(7, 53, 143, 0.7));
   backdrop-filter: blur(6px);
   color: #fff;
   display: flex;

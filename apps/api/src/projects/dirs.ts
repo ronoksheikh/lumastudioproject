@@ -45,13 +45,39 @@ export function git(project: ProjectRef, args: string[], opts?: { input?: string
   return runAsProject(project, 'git', args, opts);
 }
 
+/** The student's saved voice defaults (Settings → Voice), written into the new project's script.json. */
+export interface VoiceDefaults {
+  voiceId: string;
+  modelId: string;
+  languageCode: string | null;
+  speed: number;
+  tempo: number;
+  stability: number;
+  similarityBoost: number;
+  style: number;
+}
+
+export function applyVoiceDefaults(scriptFile: string, v: VoiceDefaults) {
+  const script = JSON.parse(fs.readFileSync(scriptFile, 'utf8'));
+  const voice = script.voice ?? {};
+  script.voice = {
+    ...voice,
+    model_id: v.modelId,
+    voice_id: v.voiceId,
+    ...(v.languageCode ? { language_code: v.languageCode } : {}),
+    voice_settings: { ...(voice.voice_settings ?? {}), stability: v.stability, similarity_boost: v.similarityBoost, style: v.style, speed: v.speed },
+    tempo: v.tempo,
+  };
+  fs.writeFileSync(scriptFile, JSON.stringify(script, null, 2) + '\n');
+}
+
 const COPY_SKIP = new Set(['node_modules', 'export', 'test', '.git', '.home']);
 
 /**
  * Creates the project folder from the Luma template: copy → own it → `git init` → first commit.
  * The folder is 0700 and owned by the project's uid, so other students' commands cannot read it.
  */
-export function initProjectDir(project: ProjectRef, opts: { title?: string; aspect?: string; templateDir?: string } = {}) {
+export function initProjectDir(project: ProjectRef, opts: { title?: string; aspect?: string; templateDir?: string; voice?: VoiceDefaults } = {}) {
   const templateDir = opts.templateDir ?? config.templateDir;
   if (!fs.existsSync(path.join(templateDir, 'project.json'))) throw new Error(`Luma template not found at ${templateDir}`);
   if (fs.existsSync(project.dir)) throw new Error(`project folder already exists: ${project.dir}`);
@@ -72,6 +98,7 @@ export function initProjectDir(project: ProjectRef, opts: { title?: string; aspe
     if (opts.aspect) pj.aspect = opts.aspect;
     fs.writeFileSync(file, JSON.stringify(pj, null, 2) + '\n');
   }
+  if (opts.voice) applyVoiceDefaults(path.join(project.dir, 'script.json'), opts.voice);
   fs.mkdirSync(path.join(project.dir, '.home'), { recursive: true });
   fs.mkdirSync(path.join(project.dir, '.luma'), { recursive: true });
   fs.mkdirSync(path.join(project.dir, 'assets/uploads'), { recursive: true });

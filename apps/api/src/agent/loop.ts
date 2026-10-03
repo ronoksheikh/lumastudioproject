@@ -115,8 +115,8 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
   let finalText = '';
   let nudges = 0;
 
-  const persist = (msg: ChatMessage, stored: ChatMessage = msg): StoredMessage => {
-    const row = store.add(stored);
+  const persist = (msg: ChatMessage, stored: ChatMessage = msg, internal = false): StoredMessage => {
+    const row = store.add(stored, null, internal);
     rows.push(row);
     if (stored !== msg) live.set(row.rowid, msg);
     return row;
@@ -199,7 +199,7 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
       if (!turn.toolCalls.length) {
         if (!turn.content.trim() && nudges < 2) {
           nudges++;
-          persist({ role: 'user', content: 'Your last reply was empty. Continue: call a tool, or give your final answer.' });
+          persist({ role: 'user', content: 'Your last reply was empty. Continue: call a tool, or give your final answer.' }, undefined, true);
           continue;
         }
         stopReason = 'completed';
@@ -244,7 +244,7 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
         for (const img of images) {
           parts.push({ type: 'text', text: `(${img.label})` }, { type: 'image_url', image_url: { url: `data:${img.mime};base64,${img.base64}` } });
         }
-        persist({ role: 'user', content: parts }, { role: 'user', content: `[Images from the tool results: ${images.map((i) => i.label).join(', ')}]` });
+        persist({ role: 'user', content: parts }, { role: 'user', content: `[Images from the tool results: ${images.map((i) => i.label).join(', ')}]` }, true);
       }
 
       if (usage.output > config.agentMaxOutputTokens) {

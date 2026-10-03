@@ -1,17 +1,18 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { ASPECTS } from '@luma/shared';
 import { z } from 'zod';
 import type { AppContext } from '../app.js';
 import { authUser, requireAuth } from '../auth/plugin.js';
 import { config } from '../config.js';
-import { runs } from '../db/schema.js';
+import { renders, runs } from '../db/schema.js';
 import { badRequest, conflict } from '../http/errors.js';
 import { parse } from '../http/validate.js';
 import { listProjectFiles, readProjectFile, ToolError } from '../runner/files.js';
 import { signPreviewToken } from '../security/crypto.js';
 import { loadSecrets } from '../security/secrets.js';
 import { assertSha, gitFileAt, gitLog, gitRestore, gitShow } from './git.js';
+import { capturePng } from './capture.js';
 import { createProject, getOwnedProject, listProjects, publicProject, softDeleteProject, toRef, touchProject, updateProject } from './service.js';
 
 const title = z.string().trim().min(1, 'Give the project a title').max(120);
@@ -107,6 +108,28 @@ export async function projectRoutes(app: FastifyInstance, ctx: AppContext) {
     const result = gitRestore(toRef(p), body.sha);
     touchProject(db, p.id);
     return { commit: result, unchanged: result === null };
+  });
+
+  // ---- renders (MP4 files are produced by the render pipeline) ----
+  app.get('/projects/:id/renders', auth, async (req) => {
+    const { id } = req.params as { id: string };
+    getOwnedProject(db, authUser(req).id, id);
+    const rows = db.select().from(renders).where(eq(renders.projectId, id)).orderBy(desc(renders.createdAt)).all();
+    return {
+      renders: rows.map((r) => ({
+        id: r.id, preset: r.preset, createdAt: r.createdAt, duration: r.duration, size: r.size,
+        url: `/api/projects/${id}/renders/${r.id}/file`,
+        contactSheetUrl: `/api/projects/${id}/renders/${r.id}/sheet`,
+      })),
+    };
+  });
+
+  // ---- one frame as a PNG (the preview's "capture frame" button) ----
+  app.post('/projects/:id/capture', { ...auth, config: config.rateLimitDisabled ? {} : { rateLimit: { max: 30, timeWindow: '10 minutes' } } }, async (req) => {
+    const { id } = req.params as { id: string };
+    const body = parse(z.object({ t: z.number().min(0).max(3600) }), req.body);
+    const p = getOwnedProject(db, authUser(req).id, id);
+    return capturePng(ctx, toRef(p), p.id, body.t);
   });
 
   // ---- preview ----

@@ -18,6 +18,7 @@ try {
   // surfaced for the export/check tools and for the agent (preview_frames reads window.adError)
   window.adError = String(err?.stack || err);
   console.error(err);
+  try { parent.postMessage({ source: 'luma-preview', type: 'error', message: String(err?.message || err) }, '*'); } catch { /* not framed */ }
   document.body.dataset.error = '1';
   document.body.classList.add('ready');
   throw err;
@@ -230,6 +231,8 @@ async function boot() {
       return btoa(bin);
     },
   };
+
+  try { parent.postMessage({ source: 'luma-preview', type: 'ready', duration: END }, '*'); } catch { /* not framed */ }
 
   // The Studio UI controls the preview over postMessage (the preview lives on another origin).
   addEventListener('message', (e) => {
