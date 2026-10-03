@@ -163,15 +163,24 @@ function ModelsTab() {
   );
 }
 
-function Num({ label, value, onChange, min, max, step, hint }: { label: string; value: number; onChange: (n: number) => void; min: number; max: number; step: number; hint?: string }) {
+/** An optional number: empty = not set (Luma chooses). */
+function OptNum({ label, value, onChange, min, max, step, hint }: { label: string; value: number | null; onChange: (n: number | null) => void; min: number; max: number; step: number; hint?: string }) {
   return (
-    <TextField value={String(value)} onChange={(v) => onChange(Math.min(max, Math.max(min, Number(v) || min)))} type="number">
+    <TextField value={value == null ? '' : String(value)} onChange={(v) => onChange(v.trim() === '' ? null : Math.min(max, Math.max(min, Number(v) || min)))} type="number">
       <Label>{label}</Label>
-      <Input min={min} max={max} step={step} inputMode="decimal" />
+      <Input min={min} max={max} step={step} inputMode="decimal" placeholder="Luma chooses" />
       {hint && <Description>{hint}</Description>}
     </TextField>
   );
 }
+
+const MODELS: Array<[string, string]> = [
+  ['', 'Let Luma choose'],
+  ['eleven_v4', 'eleven_v4 — newest, 90+ languages incl. Bengali'],
+  ['eleven_v3', 'eleven_v3 — expressive, 70+ languages incl. Bengali'],
+  ['eleven_multilingual_v2', 'eleven_multilingual_v2 — stable, 29 languages (no Bengali)'],
+  ['eleven_flash_v2_5', 'eleven_flash_v2_5 — fastest, cheapest'],
+];
 
 function VoiceTab() {
   const voice = useVoice();
@@ -181,13 +190,22 @@ function VoiceTab() {
   const [test, setTest] = useState<string | null>(null);
   const p = prefs ?? voice.data?.prefs;
   const save = useMutation({
-    mutationFn: () => api.saveVoice({ ...(key ? { apiKey: key } : {}), ...(prefs ? { prefs } : {}) }),
+    mutationFn: (next?: VoicePrefs) => api.saveVoice({ ...(key ? { apiKey: key } : {}), ...(next ?? prefs ? { prefs: (next ?? prefs)! } : {}) }),
     onSuccess: (r) => { qc.setQueryData(['voice'], r); setKey(''); setPrefs(null); toast.success('Voice settings saved'); },
     onError: (e) => toast.danger(msg(e)),
   });
-  const check = useMutation({ mutationFn: () => api.testVoice(), onSuccess: (r) => setTest(r.ok ? `Key works${r.tier ? ` (${r.tier} plan)` : ''}.` : r.error ?? 'The key was rejected.'), onError: (e) => setTest(msg(e)) });
+  const check = useMutation({
+    mutationFn: () => api.testVoice(),
+    onSuccess: (r) => setTest(r.ok
+      ? `Key works${r.tier ? ` — ${r.tier} plan` : ''}${r.characterLimit ? `, ${Math.max(0, r.characterLimit - (r.charactersUsed ?? 0)).toLocaleString()} characters left` : ''}.${r.tier === 'free' ? ' On the free plan Luma sticks to premade voices.' : ''}${r.note ? ` ${r.note}` : ''}`
+      : r.error ?? 'The key was rejected.'),
+    onError: (e) => setTest(msg(e)),
+  });
   const removeKey = useMutation({ mutationFn: () => api.deleteVoiceKey(), onSuccess: () => { void qc.invalidateQueries({ queryKey: ['voice'] }); setTest(null); } });
   if (!voice.data || !p) return <Skeleton className="h-64 rounded-2xl" />;
+  const set = (patch: Partial<VoicePrefs>) => setPrefs({ ...p, ...patch });
+  const anySet = Object.values(voice.data.prefs).some((v) => v != null);
+  const text = (v: string) => (v.trim() === '' ? null : v.trim());
 
   return (
     <div className="flex flex-col gap-4">
@@ -204,20 +222,32 @@ function VoiceTab() {
         <Card.Footer className="justify-end gap-2">
           {voice.data.hasKey && <Button size="sm" variant="danger-soft" onPress={() => removeKey.mutate()}>Remove key</Button>}
           {voice.data.hasKey && <Button size="sm" variant="secondary" isDisabled={check.isPending} onPress={() => check.mutate()}>Test key</Button>}
+          <Button size="sm" variant="primary" isDisabled={!key || save.isPending} onPress={() => save.mutate(undefined)}>Save</Button>
         </Card.Footer>
       </Card>
 
       <Card className="p-2">
-        <Card.Header><Card.Title>Voice defaults</Card.Title><Card.Description>New projects start with these. You can always ask Luma to change a voice.</Card.Description></Card.Header>
+        <Card.Header>
+          <Card.Title>Voice overrides <span className="text-sm font-normal text-[#5b6b8f]">(optional)</span></Card.Title>
+          <Card.Description>Leave these empty and Luma picks a voice and model that fit each video’s language and tone, from the voices your ElevenLabs account can use. Anything you fill in here is used for all your videos instead.</Card.Description>
+        </Card.Header>
         <Card.Content className="grid gap-4 sm:grid-cols-2">
-          <TextField value={p.voiceId} onChange={(v) => setPrefs({ ...p, voiceId: v })}><Label>Voice ID</Label><Input className="mono" /><Description>Default: Sarah</Description></TextField>
-          <TextField value={p.modelId} onChange={(v) => setPrefs({ ...p, modelId: v })}><Label>Model</Label><Input className="mono" /></TextField>
-          <Num label="Speed" value={p.speed} onChange={(n) => setPrefs({ ...p, speed: n })} min={0.7} max={1.2} step={0.05} hint="ElevenLabs allows 0.7 – 1.2" />
-          <Num label="Extra tempo" value={p.tempo} onChange={(n) => setPrefs({ ...p, tempo: n })} min={1} max={1.5} step={0.05} hint="1.05–1.1 for fast ads (time-stretch)" />
-          <Num label="Stability" value={p.stability} onChange={(n) => setPrefs({ ...p, stability: n })} min={0} max={1} step={0.05} />
-          <Num label="Similarity" value={p.similarityBoost} onChange={(n) => setPrefs({ ...p, similarityBoost: n })} min={0} max={1} step={0.05} />
+          <TextField value={p.voiceId ?? ''} onChange={(v) => set({ voiceId: text(v) })}><Label>Voice ID</Label><Input className="mono" placeholder="Luma chooses" /><Description>From your ElevenLabs voices page</Description></TextField>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium" htmlFor="voice-model">Model</label>
+            <select id="voice-model" value={p.modelId ?? ''} onChange={(e) => set({ modelId: e.target.value || null })} className="h-10 rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-[#2970ec]">
+              {MODELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+          <TextField value={p.languageCode ?? ''} onChange={(v) => set({ languageCode: text(v) })}><Label>Language code</Label><Input className="mono" placeholder="Luma chooses (e.g. bn, en)" /></TextField>
+          <OptNum label="Speed" value={p.speed} onChange={(n) => set({ speed: n })} min={0.7} max={1.2} step={0.05} hint="0.7 – 1.2" />
+          <OptNum label="Extra tempo" value={p.tempo} onChange={(n) => set({ tempo: n })} min={1} max={1.5} step={0.05} hint="1.05–1.1 makes fast ads snappier" />
+          <OptNum label="Stability" value={p.stability} onChange={(n) => set({ stability: n })} min={0} max={1} step={0.05} />
         </Card.Content>
-        <Card.Footer className="justify-end"><Button variant="primary" isDisabled={(!key && !prefs) || save.isPending} onPress={() => save.mutate()}>Save</Button></Card.Footer>
+        <Card.Footer className="justify-end gap-2">
+          {anySet && <Button variant="tertiary" isDisabled={save.isPending} onPress={() => save.mutate({ voiceId: null, modelId: null, languageCode: null, speed: null, tempo: null, stability: null, similarityBoost: null, style: null })}>Clear all — let Luma choose</Button>}
+          <Button variant="primary" isDisabled={!prefs || save.isPending} onPress={() => save.mutate(undefined)}>Save overrides</Button>
+        </Card.Footer>
       </Card>
     </div>
   );

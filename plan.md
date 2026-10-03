@@ -156,7 +156,7 @@ This section is the "secret sauce". The template (Phase 1) must encode it, and t
 
 ### 3.3 Voice (ElevenLabs)
 
-- Defaults used in this session: model `eleven_v4`, `language_code: "bn"`, voice **Sarah** `EXAVITQu4vr4xnSDxMaL`, `stability 0.5, similarity_boost 0.8, style 0.25, use_speaker_boost true`, `speed 1.15–1.2`.
+- (Round 2: no fixed defaults any more — the agent picks per `guide/voice.md`.) Settings used in the reference session: model `eleven_v4`, `language_code: "bn"`, voice **Sarah** `EXAVITQu4vr4xnSDxMaL`, `stability 0.5, similarity_boost 0.8, style 0.25, use_speaker_boost true`, `speed 1.15–1.2`.
 - `output_format=mp3_44100_128` (192 kbps requires ElevenLabs Creator tier — it 403s otherwise).
 - **Fast pacing:** ElevenLabs `speed` max is 1.2. For more, apply ffmpeg `atempo` (e.g. 1.1) **and divide every timestamp by the tempo** (`voice.tempo` in `script.json`).
 - **Pronunciation:** with `language_code: "bn"`, write English words in Bengali script in the TTS text (ইউটিউব, এনরোল, ক্লায়েন্ট, ওয়ার্কফ্লো) and numbers as words (দশজন, চল্লিশ থেকে পঞ্চাশটা).
@@ -608,6 +608,23 @@ Changes made after the product owner ran Phases 0–8 locally with a real model.
    scripts (they already run from the Studio's copy with `--root`). Agent knowledge moved from `template/LUMA.md`
    into `packages/prompts/guide/*.md`, read on demand with the `read_guide` tool (which also reads engine and
    example sources); bash sees the engine read-only at `$LUMA_ENGINE`.
+
+2. **Files tab** shows every file: Monaco limited to the core editor + Monarch tokenizers (the language services'
+   worker requests left html blank), SVG preview/code, image/audio/video/PDF previews and a download card, via a
+   new owner-only `GET /projects/:id/raw` (Range, sandbox CSP, never `.git`).
+3. **Terminal tab** is rebuilt from `run_events` (`GET /projects/:id/terminal`: shell commands + voice/frames/render
+   tools with output) with an empty state; no interactive student shell yet.
+4. **Phosphor icons** everywhere in the UI (`@phosphor-icons/react`, named imports) and for videos
+   (`@phosphor-icons/core` as a shared engine package; `lib/icons.js` → `await phosphor('rocket-launch', 'bold')`).
+5. **Navigation:** no global header inside a project; a minimal "Your videos" home with render thumbnails; account
+   and settings from a small gear/avatar on the home page.
+6. **Voice: the agent chooses.** Settings → Voice keeps the ElevenLabs key; voice/model/speed/… are optional
+   overrides, empty by default (round-1 saved prefs count only where they differ from the old defaults). Overrides are
+   written into script.json at every `generate_voice`. Otherwise the agent calls `list_voices` (pristine
+   `list-voices.mjs`, key on stdin: plan tier, characters left, voices with language/gender/accent and
+   "usable on this plan") and follows `guide/voice.md` (Bengali → `eleven_v3`, other common languages →
+   `eleven_multilingual_v2` without `language_code`, free plan → premade voices). The voice scripts drop
+   `language_code` when a model refuses it and turn ElevenLabs errors into a reason + what to try next.
 
 ## Open questions (defaults assumed)
 

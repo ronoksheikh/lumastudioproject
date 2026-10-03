@@ -36,7 +36,7 @@ export function emptyProjectReason(root) {
 }
 
 /** Flags that never take a value (so a positional argument after them stays positional). */
-const BOOLEAN_FLAGS = new Set(['placeholder', 'key-stdin', 'no-env', 'video-only', 'page', 'json', 'list', 'help', 'no-checks']);
+const BOOLEAN_FLAGS = new Set(['placeholder', 'key-stdin', 'no-env', 'video-only', 'page', 'json', 'list', 'help', 'no-checks', 'describe']);
 
 /** `--key value` and `--flag` options plus positional arguments. */
 export function parseArgs(argv = process.argv.slice(2)) {
@@ -78,11 +78,11 @@ export const round3 = (n) => Math.round(n * 1000) / 1000;
 
 export const ELEVEN_BASE = () => (process.env.ELEVENLABS_API_BASE ?? 'https://api.elevenlabs.io').replace(/\/$/, '');
 
-/** Validates script.json; returns a list of human-readable problems. */
-export function validateScript(script) {
+/** Validates script.json; returns a list of human-readable problems. A placeholder (silent) voice needs no voice/model yet. */
+export function validateScript(script, { requireVoice = true } = {}) {
   const problems = [];
-  if (!script?.voice?.voice_id) problems.push('script.json: voice.voice_id is missing');
-  if (!script?.voice?.model_id) problems.push('script.json: voice.model_id is missing');
+  if (requireVoice && !script?.voice?.voice_id) problems.push('script.json: voice.voice_id is missing — call list_voices and pick one');
+  if (requireVoice && !script?.voice?.model_id) problems.push('script.json: voice.model_id is missing (e.g. eleven_multilingual_v2, or eleven_v3 for Bengali)');
   if (!Array.isArray(script?.segments) || !script.segments.length) problems.push('script.json: segments[] is empty');
   const seen = new Set();
   for (const s of script?.segments ?? []) {
@@ -118,4 +118,48 @@ export async function applyKeyFromStdin(opts) {
   for await (const c of process.stdin) chunks.push(c);
   const key = Buffer.concat(chunks).toString('utf8').trim();
   if (key) process.env.ELEVENLABS_API_KEY = key;
+}
+
+/** A plain-language explanation (and what to try next) for an ElevenLabs error response. */
+export function explainElevenError(status, bodyText) {
+  let detail = {};
+  try { detail = JSON.parse(bodyText)?.detail ?? {}; } catch { /* not json */ }
+  const code = typeof detail === 'object' ? String(detail.status ?? detail.code ?? '') : '';
+  const message = typeof detail === 'string' ? detail : String(detail.message ?? bodyText).slice(0, 400);
+  const all = `${code} ${message}`;
+  let hint = '';
+  if (status === 401 && /permission/i.test(all)) hint = 'The key lacks a permission (it needs text_to_speech, and voices_read for list_voices). Ask the student to edit the key in ElevenLabs.';
+  else if (status === 401) hint = 'ElevenLabs rejected the API key — the student should check it in Settings → Voice.';
+  else if (/free users|free_users|paid|subscription|upgrade|plan/i.test(all)) hint = 'Not available on this ElevenLabs plan. Pick a "premade" voice from list_voices (usable: yes) and a free-plan model (eleven_multilingual_v2, or eleven_v3 for languages it lacks such as Bengali), then try again.';
+  else if (/quota|credits|character_limit|exceeds your/i.test(all)) hint = 'The ElevenLabs account is out of characters this month. Tell the student; continue with generate_voice placeholder:true meanwhile.';
+  else if (/voice_not_found|voice.*not found|does not exist/i.test(all)) hint = 'That voice id does not exist for this account. Call list_voices and use one of its voice_id values.';
+  else if (/model/i.test(all)) hint = 'That model can\'t be used here. Try eleven_v3 (all languages incl. Bengali) or eleven_multilingual_v2 (English and 28 other languages).';
+  else if (status === 429) hint = 'ElevenLabs is rate limiting / busy. Wait a little and try again.';
+  return `ElevenLabs refused the request (${status}${code ? ` ${code}` : ''}): ${message}${hint ? `\n→ ${hint}` : ''}`;
+}
+
+/** True when ElevenLabs complains about language_code (some models, e.g. eleven_multilingual_v2, don't take it). */
+export const isLanguageCodeError = (status, bodyText) => status >= 400 && status < 500 && /language[_ ]code|language enforcement/i.test(bodyText);
+
+/**
+ * POST /v1/text-to-speech/:voice/with-timestamps. language_code is only sent when set, and dropped (with a note)
+ * if the model refuses it. Throws an Error whose message is already explained for the agent (explainElevenError).
+ */
+export async function ttsWithTimestamps(apiKey, voice, fields) {
+  const url = `${ELEVEN_BASE()}/v1/text-to-speech/${encodeURIComponent(voice.voice_id)}/with-timestamps?output_format=mp3_44100_128`;
+  const send = (withLang) => fetch(url, {
+    method: 'POST',
+    headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ ...fields, model_id: voice.model_id, ...(withLang && voice.language_code ? { language_code: voice.language_code } : {}), voice_settings: voice.voice_settings }),
+  });
+  let res = await send(true);
+  if (!res.ok) {
+    const text = (await res.text()).replaceAll(apiKey, '***');
+    if (voice.language_code && isLanguageCodeError(res.status, text)) {
+      console.log(`Note: ${voice.model_id} does not take language_code — retrying without it (the language comes from the text).`);
+      res = await send(false);
+      if (!res.ok) throw new Error(explainElevenError(res.status, (await res.text()).replaceAll(apiKey, '***')));
+    } else throw new Error(explainElevenError(res.status, text));
+  }
+  return res.json();
 }

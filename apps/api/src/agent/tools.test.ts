@@ -122,6 +122,31 @@ describe('voice tools', () => {
     expect(fs.readFileSync(path.join(dir(), 'script.json'), 'utf8')).not.toContain(ELEVEN_KEY);
   }, 60_000);
 
+  it('list_voices shows the plan and usable voices; Settings overrides are applied on generate', async () => {
+    await c.put('/api/settings/voice', { prefs: { voiceId: 'chosenVoice42', speed: 1.1 } });
+    eleven.calls.length = 0;
+    turns = [
+      { toolCalls: [{ name: 'list_voices', args: { language: 'en' } }] },
+      { toolCalls: [{ name: 'generate_voice', args: {} }] },
+      { content: 'ok' },
+    ];
+    const { events } = await runToEnd('pick a voice');
+    const r = results(events);
+    expect(r[0], JSON.stringify(r[0])).toMatchObject({ ok: true });
+    expect(r[0]!.summary).toBe('2 voices · free plan');
+    const toolMsgs = seen.at(-1).messages.filter((m: any) => m.role === 'tool').map((m: any) => m.content).join('\n');
+    expect(toolMsgs).toContain('Sarah — EXAVITQu4vr4xnSDxMaL — premade');
+    expect(toolMsgs).toContain('[NOT on this plan]');
+    expect(toolMsgs).toContain('Free plan: prefer "premade" voices');
+    expect(toolMsgs).toContain('voiceId=chosenVoice42');
+    expect(toolMsgs).not.toContain(ELEVEN_KEY);
+    expect(eleven.calls.at(-1)!.url).toContain('/chosenVoice42/');
+    const script = JSON.parse(fs.readFileSync(path.join(dir(), 'script.json'), 'utf8'));
+    expect(script.voice.voice_id).toBe('chosenVoice42');
+    expect(script.voice.voice_settings.speed).toBe(1.1);
+    await c.put('/api/settings/voice', { prefs: { voiceId: null, speed: null } });
+  }, 60_000);
+
   it('patch_voice re-records one segment and shifts the later ones', async () => {
     const script = JSON.parse(fs.readFileSync(path.join(dir(), 'script.json'), 'utf8'));
     script.segments.splice(1, 0, { id: 'mid', text: 'Short.' });

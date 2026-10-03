@@ -9,7 +9,7 @@
 import { writeFile, readFile, mkdir, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { parseArgs, projectRoot, loadEnv, applyKeyFromStdin, readJson, round3, ELEVEN_BASE, validateScript } from './lib/common.mjs';
+import { parseArgs, projectRoot, loadEnv, applyKeyFromStdin, readJson, round3, validateScript, ttsWithTimestamps } from './lib/common.mjs';
 
 const { opts } = parseArgs();
 const root = projectRoot(opts);
@@ -17,12 +17,13 @@ await loadEnv(root, opts);
 await applyKeyFromStdin(opts);
 
 const script = await readJson(path.join(root, 'script.json'));
-const problems = validateScript(script);
+const problems = validateScript(script, { requireVoice: !opts.placeholder });
 if (problems.length) {
   console.error(problems.join('\n'));
   process.exit(1);
 }
-const { voice, segments } = script;
+const { segments } = script;
+const voice = script.voice ?? {};
 const audioDir = path.join(root, 'public/audio');
 const mp3Path = path.join(audioDir, 'voiceover.mp3');
 await mkdir(audioDir, { recursive: true });
@@ -64,19 +65,14 @@ if (opts.placeholder) {
     console.error('Missing ELEVENLABS_API_KEY (set it in the environment or .env, or use --placeholder)');
     process.exit(1);
   }
-  const url = `${ELEVEN_BASE()}/v1/text-to-speech/${voice.voice_id}/with-timestamps?output_format=mp3_44100_128`;
-  const body = { text: fullText, model_id: voice.model_id, language_code: voice.language_code, voice_settings: voice.voice_settings };
-  console.log(`Requesting ${voice.model_id} (${voice.language_code}) — ${fullText.length} chars…`);
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    console.error(`ElevenLabs error ${res.status}: ${(await res.text()).replaceAll(apiKey, '***')}`);
+  console.log(`Requesting ${voice.model_id}${voice.language_code ? ` (${voice.language_code})` : ''}, voice ${voice.voice_id} — ${fullText.length} chars…`);
+  let data;
+  try {
+    data = await ttsWithTimestamps(apiKey, voice, { text: fullText });
+  } catch (e) {
+    console.error(e.message);
     process.exit(1);
   }
-  const data = await res.json();
   const align = data.alignment;
   if (!align?.characters?.length) {
     console.error('No alignment returned.');
@@ -129,7 +125,7 @@ if (tempo !== 1) {
 const duration = round3(rawDuration / tempo);
 await writeFile(
   path.join(audioDir, 'timing.json'),
-  JSON.stringify({ model: voice.model_id, duration, ...(opts.placeholder ? { placeholder: true } : {}), segments: out }, null, 2),
+  JSON.stringify({ model: voice.model_id ?? null, duration, ...(opts.placeholder ? { placeholder: true } : {}), segments: out }, null, 2),
 );
 
 console.log(`Done. ${duration}s of audio, ${words.length} words.`);

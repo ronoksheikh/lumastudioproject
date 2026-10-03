@@ -51,7 +51,8 @@ try {
 }
 try {
   script = await readJson(path.join(root, 'script.json'));
-  validateScript(script).forEach(err);
+  validateScript(script, { requireVoice: false }).forEach(err);
+  if (!script.voice?.voice_id || !script.voice?.model_id) warn('script.json: no voice chosen yet (voice.voice_id / voice.model_id) — call list_voices, set them, then generate the real voice');
 } catch (e) {
   err(e.code === 'ENOENT' ? 'script.json does not exist yet — write the voiceover script first (voice settings + one segment per scene)' : `script.json: ${e.message}`);
 }

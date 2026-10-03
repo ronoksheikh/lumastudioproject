@@ -9,7 +9,7 @@ import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { parseArgs, projectRoot, loadEnv, applyKeyFromStdin, readJson, round3, ELEVEN_BASE } from './lib/common.mjs';
+import { parseArgs, projectRoot, loadEnv, applyKeyFromStdin, readJson, round3, ttsWithTimestamps } from './lib/common.mjs';
 
 const { opts, pos } = parseArgs();
 const id = pos[0];
@@ -35,24 +35,18 @@ const seg = script.segments[si];
 const old = timing.segments[ti];
 const prev = timing.segments[ti - 1];
 const next = timing.segments[ti + 1];
-if (!next) throw new Error('Patching the last segment is not supported — regenerate with npm run voice');
+if (!next) throw new Error('Patching the last segment is not supported — regenerate the whole voice (generate_voice)');
 
 // --- 1. generate the new line, with the neighbours as context for natural prosody
 const { voice } = script;
-const res = await fetch(`${ELEVEN_BASE()}/v1/text-to-speech/${voice.voice_id}/with-timestamps?output_format=mp3_44100_128`, {
-  method: 'POST',
-  headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    text: seg.text,
-    model_id: voice.model_id,
-    language_code: voice.language_code,
-    voice_settings: voice.voice_settings,
-    previous_text: script.segments.slice(Math.max(0, si - 2), si).map((s) => s.text).join(' ') || undefined,
-    next_text: script.segments.slice(si + 1, si + 3).map((s) => s.text).join(' ') || undefined,
-  }),
+const data = await ttsWithTimestamps(apiKey, voice, {
+  text: seg.text,
+  previous_text: script.segments.slice(Math.max(0, si - 2), si).map((s) => s.text).join(' ') || undefined,
+  next_text: script.segments.slice(si + 1, si + 3).map((s) => s.text).join(' ') || undefined,
+}).catch((e) => {
+  console.error(e.message);
+  process.exit(1);
 });
-if (!res.ok) throw new Error(`ElevenLabs ${res.status}: ${(await res.text()).replaceAll(apiKey, '***')}`);
-const data = await res.json();
 const al = data.alignment;
 
 const tmp = await mkdtemp(path.join(tmpdir(), 'voicepatch-'));

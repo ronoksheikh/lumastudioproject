@@ -17,6 +17,7 @@ import { ConvoStore, type ChatMessage, type StoredMessage } from './convo.js';
 import type { RunBus } from './events.js';
 import { attachmentsSummary, brandSummary, projectFacts } from './facts.js';
 import { buildSystemPrompt } from './prompts.js';
+import { describeOverrides, getVoicePrefs } from '../settings/service.js';
 import { collectTurn, type AssistantTurn } from './stream.js';
 import { inc } from '../observability/metrics.js';
 import { runTool, type ImagePart, type RenderService } from './tools/index.js';
@@ -104,7 +105,9 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
 
   const systemFor = (mem: string | null): ChatMessage => {
     const base = buildSystemPrompt({ aspect: input.aspect, brandSummary: brandSummary(project), attachmentsSummary: attachmentsSummary(db, input.projectId) });
-    return { role: 'system', content: `${base}\n\n## Current project state\n${projectFacts(db, project)}${mem ? `\n\n## Project memory (summary of earlier work)\n${mem}` : ''}` };
+    const overrides = describeOverrides(getVoicePrefs(db, input.userId));
+    const voiceLine = `\nVoice settings from the student: ${overrides ? `${overrides} (these override your choice automatically)` : 'none — you choose the voice and model (list_voices)'}. ElevenLabs key: ${input.elevenKey() ? 'saved' : 'NOT saved — use generate_voice placeholder:true and tell the student to add it in Settings → Voice'}.`;
+    return { role: 'system', content: `${base}\n\n## Current project state\n${projectFacts(db, project)}${voiceLine}${mem ? `\n\n## Project memory (summary of earlier work)\n${mem}` : ''}` };
   };
   let system = systemFor(memory?.summary ?? null);
   const messages = () => [system, ...rows.map((r) => live.get(r.rowid) ?? r.msg)];

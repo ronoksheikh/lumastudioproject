@@ -143,13 +143,22 @@ export async function startMockLlm(opts: MockLlmOptions = {}) {
   return { url: `http://127.0.0.1:${port}/v1`, apiKey: o.apiKey, requests, close: () => new Promise<void>((r) => server.close(() => r())) };
 }
 
-/** Mock of ElevenLabs GET /v1/user */
+/** Mock of ElevenLabs: GET /v1/user, /v1/user/subscription, /v2/voices and POST …/with-timestamps */
 export async function startMockEleven(validKey = 'xi-valid-key-123') {
   const calls: Array<{ url: string; text?: string }> = [];
   const server = http.createServer((req, res) => {
     if (req.headers['xi-api-key'] !== validKey) return void res.writeHead(401, { 'content-type': 'application/json' }).end('{"detail":"invalid"}');
     if (req.url === '/v1/user') {
       return void res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ subscription: { tier: 'creator', character_count: 100, character_limit: 100000 } }));
+    }
+    if (req.url === '/v1/user/subscription') {
+      return void res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ tier: 'free', character_count: 100, character_limit: 10000 }));
+    }
+    if (req.url?.startsWith('/v2/voices')) {
+      return void res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ has_more: false, voices: [
+        { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', category: 'premade', labels: { gender: 'female', age: 'young', accent: 'american', use_case: 'narration' }, verified_languages: [{ language: 'en' }] },
+        { voice_id: 'libVoice123', name: 'Library Narrator', category: 'professional', labels: { gender: 'male' }, sharing: { free_users_allowed: false }, verified_languages: [{ language: 'bn' }] },
+      ] }));
     }
     if (req.url?.includes('/with-timestamps')) {
       let raw = '';

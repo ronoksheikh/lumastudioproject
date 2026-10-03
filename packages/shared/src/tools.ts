@@ -40,6 +40,10 @@ export const toolSchemas = {
       .describe('Optional: replace script.json segments before generating. Omit to use script.json as it is.'),
     placeholder: z.boolean().optional().describe('Dry run: silent audio with evenly spaced word timings. Use only when no ElevenLabs key is available or to preview visuals quickly.'),
   }),
+  list_voices: z.object({
+    language: z.string().max(10).optional().describe('ISO language code to rank first, e.g. "bn", "en"'),
+    search: z.string().max(60).optional().describe('Filter by name/description/labels, e.g. "narration", "deep"'),
+  }),
   patch_voice: z.object({
     segment_id: z.string().regex(/^[A-Za-z0-9_-]+$/).describe('Id of the segment whose text you changed in script.json'),
   }),
@@ -74,6 +78,7 @@ const descriptions: Record<ToolName, string> = {
   list_files: 'List files and folders in the project (node_modules, export and .git are hidden).',
   update_plan: 'Publish/refresh the pinned checklist the student sees. Send the whole list each time.',
   generate_voice: 'Generate the voiceover with ElevenLabs from script.json and write public/audio/{voiceover.mp3,timing.json}. Returns every word with its start time so you can plan visuals on words.',
+  list_voices: 'List the ElevenLabs voices the student\'s account can use (name, voice_id, gender/age/accent, languages, whether usable on their plan) and their plan tier + characters left. Call it before choosing script.json voice settings.',
   patch_voice: 'Re-record ONE segment after editing its text in script.json and splice it into the existing audio. Later timings shift automatically.',
   preview_frames: 'Render the video at the given timeline seconds and return screenshots (and layout problems found in the page). Use it to check every scene.',
   render_video: 'Queue an MP4 render (draft or final). The student sees live progress; returns when the render is done.',

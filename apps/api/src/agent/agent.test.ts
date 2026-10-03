@@ -134,7 +134,7 @@ describe('agent loop', () => {
     expect(req.messages[0].content).toContain('1920x1080');
     expect(req.messages[0].content).toContain('## Current project state');
     expect(req.messages[0].content).toContain('This project is EMPTY');
-    expect(req.tools.map((x: any) => x.function.name).sort()).toEqual(['ask_user', 'bash', 'edit_file', 'generate_voice', 'list_files', 'patch_voice', 'preview_frames', 'read_file', 'read_guide', 'render_video', 'update_plan', 'web_fetch', 'write_file']);
+    expect(req.tools.map((x: any) => x.function.name).sort()).toEqual(['ask_user', 'bash', 'edit_file', 'generate_voice', 'list_files', 'list_voices', 'patch_voice', 'preview_frames', 'read_file', 'read_guide', 'render_video', 'update_plan', 'web_fetch', 'write_file']);
     // history from the earlier run is replayed, including its tool calls and results, in valid order
     const roles = req.messages.map((m: any) => m.role);
     expect(roles.filter((r: string) => r === 'user').length).toBeGreaterThanOrEqual(2);

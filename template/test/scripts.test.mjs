@@ -25,12 +25,27 @@ before(async () => {
   await cp(path.join(template, 'scaffold'), dir, { recursive: true });
   // mock /v1/text-to-speech/:voice/with-timestamps: 0.05s per character, audio length = text length * 0.05
   mock = http.createServer((req, res) => {
+    if (req.method === 'GET') {
+      if (req.headers['xi-api-key'] !== 'test-key') return res.writeHead(401).end('{"detail":{"status":"invalid_api_key","message":"Invalid API key"}}');
+      res.writeHead(200, { 'content-type': 'application/json' });
+      if (req.url === '/v1/user/subscription') return res.end(JSON.stringify({ tier: 'free', character_count: 1000, character_limit: 10000 }));
+      if (req.url.startsWith('/v2/voices')) {
+        return res.end(JSON.stringify({ has_more: false, voices: [
+          { voice_id: 'lib1', name: 'Library Lady', category: 'professional', labels: { gender: 'female', accent: 'british' }, sharing: { free_users_allowed: false }, verified_languages: [{ language: 'en' }] },
+          { voice_id: 'pre1', name: 'Sarah', category: 'premade', labels: { gender: 'female', age: 'young', accent: 'american', use_case: 'narration' }, verified_languages: [{ language: 'en' }], high_quality_base_model_ids: ['eleven_v3'] },
+          { voice_id: 'bn1', name: 'Bangla Voice', category: 'professional', labels: { gender: 'male' }, sharing: {}, verified_languages: [{ language: 'bn' }] },
+        ] }));
+      }
+      return res.end('{}');
+    }
     let body = '';
     req.on('data', (c) => (body += c));
     req.on('end', () => {
       const j = JSON.parse(body);
       requests.push({ url: req.url, key: req.headers['xi-api-key'], body: j });
       if (req.headers['xi-api-key'] !== 'test-key') return res.writeHead(401).end('{"detail":"bad key"}');
+      if (j.model_id === 'no-lang-model' && j.language_code) return res.writeHead(400, { 'content-type': 'application/json' }).end('{"detail":{"status":"invalid_parameters","message":"language_code is not supported for this model"}}');
+      if (req.url.includes('/paidvoice/')) return res.writeHead(402, { 'content-type': 'application/json' }).end('{"detail":{"status":"free_users_not_allowed","message":"This voice is not available for free users."}}');
       const chars = [...j.text];
       const dur = chars.length * 0.05;
       res.writeHead(200, { 'content-type': 'application/json' });
@@ -226,4 +241,36 @@ test('Phosphor icons: the engine helper renders them and check flags unknown nam
   } finally {
     await rm(p, { recursive: true, force: true });
   }
+});
+
+test('list-voices reports the plan and which voices this account can really use', async () => {
+  const r = await run('list-voices.mjs', ['--language', 'bn'], { ELEVENLABS_API_KEY: 'test-key' });
+  assert.equal(r.status, 0, r.stderr);
+  const out = JSON.parse(r.stdout.trim().split('\n').at(-1));
+  assert.equal(out.tier, 'free');
+  assert.equal(out.charactersLeft, 9000);
+  assert.equal(out.voices[0].voice_id, 'bn1'); // the wanted language first
+  const by = Object.fromEntries(out.voices.map((v) => [v.voice_id, v]));
+  assert.equal(by.pre1.usable, 'yes');
+  assert.equal(by.lib1.usable, 'paid_only');
+  assert.equal(by.bn1.usable, 'maybe');
+  assert.deepEqual(by.pre1.languages, ['en']);
+  const bad = await run('list-voices.mjs', [], { ELEVENLABS_API_KEY: 'wrong-key-999' });
+  assert.notEqual(bad.status, 0);
+  assert.ok(!(bad.stdout + bad.stderr).includes('wrong-key-999'));
+});
+
+test('generate-voice drops language_code for models that refuse it and explains plan errors', async () => {
+  const script = { voice: { voice_id: 'v1', model_id: 'no-lang-model', language_code: 'en', voice_settings: {} }, segments: [{ id: 'a', text: 'Hello there.' }] };
+  await writeFile(path.join(dir, 'script.json'), JSON.stringify(script));
+  const r = await run('generate-voice.mjs', [], { ELEVENLABS_API_KEY: 'test-key' });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(r.stdout, /retrying without it/);
+  script.voice = { voice_id: 'paidvoice', model_id: 'm', voice_settings: {} };
+  await writeFile(path.join(dir, 'script.json'), JSON.stringify(script));
+  const paid = await run('generate-voice.mjs', [], { ELEVENLABS_API_KEY: 'test-key' });
+  assert.notEqual(paid.status, 0);
+  assert.match(paid.stderr, /not available for free users/);
+  assert.match(paid.stderr, /premade/);
+  assert.doesNotMatch(paid.stderr, /at .*\.mjs:\d+/);
 });

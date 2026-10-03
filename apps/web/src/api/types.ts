@@ -43,15 +43,16 @@ export interface TestResult {
   notes: string[];
 }
 
+/** Optional overrides from Settings → Voice; null = Luma chooses. */
 export interface VoicePrefs {
-  voiceId: string;
-  modelId: string;
+  voiceId: string | null;
+  modelId: string | null;
   languageCode: string | null;
-  speed: number;
-  tempo: number;
-  stability: number;
-  similarityBoost: number;
-  style: number;
+  speed: number | null;
+  tempo: number | null;
+  stability: number | null;
+  similarityBoost: number | null;
+  style: number | null;
 }
 export interface VoiceSettings {
   hasKey: boolean;

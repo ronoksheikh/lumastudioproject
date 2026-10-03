@@ -5,7 +5,7 @@ import { previewFrames } from './frames.js';
 import { readGuide } from './guide.js';
 import { askUser, renderVideo, updatePlan, webFetch } from './misc.js';
 import { fail, type ToolContext, type ToolResult } from './types.js';
-import { generateVoice, patchVoice } from './voice.js';
+import { generateVoice, listVoices, patchVoice } from './voice.js';
 
 export * from './types.js';
 
@@ -18,6 +18,7 @@ const handlers: { [N in ToolName]: Handler<N> } = {
   list_files: listFiles,
   update_plan: updatePlan,
   generate_voice: generateVoice,
+  list_voices: listVoices,
   patch_voice: patchVoice,
   preview_frames: previewFrames,
   render_video: renderVideo,

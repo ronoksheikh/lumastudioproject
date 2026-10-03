@@ -23,7 +23,8 @@ const TOOL_META: Record<string, { icon: IconName; label: string }> = {
   render_video: { icon: 'film', label: 'Render' },
   ask_user: { icon: 'help', label: 'Question' },
   web_fetch: { icon: 'globe', label: 'Fetch page' },
-  read_guide: { icon: 'help', label: 'Guide' },
+  read_guide: { icon: 'guide', label: 'Guide' },
+  list_voices: { icon: 'mic', label: 'Voices' },
 };
 
 const argOf = (b: ToolBlock, key: string): string | undefined => {

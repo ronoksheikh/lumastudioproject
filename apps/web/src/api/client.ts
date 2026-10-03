@@ -108,7 +108,7 @@ export const api = {
   voice: () => get<VoiceSettings>('/api/settings/voice'),
   saveVoice: (v: { apiKey?: string; prefs?: Partial<VoicePrefs> }) => put<VoiceSettings>('/api/settings/voice', v),
   deleteVoiceKey: () => del<{ ok: true }>('/api/settings/voice/key'),
-  testVoice: () => post<{ ok: boolean; error?: string; tier?: string | null }>('/api/settings/voice/test'),
+  testVoice: () => post<{ ok: boolean; error?: string; tier?: string | null; charactersUsed?: number | null; characterLimit?: number | null; note?: string }>('/api/settings/voice/test'),
 };
 
 /** Opens the live event stream of a run; resumes from `after` and reconnects with Last-Event-ID semantics. */
