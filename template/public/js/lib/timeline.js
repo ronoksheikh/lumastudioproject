@@ -2,11 +2,13 @@
 // helpers scenes use to put motion on spoken words. See LUMA.md for the full catalogue.
 
 import { el, q, qa } from './core.js';
+import { Sfx } from '../sfx.js';
 
 export function makeContext({ timing, world, scenesRoot, fxRoot, project, brand, size }) {
   const S = Object.fromEntries(timing.segments.map((s) => [s.id, s]));
   const ids = timing.segments.map((s) => s.id);
-  const tail = project.tail ?? 2.4;
+  // a voiced video keeps a short tail after the last word; a timeline-only video ends with its last scene
+  const tail = project.tail ?? (timing.silent ? 0 : 2.4);
   const END = timing.duration + tail;
 
   const tl = gsap.timeline({ paused: true, defaults: { ease: 'expo.out', duration: 0.6 } });
@@ -24,6 +26,7 @@ export function makeContext({ timing, world, scenesRoot, fxRoot, project, brand,
     const n = s.words.length;
     const k = i < 0 ? n + i : i;
     if (!s.words[k]) {
+      if (!n) throw new Error(`w('${id}', ${i}): segment "${id}" has no words (this video has no voice) — use ctx.at('${id}', seconds) or ctx.range('${id}') instead`);
       throw new Error(`w('${id}', ${i}): segment "${id}" has ${n} words (0-${n - 1}): ${s.words.map((x, j) => `${j}:${x.w}`).join(' ')}`);
     }
     return s.words[k].start;
@@ -41,7 +44,13 @@ export function makeContext({ timing, world, scenesRoot, fxRoot, project, brand,
     return [S[id].start, k + 1 < ids.length ? timing.segments[k + 1].start : END];
   };
 
+  /** `seconds` after the start of segment `id` (videos without a voice time their beats this way). */
+  const at = (id, seconds = 0) => seg(id).start + seconds;
   const cue = (t, type, gain = 1) => cues.push({ t, type, gain });
+  /** Play an audio file (music bed, recorded sfx, a voice from another provider…) from time t. Relative URL, e.g. 'assets/music.mp3'. */
+  const cueFile = (t, url, { gain = 1, offset = 0 } = {}) => cues.push({ t, type: 'file', url, gain, offset });
+  /** Register a sound you synthesize yourself with WebAudio: fn(audioCtx, destination, t, gain). Then cue(t, name). */
+  const sound = (name, fn) => Sfx.register(name, fn);
   const onFrame = (fn) => frameHooks.push(fn);
 
   const flashEl = fxRoot.querySelector('.flash');
@@ -76,7 +85,7 @@ export function makeContext({ timing, world, scenesRoot, fxRoot, project, brand,
     world, st: world.state, P: world.particles, BG: world.bg,
     project, brand, size, W: size.W, H: size.H,
     scenesRoot, fxRoot,
-    w, wEnd, seg, range, cue, onFrame, flash, shake, show, add, setStage, q, qa, el, wordIn, reveal, wordsOut,
+    w, wEnd, seg, range, at, cue, cueFile, sound, onFrame, flash, shake, show, add, setStage, q, qa, el, wordIn, reveal, wordsOut,
     /** Build-time memory shared by recipes (e.g. which particle target is currently active). */
     memo: { particleTarget: 'scatter' },
     /** Set the world's starting state at t=0. Call once from scenes/index.js. */

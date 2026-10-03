@@ -65,10 +65,9 @@ try {
     await close();
   }
   const total = Math.round(duration * fps);
-  const voice = path.join(root, 'public/audio/voiceover.mp3');
-  await access(voice).catch(() => {
-    throw new Error('public/audio/voiceover.mp3 is missing — generate the voiceover first.');
-  });
+  // a voiceover is optional: videos without a voice get only their sound design / music
+  const voicePath = path.join(root, 'public/audio/voiceover.mp3');
+  const voice = await access(voicePath).then(() => voicePath, () => null);
   console.log(`[luma] ${W}x${H} ${fps}fps ${duration.toFixed(2)}s ${total} frames, ${workers} worker(s), preset ${preset}`);
 
   // 2. render chunks in parallel
@@ -111,8 +110,10 @@ try {
   await run('ffmpeg', [
     '-y', '-loglevel', 'error',
     '-f', 'concat', '-safe', '0', '-i', path.join(work, 'list.txt'),
-    '-i', voice, '-i', path.join(work, 'sfx.wav'),
-    '-filter_complex', '[1:a]volume=1.0[vo];[2:a]volume=0.9[fx];[vo][fx]amix=inputs=2:duration=longest:normalize=0,apad[a]',
+    ...(voice ? ['-i', voice] : []), '-i', path.join(work, 'sfx.wav'),
+    '-filter_complex', voice
+      ? '[1:a]volume=1.0[vo];[2:a]volume=0.9[fx];[vo][fx]amix=inputs=2:duration=longest:normalize=0,apad[a]'
+      : '[1:a]volume=0.9,apad[a]',
     '-map', '0:v', '-map', '[a]', '-t', duration.toFixed(3), '-c:v', 'copy', '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', out,
   ]);
 
@@ -130,7 +131,7 @@ try {
     { name: 'fps', ok: Math.abs(actualFps - fps) < 0.01, detail: `${actualFps.toFixed(2)} (expected ${fps})` },
     { name: 'duration', ok: Math.abs(actualDur - duration) < 0.25, detail: `${actualDur.toFixed(2)}s (timeline ${duration.toFixed(2)}s)` },
     { name: 'audio', ok: Boolean(a), detail: a ? `${a.codec_name} ${a.channels}ch` : 'no audio stream' },
-    { name: 'peak', ok: Number.isFinite(peak) && peak < 0, detail: Number.isFinite(peak) ? `${peak} dBFS (must stay below 0)` : 'could not measure' },
+    { name: 'peak', ok: !Number.isFinite(peak) || peak < 0, detail: Number.isFinite(peak) ? `${peak} dBFS (must stay below 0)` : 'silent or not measurable' },
   ];
 
   // 5. contact sheet (2×2)

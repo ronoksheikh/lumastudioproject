@@ -1,5 +1,5 @@
 // Shared by the CLI scripts: argument parsing, project root, .env loading, project files.
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -29,10 +29,20 @@ export function emptyProjectReason(root) {
   if (!existsSync(path.join(root, 'public/js/scenes/index.js'))) {
     return 'This project has no scenes yet (public/js/scenes/index.js does not exist). Write script.json, generate the voice, then create the scene files and public/js/scenes/index.js — see read_guide("engine").';
   }
-  if (!existsSync(path.join(root, 'public/audio/timing.json'))) {
-    return 'This project has no voice timing yet (public/audio/timing.json is missing). Generate the voice first (generate_voice; placeholder:true works without a key).';
+  if (!existsSync(path.join(root, 'public/audio/timing.json')) && !hasTimeline(root)) {
+    return 'This project has no time base yet: generate a voice (generate_voice, or import one with $LUMA_ENGINE/scripts/import-voice.mjs) — or, for a video without a voice, add "timeline": [{ "id": "intro", "duration": 3 }, …] to project.json.';
   }
   return null;
+}
+
+/** project.json declares a "timeline" (a video without a voice). */
+export function hasTimeline(root) {
+  try {
+    const pj = JSON.parse(readFileSync(path.join(root, 'project.json'), 'utf8'));
+    return Array.isArray(pj.timeline) && pj.timeline.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 /** Flags that never take a value (so a positional argument after them stays positional). */

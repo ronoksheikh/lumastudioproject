@@ -8,6 +8,7 @@
     "check": "node \"$LUMA_ENGINE/scripts/check.mjs\" --root .",
     "map": "node \"$LUMA_ENGINE/scripts/build-map.mjs\" --root .",
     "example": "node \"$LUMA_ENGINE/scripts/use-example.mjs\" --root .",
-    "start": "node \"$LUMA_ENGINE/server.mjs\" --root ."
+    "start": "node \"$LUMA_ENGINE/server.mjs\" --root .",
+    "import-voice": "node \"$LUMA_ENGINE/scripts/import-voice.mjs\" --root ."
   }
 }

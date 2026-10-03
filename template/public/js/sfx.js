@@ -1,15 +1,46 @@
-// Small synthesized sound-design layer (whooshes, impacts, ticks) that sits
-// under the voiceover. Everything is generated with WebAudio — no extra files.
+// Sound layer: synthesized sound design (whooshes, impacts, ticks — WebAudio, no files), sounds a video
+// defines itself in code (Sfx.register / ctx.sound), and audio files (music, recorded sounds, a voice from
+// another provider — ctx.cueFile). The same cues play live and are rendered offline into the MP4's mix.
+
+const custom = new Map(); // name -> fn(audioCtx, destination, t, gain)
+const fileBytes = new Map(); // url -> ArrayBuffer
 
 export class Sfx {
   constructor() {
     this.ctx = null;
     this.enabled = true;
+    this.buffers = new Map(); // url -> AudioBuffer (decoded for this context)
+    this.playingFiles = [];
+    this.ready = Promise.resolve();
+  }
+
+  /** A sound designed in code: fn(audioCtx, destination, t, gain) builds WebAudio nodes that start at t. */
+  static register(name, fn) {
+    if (typeof fn !== 'function') throw new Error(`sound("${name}") needs a function (audioCtx, destination, t, gain) => void`);
+    custom.set(name, fn);
+  }
+
+  /** Fetch every audio file the cues use (once). Missing files are reported, not fatal. */
+  static async prefetch(cues) {
+    const urls = [...new Set(cues.filter((c) => c.type === 'file').map((c) => c.url))].filter((u) => !fileBytes.has(u));
+    await Promise.all(urls.map(async (u) => {
+      const r = await fetch(u).catch(() => null);
+      if (!r?.ok) return console.error(`cueFile: audio file not found: ${u}`);
+      fileBytes.set(u, await r.arrayBuffer());
+    }));
   }
 
   init(ctx = new AudioContext()) {
     if (this.ctx) return;
     this.ctx = ctx;
+    // decode the prefetched files for this context (copies: decodeAudioData detaches its input)
+    this.ready = Promise.all([...fileBytes].map(async ([u, bytes]) => {
+      try {
+        this.buffers.set(u, await ctx.decodeAudioData(bytes.slice(0)));
+      } catch {
+        console.error(`cueFile: could not decode ${u}`);
+      }
+    }));
     this.master = ctx.createGain();
     this.master.gain.value = 0.42;
     const comp = ctx.createDynamicsCompressor();
@@ -24,22 +55,68 @@ export class Sfx {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   }
 
-  resume() {
-    return this.ctx?.resume();
+  async resume() {
+    await this.ctx?.resume();
+    await this.ready;
   }
 
-  play(type, gain = 1, when = this.ctx?.currentTime) {
+  play(type, gain = 1, when = this.ctx?.currentTime, cue = null) {
     if (!this.ctx || !this.enabled) return;
+    if (type === 'file') return cue && this.playFile(cue, when, cue.offset ?? 0);
+    if (custom.has(type)) {
+      try {
+        custom.get(type)(this.ctx, this.master, when, gain);
+      } catch (e) {
+        console.error(`sound "${type}" failed: ${e.message}`);
+      }
+      return;
+    }
     const fn = this[type];
     if (fn) fn.call(this, when, gain);
+    else console.error(`cue: unknown sound "${type}" — use a built-in one or register it with ctx.sound()`);
+  }
+
+  /** Start an audio-file cue at `when` (context time), `offset` seconds into the file. */
+  playFile(cue, when, offset = 0) {
+    const buf = this.buffers.get(cue.url);
+    if (!buf || offset >= buf.duration) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    const g = this.ctx.createGain();
+    g.gain.value = cue.gain ?? 1;
+    src.connect(g).connect(this.ctx.destination); // files bypass the sfx compressor: music keeps its own mix
+    src.start(when, offset);
+    this.playingFiles.push(src);
+    src.onended = () => (this.playingFiles = this.playingFiles.filter((x) => x !== src));
+  }
+
+  /** Live playback starting at timeline time t: start the file cues that are already under way. */
+  syncFiles(cues, t) {
+    if (!this.ctx) return;
+    this.stopFiles();
+    for (const c of cues) {
+      if (c.type !== 'file' || c.t > t) continue;
+      const buf = this.buffers.get(c.url);
+      const into = t - c.t + (c.offset ?? 0);
+      if (buf && into < buf.duration && into > 0.02) this.playFile(c, this.ctx.currentTime, into);
+    }
+  }
+
+  stopFiles() {
+    for (const s of this.playingFiles) {
+      try { s.stop(); } catch { /* already stopped */ }
+    }
+    this.playingFiles = [];
   }
 
   // Renders every cue offline into a WAV (used by the MP4 exporter).
   static async renderWav(cues, duration) {
-    const ctx = new OfflineAudioContext(2, Math.ceil(duration * 48000), 48000);
+    await Sfx.prefetch(cues);
+    const ctx = new OfflineAudioContext(2, Math.ceil(Math.max(duration, 0.1) * 48000), 48000);
     const sfx = new Sfx();
     sfx.init(ctx);
-    for (const c of cues) sfx.play(c.type, c.gain, c.t);
+    await sfx.ready;
+    for (const c of cues) sfx.play(c.type, c.gain, c.t, c);
     const buf = await ctx.startRendering();
     return encodeWav(buf);
   }
