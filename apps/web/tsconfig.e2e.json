@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node"], "module": "ESNext", "moduleResolution": "Bundler", "allowImportingTsExtensions": false },
+  "include": ["e2e", "../api/src/test/helpers.ts"]
+}

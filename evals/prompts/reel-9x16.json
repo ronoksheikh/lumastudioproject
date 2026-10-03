@@ -1,0 +1,13 @@
+{
+  "id": "reel-9x16",
+  "title": "9:16 reel, 15 s",
+  "aspect": "9:16",
+  "target_seconds": [
+    10,
+    22
+  ],
+  "prompt": "Make a 15-second vertical Instagram reel in Bengali about \"৩টি এআই টুল যা আপনার ভিডিও এডিটিং সময় অর্ধেক করবে\". Big kinetic type on every word, a quick number-list structure (১, ২, ৩), and a final line \"ফলো করুন\".",
+  "expects": {
+    "aspect": "9:16"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "luma-project",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A Luma Studio motion-graphics project (GSAP + Three.js + ElevenLabs voice)",
+  "scripts": {
+    "start": "node server.mjs",
+    "voice": "node scripts/generate-voice.mjs",
+    "patch-voice": "node scripts/patch-voice.mjs",
+    "map": "node scripts/build-map.mjs",
+    "check": "node scripts/check.mjs",
+    "export": "node scripts/export-mp4.mjs",
+    "example": "node scripts/use-example.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@phosphor-icons/core": "^2.1.1",
+    "d3-geo": "^3.1.1",
+    "gsap": "^3.15.0",
+    "three": "^0.186.1",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.12.0"
+  }
+}

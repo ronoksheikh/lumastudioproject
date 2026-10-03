@@ -1,8 +1,15 @@
 node_modules/
 .env
 .env.*
+!.env.example
 export.log
 *.[mM][pP]4
 .DS_Store
 /work/
 /outputs/
+dist/
+*.tsbuildinfo
+/data/
+.pnpm-store/
+coverage/
+apps/web/e2e/out/

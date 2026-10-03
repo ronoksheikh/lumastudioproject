@@ -1,0 +1,11 @@
+{
+  "id": "explainer-ad",
+  "title": "Explainer ad (map + chart)",
+  "aspect": "16:9",
+  "target_seconds": [
+    28,
+    45
+  ],
+  "prompt": "Make a Lumademy ad from this exact Bengali voiceover script. Keep my wording. One scene per line, premium minimal Lumademy-blue look, a strong hook in the first 3 seconds.\n\nএই ভিডিওর সব অ্যানিমেশন বানানো এআই দিয়ে।\nদশজনের মধ্যে একজন? চোখের সামনে।\nকোন দেশ, কোন শহর? ম্যাপে সোজা জুম।\nকত বাড়ল? এক গ্রাফেই পরিষ্কার।\nবড় বড় ইউটিউব চ্যানেল ঠিক এভাবেই ভিউ ধরে রাখে।\nকিন্তু এতদিন এসব বানাতে, হয় হাজার টাকা দিয়ে কাউকে হায়ার করতেন, নয়তো সারারাত জেগে নিজে।\nএখন এগুলো আপনি নিজেই বানাবেন। ডিজাইন না জেনেও।\nনিজের ভিডিওতে, অথবা ক্লায়েন্টের কাজে।\nলুমাডেমি এআই মোশন গ্রাফিক্স ক্র্যাশ কোর্স।\nআজই এনরোল করুন।",
+  "expects": {}
+}

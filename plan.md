@@ -94,7 +94,7 @@ luma-studio/
     shared/         zod schemas, event types, tool schemas, constants
     prompts/        system prompt + agent guides (markdown, versioned)
   Dockerfile        the single luma-studio image (app + node + ffmpeg + chromium + fonts)
-  template/         the Luma video template (Phase 1) — copied into every new project
+  template/         the Luma video engine (Phase 1) — served read-only to every project; scaffold/ = a new project's files (Round 2)
   evals/            golden prompts + rubric (Phase 7)
   docker-compose.yml
   .env.example
@@ -156,7 +156,7 @@ This section is the "secret sauce". The template (Phase 1) must encode it, and t
 
 ### 3.3 Voice (ElevenLabs)
 
-- Defaults used in this session: model `eleven_v4`, `language_code: "bn"`, voice **Sarah** `EXAVITQu4vr4xnSDxMaL`, `stability 0.5, similarity_boost 0.8, style 0.25, use_speaker_boost true`, `speed 1.15–1.2`.
+- (Round 2: no fixed defaults any more — the agent picks per `guide/voice.md`.) Settings used in the reference session: model `eleven_v4`, `language_code: "bn"`, voice **Sarah** `EXAVITQu4vr4xnSDxMaL`, `stability 0.5, similarity_boost 0.8, style 0.25, use_speaker_boost true`, `speed 1.15–1.2`.
 - `output_format=mp3_44100_128` (192 kbps requires ElevenLabs Creator tier — it 403s otherwise).
 - **Fast pacing:** ElevenLabs `speed` max is 1.2. For more, apply ffmpeg `atempo` (e.g. 1.1) **and divide every timestamp by the tempo** (`voice.tempo` in `script.json`).
 - **Pronunciation:** with `language_code: "bn"`, write English words in Bengali script in the TTS text (ইউটিউব, এনরোল, ক্লায়েন্ট, ওয়ার্কফ্লো) and numbers as words (দশজন, চল্লিশ থেকে পঞ্চাশটা).
@@ -313,7 +313,7 @@ public/
 - Email + password (argon2id), httpOnly secure session cookie, CSRF protection for mutations. No email verification in v1 (see Open questions). Rate-limit signup/login.
 
 **Projects**
-- `POST /api/projects {title, aspect}` → create row, `cp -r template` → `/data/projects/<id>`, `git init`, initial commit "Create project from Luma template".
+- `POST /api/projects {title, aspect}` → create row, copy `template/scaffold` → `/data/projects/<id>`, `git init`, initial commit "Create empty project". (Round 2: projects start empty; the engine is served, not copied — see "Round 2".)
 - List / rename / delete (soft delete, purge job later).
 - Git service (server-side `git` CLI on the projects volume): log, diff for a commit, file at commit, **restore** (checkout tree of commit X → new commit "Restore to …").
 
@@ -591,6 +591,62 @@ Put these in `LUMA.md` so the agent avoids them:
 15. **Match cuts need exact geometry.** Compute the on-screen rect of the source element after its transforms (or use `getBoundingClientRect()/stageScale` at build time) so the cut is seamless.
 
 ---
+
+## Round 2 — feedback from local testing
+
+Changes made after the product owner ran Phases 0–8 locally with a real model.
+
+1. **New projects start empty.** Chosen architecture: *engine served read-only* (option b). A project holds only its
+   own files (`project.json`, `brand.json`, `package.json`, `.gitignore`, `public/css/scenes.css`, later `script.json`,
+   `public/js/scenes/*`, `public/audio/*`, `assets/*`). The preview server and the pristine scripts' static server
+   resolve every other path (index.html, main.js, world.js, lib/, recipes, base css, fonts, logos, world map) from
+   the Studio's `template/`; project files always win, so legacy projects that carry a full copy are untouched.
+   Project-owned paths (scenes, audio, scenes.css, root json) never fall back, so an empty project looks empty
+   (engine `main.js` shows "Nothing here yet"; tools return "no scenes yet" errors). Why not option (a): copying a
+   skeleton still puts ~40 engine files in every project and freezes each project on the engine version it was
+   created with; (b) keeps trees tiny, fixes reach every project, and needs no new mechanism for the pristine
+   scripts (they already run from the Studio's copy with `--root`). Agent knowledge moved from `template/LUMA.md`
+   into `packages/prompts/guide/*.md`, read on demand with the `read_guide` tool (which also reads engine and
+   example sources); bash sees the engine read-only at `$LUMA_ENGINE`.
+
+2. **Files tab** shows every file: Monaco limited to the core editor + Monarch tokenizers (the language services'
+   worker requests left html blank), SVG preview/code, image/audio/video/PDF previews and a download card, via a
+   new owner-only `GET /projects/:id/raw` (Range, sandbox CSP, never `.git`).
+3. **Terminal tab** is rebuilt from `run_events` (`GET /projects/:id/terminal`: shell commands + voice/frames/render
+   tools with output) with an empty state; no interactive student shell yet.
+4. **Phosphor icons** everywhere in the UI (`@phosphor-icons/react`, named imports) and for videos
+   (`@phosphor-icons/core` as a shared engine package; `lib/icons.js` → `await phosphor('rocket-launch', 'bold')`).
+5. **Navigation:** no global header inside a project; a minimal "Your videos" home with render thumbnails; account
+   and settings from a small gear/avatar on the home page.
+6. **Voice: the agent chooses.** Settings → Voice keeps the ElevenLabs key; voice/model/speed/… are optional
+   overrides, empty by default (round-1 saved prefs count only where they differ from the old defaults). Overrides are
+   written into script.json at every `generate_voice`. Otherwise the agent calls `list_voices` (pristine
+   `list-voices.mjs`, key on stdin: plan tier, characters left, voices with language/gender/accent and
+   "usable on this plan") and follows `guide/voice.md` (Bengali → `eleven_v3`, other common languages →
+   `eleven_multilingual_v2` without `language_code`, free plan → premade voices). The voice scripts drop
+   `language_code` when a model refuses it and turn ElevenLabs errors into a reason + what to try next.
+
+7. **"Attach this frame".** The Preview's button puts the exact time on the composer (chip `t=12.40s · segment`).
+   On send (`POST /runs` `frames: number[]`), the run first resolves them lazily: one CPU-budget capture with the
+   pristine `preview-frames.mjs --describe` (layout probe + `describeFrame`: segment and word being spoken, scenes and
+   text on screen, problems at that time). The model always gets those facts as text (stored with the message, so
+   replays keep them); vision models also get the PNG. Nothing is written to the project and nothing is re-rendered:
+   the PNG is moved to `DATA_DIR/frame-attachments/<project>/` and served to the owner for the bubble thumbnail.
+8. **Attachments are files.** Uploads land in `assets/uploads/` at once (visible in the Files tab); `uploads.sent_at`
+   marks the ones that went out with a message. The composer's X only detaches: it deletes the upload only while it
+   was never sent (the server refuses otherwise); unsent chips come back after a reload. Sent messages show their
+   attachments (thumbnails for images). Deleting project files happens in the Files tab (confirmation, saved as a
+   history step) or by the agent.
+
+9. **System prompt rewrite** (`packages/prompts/system.md`, ~1.2k words): role and Studio, a strict 8-step workflow
+   (understand → plan → read the guide → script → voice → build → verify → report), compact design rules with
+   numbers (type scale, safe areas, easing/durations, pacing per video type), the engine contract and one minimal
+   scene. Long material lives in `guide/*.md` (engine, recipes with usage, design, voice, pitfalls, vertical, assets,
+   checklist, and examples.md with two tested worked examples: a 16:9 hook → word-synced counter → white end card,
+   and a 9:16 Bengali numbered reel). Engine additions found while writing them: `ctx.setStage(t, 'white'|'blue')`
+   (white stage without the grey vignette) and `show()` no longer hides a scene on the very last frame. Evals gained
+   `guide_before_build`, `verified_after_last_edit`, `voice_chosen`, a `--label` and `evals/compare.mjs`; the
+   real-model before/after comparison is in `evals/README.md`.
 
 ## Open questions (defaults assumed)
 

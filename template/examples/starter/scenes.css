@@ -1,0 +1,16 @@
+/* Scene styles for the starter project (a 15 s title → map → chart → call-to-action explainer).
+   Recipe styles live in recipes.css — don't edit those from a project; add your own classes here.
+   Stage is 1920×1080 (16:9) or 1080×1920 (9:16). Keep text inside a 64px safe margin. */
+
+.s-title .t-main { position: absolute; left: 0; right: 0; top: 380px; padding: 0 220px; text-wrap: balance; text-align: center; font-size: 120px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
+.s-title .t-sub { position: absolute; left: 0; right: 0; top: 640px; text-align: center; font-size: 46px; font-weight: 500; color: var(--ice); }
+.s-title .t-chip { position: absolute; left: 50%; top: 280px; transform: translateX(-50%); padding: 12px 28px; border-radius: 40px; background: #fff; color: var(--blue); font-size: 22px; letter-spacing: 0.2em; opacity: 0; white-space: nowrap; }
+
+.s-map .m-cap { text-wrap: balance; padding: 0 120px; position: absolute; left: 0; right: 0; bottom: 90px; text-align: center; font-size: 76px; font-weight: 800; text-shadow: 0 6px 30px rgba(0, 0, 0, 0.5); }
+
+.s-chart .c-card { position: absolute; left: 50%; top: 250px; width: 1300px; margin-left: -650px; }
+.s-chart .c-num { position: absolute; left: 0; right: 0; top: 70px; text-align: center; font-size: 150px; font-weight: 900; letter-spacing: -0.04em; line-height: 1; }
+.s-chart .c-cap { position: absolute; left: 0; right: 0; bottom: 60px; text-align: center; font-size: 64px; font-weight: 800; }
+
+.s-cta .o-line { position: absolute; left: 0; right: 0; top: 590px; text-align: center; font-size: 96px; font-weight: 800; letter-spacing: -0.03em; }
+.s-cta .o-lockup { position: absolute; left: 50%; top: 790px; width: 520px; margin-left: -260px; opacity: 0; }

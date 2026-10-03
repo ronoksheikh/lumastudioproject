@@ -1,0 +1,11 @@
+node_modules
+**/node_modules
+.git
+data
+reference-ads
+Lumademy_Brand_Kit
+**/dist
+*.mp4
+.env
+.env.*
+!.env.example

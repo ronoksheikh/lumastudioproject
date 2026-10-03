@@ -1,0 +1,16 @@
+{
+  "id": "map-only",
+  "title": "Map zoom, 20 s",
+  "aspect": "16:9",
+  "target_seconds": [
+    15,
+    30
+  ],
+  "prompt": "Make a 20-second English explainer: \"Our students come from everywhere.\" Zoom into Dhaka on a world map, drop a pin labelled Dhaka, Bangladesh, count up to 2.4 million learners, and end on the Lumademy logo with \"Join today.\"",
+  "expects": {
+    "recipes": [
+      "map-zoom",
+      "counter"
+    ]
+  }
+}

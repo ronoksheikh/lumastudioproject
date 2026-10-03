@@ -1,0 +1,179 @@
+{
+  "model": "eleven_v4",
+  "duration": 12.16,
+  "placeholder": true,
+  "segments": [
+    {
+      "id": "title",
+      "text": "This whole video was built from a single prompt.",
+      "start": 0.2,
+      "end": 3.72,
+      "words": [
+        {
+          "w": "This",
+          "start": 0.2,
+          "end": 0.52
+        },
+        {
+          "w": "whole",
+          "start": 0.58,
+          "end": 0.94
+        },
+        {
+          "w": "video",
+          "start": 1,
+          "end": 1.36
+        },
+        {
+          "w": "was",
+          "start": 1.42,
+          "end": 1.7
+        },
+        {
+          "w": "built",
+          "start": 1.76,
+          "end": 2.12
+        },
+        {
+          "w": "from",
+          "start": 2.18,
+          "end": 2.5
+        },
+        {
+          "w": "a",
+          "start": 2.56,
+          "end": 2.76
+        },
+        {
+          "w": "single",
+          "start": 2.82,
+          "end": 3.22
+        },
+        {
+          "w": "prompt.",
+          "start": 3.28,
+          "end": 3.72
+        }
+      ]
+    },
+    {
+      "id": "map",
+      "text": "Any country, any city. One smooth zoom.",
+      "start": 4.03,
+      "end": 6.83,
+      "words": [
+        {
+          "w": "Any",
+          "start": 4.03,
+          "end": 4.31
+        },
+        {
+          "w": "country,",
+          "start": 4.37,
+          "end": 4.85
+        },
+        {
+          "w": "any",
+          "start": 4.91,
+          "end": 5.19
+        },
+        {
+          "w": "city.",
+          "start": 5.25,
+          "end": 5.61
+        },
+        {
+          "w": "One",
+          "start": 5.67,
+          "end": 5.95
+        },
+        {
+          "w": "smooth",
+          "start": 6.01,
+          "end": 6.41
+        },
+        {
+          "w": "zoom.",
+          "start": 6.47,
+          "end": 6.83
+        }
+      ]
+    },
+    {
+      "id": "chart",
+      "text": "Growth at a glance. Up and to the right.",
+      "start": 7.14,
+      "end": 10.34,
+      "words": [
+        {
+          "w": "Growth",
+          "start": 7.14,
+          "end": 7.54
+        },
+        {
+          "w": "at",
+          "start": 7.6,
+          "end": 7.84
+        },
+        {
+          "w": "a",
+          "start": 7.9,
+          "end": 8.1
+        },
+        {
+          "w": "glance.",
+          "start": 8.16,
+          "end": 8.6
+        },
+        {
+          "w": "Up",
+          "start": 8.66,
+          "end": 8.9
+        },
+        {
+          "w": "and",
+          "start": 8.96,
+          "end": 9.24
+        },
+        {
+          "w": "to",
+          "start": 9.3,
+          "end": 9.54
+        },
+        {
+          "w": "the",
+          "start": 9.6,
+          "end": 9.88
+        },
+        {
+          "w": "right.",
+          "start": 9.94,
+          "end": 10.34
+        }
+      ]
+    },
+    {
+      "id": "cta",
+      "text": "Make yours today.",
+      "start": 10.65,
+      "end": 11.85,
+      "words": [
+        {
+          "w": "Make",
+          "start": 10.65,
+          "end": 10.97
+        },
+        {
+          "w": "yours",
+          "start": 11.03,
+          "end": 11.39
+        },
+        {
+          "w": "today.",
+          "start": 11.45,
+          "end": 11.85
+        }
+      ]
+    }
+  ]
+}

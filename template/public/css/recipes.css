@@ -1,0 +1,80 @@
+/* Styles for js/lib/recipes/*. Scenes position these blocks (left/top/width) in scenes.css. */
+
+/* ---------- map-zoom ---------- */
+.rc-map { position: absolute; inset: 0; width: 100%; height: 100%; }
+.rc-map path { vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.rc-map .rest { fill: rgba(255, 255, 255, 0.1); stroke: rgba(255, 255, 255, 0.28); stroke-width: 0.8; }
+.rc-map .nb { fill: rgba(255, 255, 255, 0.14); stroke: rgba(255, 255, 255, 0.4); stroke-width: 1; }
+.rc-map .hl { fill: rgba(255, 255, 255, 0.16); stroke: #fff; stroke-width: 2; filter: drop-shadow(0 0 6px rgba(93, 174, 255, 0.9)); }
+.rc-ripple { position: absolute; width: 360px; height: 360px; margin: -180px; border-radius: 50%; border: 3px solid #fff; opacity: 0; }
+.rc-tag { position: absolute; margin: -130px 0 0 30px; display: flex; flex-direction: column; font-size: 18px; letter-spacing: 0.24em; color: var(--ice); opacity: 0; white-space: nowrap; }
+.rc-tag b { font-size: 44px; letter-spacing: 0; color: #fff; }
+.rc-city { position: absolute; width: 22px; height: 22px; margin: -11px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.25), 0 0 30px #fff; opacity: 0; }
+.rc-pin { position: absolute; width: 90px; height: 120px; margin: -120px 0 0 -45px; opacity: 0; filter: drop-shadow(0 16px 20px rgba(0, 0, 0, 0.45)); }
+.rc-pin svg { width: 100%; height: 100%; }
+.rc-card { position: absolute; margin: -150px 0 0 70px; padding: 22px 30px; border-radius: 24px; background: #fff; color: var(--navy); display: flex; flex-direction: column; gap: 4px; white-space: nowrap; opacity: 0; box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45); }
+.rc-card b { font-size: 48px; font-weight: 800; }
+.rc-card span { font-size: 18px; letter-spacing: 0.12em; color: var(--blue); }
+
+/* ---------- bar-chart ---------- */
+.rc-chart { padding: 40px 50px 30px; border-radius: 40px; background: #fff; color: var(--navy); box-shadow: 0 60px 120px rgba(3, 20, 70, 0.4); --bar-k: 3.8; }
+.rc-chart-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.rc-chart-head > .t { font-size: 44px; font-weight: 800; }
+.rc-chip { font-size: 32px; font-weight: 800; color: #fff; background: var(--blue); padding: 8px 22px; border-radius: 30px; }
+.rc-plot { position: relative; height: 470px; display: flex; align-items: flex-end; justify-content: space-around; padding: 0 20px 60px; }
+.rc-grid { position: absolute; inset: 0 0 60px; display: flex; flex-direction: column; justify-content: space-between; }
+.rc-grid i { height: 1px; background: #e6eefc; }
+.rc-bar { position: relative; width: 120px; height: calc(var(--h) * var(--bar-k) * 1px); display: flex; flex-direction: column; align-items: center; }
+.rc-bar i { flex: 1; width: 100%; border-radius: 16px 16px 6px 6px; background: var(--grad); }
+.rc-bar b { position: absolute; top: -40px; font-size: 22px; color: var(--blue); }
+.rc-bar span { position: absolute; bottom: -48px; font-size: 26px; font-weight: 600; color: #5b6b8f; white-space: nowrap; }
+.rc-trend { position: absolute; inset: 0 20px 60px; width: calc(100% - 40px); height: calc(100% - 60px); overflow: visible; }
+.rc-trend path { fill: none; stroke: var(--navy); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+
+/* ---------- callouts ---------- */
+.rc-callout { position: absolute; width: 1200px; height: 675px; }
+.rc-callout .device { position: absolute; left: 50%; top: 50%; width: 240px; height: 420px; margin: -210px 0 0 -120px; border-radius: 40px; background: linear-gradient(160deg, #2970ec, #07358f); border: 6px solid #fff; }
+.rc-callout .device i { position: absolute; left: 50%; top: 26px; width: 60px; height: 60px; margin-left: -30px; border-radius: 50%; background: #0b1530; border: 4px solid #9fd3ff; }
+.rc-callout svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.rc-callout path { fill: none; stroke: #fff; stroke-width: 3; }
+.rc-callout .cl { position: absolute; padding: 10px 20px; border-radius: 14px; background: #fff; color: var(--navy); font-size: 28px; font-weight: 700; }
+
+/* ---------- ui-mockups: ide window ---------- */
+.rc-ide { position: absolute; left: 160px; top: 180px; width: 1600px; height: 780px; border-radius: 24px; background: #0b1226; border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 60px 140px rgba(0, 0, 0, 0.6); overflow: hidden; }
+.rc-ide-bar { height: 50px; display: flex; align-items: center; gap: 9px; padding: 0 18px; background: #111a33; color: rgba(255, 255, 255, 0.55); font-size: 15px; }
+.rc-ide-bar > i { width: 13px; height: 13px; border-radius: 50%; background: #2a3554; }
+.rc-ide-bar span { margin-left: 16px; }
+.rc-ide-body { display: flex; height: calc(100% - 50px); }
+.rc-code { width: 760px; padding: 30px 26px; font-size: 19px; line-height: 2; border-right: 1px solid #1a2442; }
+.rc-code .ln { display: flex; gap: 22px; white-space: nowrap; }
+.rc-code em { font-style: normal; width: 24px; text-align: right; color: rgba(255, 255, 255, 0.25); }
+.rc-code .k span { color: #dbe8ff; }
+.rc-code .c span { color: #6f86b8; }
+.rc-preview { width: 840px; padding: 30px; display: flex; flex-direction: column; gap: 22px; }
+.rc-pv-screen { position: relative; flex: none; height: 439px; border-radius: 16px; background: linear-gradient(160deg, #0d1d44, #07112b); overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.15); }
+.rc-pv-badge { position: absolute; right: 14px; top: 14px; font-size: 13px; letter-spacing: 0.16em; padding: 6px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.12); }
+.rc-prompt { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-radius: 18px; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.16); font-size: 22px; }
+.rc-prompt .sp { color: var(--sky); font-size: 26px; }
+
+/* ---------- ui-mockups: video player + channel row ---------- */
+.rc-player { position: absolute; left: 50%; top: 170px; width: 1200px; margin-left: -600px; border-radius: 24px; overflow: hidden; background: #000; box-shadow: 0 60px 140px rgba(0, 0, 0, 0.6); }
+.rc-screen { position: relative; height: 675px; background: linear-gradient(160deg, #0d1d44, #07112b); overflow: hidden; }
+.rc-mtg { position: absolute; inset: 0; visibility: hidden; opacity: 0; }
+.rc-ctrl { height: 64px; display: flex; align-items: center; gap: 18px; padding: 0 22px; background: #0a1022; color: #fff; font-size: 26px; }
+.rc-ctrl .pp { width: 26px; height: 26px; }
+.rc-ctrl .prog { flex: 1; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.2); }
+.rc-ctrl .prog i { display: block; height: 100%; border-radius: 3px; background: var(--sky); transform-origin: left; }
+.rc-ctrl .mono { font-size: 16px; opacity: 0.75; }
+.rc-channel { position: absolute; left: 50%; top: 940px; width: 1200px; margin-left: -600px; display: flex; align-items: center; gap: 22px; }
+.rc-ch-av { width: 72px; height: 72px; border-radius: 50%; background: var(--grad); color: #fff; display: grid; place-items: center; font-size: 30px; }
+.rc-channel b { display: block; font-size: 32px; font-weight: 800; }
+.rc-channel span.mono { font-size: 18px; color: var(--ice); }
+.rc-ch-sub { margin-left: auto; padding: 14px 30px; border-radius: 40px; font-size: 26px; font-weight: 700; background: #fff; color: var(--navy); }
+
+/* ---------- kinetic-type: stamp ---------- */
+.rc-stamp { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 18px; padding: 10px 44px 16px 30px; border-radius: 40px; background: #fff; color: var(--blue); font-size: 76px; font-weight: 800; white-space: nowrap; box-shadow: 0 30px 80px rgba(3, 20, 70, 0.45); opacity: 0; }
+.rc-stamp .ico { font-size: 64px; padding: 10px; border-radius: 50%; background: var(--blue); color: #fff; width: 1.1em; height: 1.1em; }
+
+/* ---------- confetti ---------- */
+.rc-confetti { position: absolute; inset: 0; overflow: hidden; }
+.rc-confetti i { position: absolute; left: 0; top: 0; width: 14px; height: 22px; border-radius: 3px; opacity: 0; }
