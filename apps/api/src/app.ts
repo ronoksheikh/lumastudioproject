@@ -4,6 +4,8 @@ import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, type FastifyRequest } from 'fastify';
+import { agentRoutes } from './agent/routes.js';
+import type { RunRegistry } from './agent/registry.js';
 import { authRoutes } from './auth/routes.js';
 import { registerAuth } from './auth/plugin.js';
 import { config } from './config.js';
@@ -22,6 +24,8 @@ export interface AppContext {
   sqlite: import('better-sqlite3').Database;
   /** heavy-job gate; optional so tests can build the app without timers */
   cpu?: ReturnType<typeof import('./cpu/index.js').createCpuBudget>;
+  /** agent runs; created in index.ts (tests inject their own) */
+  agent?: RunRegistry;
 }
 
 const hostOf = (origin: string) => new URL(origin).host.toLowerCase();
@@ -68,6 +72,7 @@ export async function buildApp(ctx: AppContext) {
       await providerRoutes(api, ctx);
       await settingsRoutes(api, ctx);
       await uploadRoutes(api, ctx);
+      if (ctx.agent) await agentRoutes(api, ctx);
     },
     { prefix: '/api' },
   );

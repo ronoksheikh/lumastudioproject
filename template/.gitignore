@@ -3,3 +3,4 @@ export
 .env
 .home
 .luma/tmp
+.luma/frames

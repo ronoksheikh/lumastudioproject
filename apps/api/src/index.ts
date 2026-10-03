@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import { buildApp } from './app.js';
 import { config } from './config.js';
+import { RunRegistry } from './agent/registry.js';
 import { createCpuBudget } from './cpu/index.js';
 import { createDb, runMigrations } from './db/index.js';
 import { logger } from './logger.js';
@@ -30,13 +31,16 @@ async function main() {
 
   logger.info({ isolation: effectiveSandbox().description }, 'agent command isolation');
   const cpu = createCpuBudget();
-  const app = await buildApp({ db, sqlite, cpu });
+  const agent = new RunRegistry({ db, sqlite, cpu: cpu.budget }, sqlite);
+  agent.resetStaleRuns();
+  const app = await buildApp({ db, sqlite, cpu, agent });
   await app.listen({ port: config.port, host: '0.0.0.0' });
   const previewServer = await listenPreviewPort(app);
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'shutting down');
     previewServer?.close();
+    await agent.stopAll();
     await app.close();
     cpu.stop();
     sqlite.close();

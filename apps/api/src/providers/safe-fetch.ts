@@ -61,3 +61,24 @@ export function assertProviderUrl(raw: string): URL {
 /** fetch() for the openai client: blocks private destinations unless ALLOW_PRIVATE_PROVIDER_URLS=1. */
 export const safeFetch = ((input: unknown, init?: unknown) =>
   undiciFetch(input as never, { ...(init as object), dispatcher: config.allowPrivateProviderUrls ? openAgent : guardedAgent } as never)) as unknown as typeof fetch;
+
+/** fetch() that ALWAYS refuses private destinations (used by the agent's web_fetch, regardless of ALLOW_PRIVATE_PROVIDER_URLS). */
+export const guardedFetch = ((input: unknown, init?: unknown) =>
+  undiciFetch(input as never, { ...(init as object), dispatcher: guardedAgent } as never)) as unknown as typeof fetch;
+
+/** Literal-IP / localhost check for URLs the agent wants to fetch. */
+export function assertPublicHttpUrl(raw: string): URL {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    throw badRequest('Not a valid URL');
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') throw badRequest('Only http(s) URLs can be fetched');
+  if (u.username || u.password) throw badRequest('URLs with credentials are not allowed');
+  const host = u.hostname.replace(/^\[|\]$/g, '');
+  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal') || (net.isIP(host) && isBlockedAddress(host))) {
+    throw badRequest('That address is not reachable (private or local)');
+  }
+  return u;
+}

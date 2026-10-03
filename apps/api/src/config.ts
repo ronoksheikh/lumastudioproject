@@ -43,6 +43,10 @@ const schema = z.object({
   RATE_LIMIT_DISABLED: z.enum(['0', '1']).default('0'),
   /** ElevenLabs API base (override only for tests / proxies). */
   ELEVENLABS_API_BASE: z.string().default('https://api.elevenlabs.io'),
+  /** Agent limits. */
+  AGENT_MAX_STEPS: num(80),
+  AGENT_MAX_OUTPUT_TOKENS: num(400_000),
+  MAX_RUNS_PER_USER: num(1),
   /** Set to 1 to allow signup (closed beta switch). */
   SIGNUP_ENABLED: z.enum(['0', '1']).default('1'),
 });
@@ -79,6 +83,9 @@ export const config = {
   previewTokenTtlS: env.PREVIEW_TOKEN_TTL_S,
   rateLimitDisabled: env.RATE_LIMIT_DISABLED === '1' || env.NODE_ENV === 'test',
   signupEnabled: env.SIGNUP_ENABLED === '1',
+  agentMaxSteps: env.AGENT_MAX_STEPS,
+  agentMaxOutputTokens: env.AGENT_MAX_OUTPUT_TOKENS,
+  maxRunsPerUser: env.MAX_RUNS_PER_USER,
   elevenBase: env.ELEVENLABS_API_BASE.replace(/\/$/, ''),
   cores,
 };

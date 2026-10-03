@@ -9,11 +9,12 @@
 import { writeFile, readFile, mkdir, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { parseArgs, projectRoot, loadEnv, readJson, round3, ELEVEN_BASE, validateScript } from './lib/common.mjs';
+import { parseArgs, projectRoot, loadEnv, applyKeyFromStdin, readJson, round3, ELEVEN_BASE, validateScript } from './lib/common.mjs';
 
 const { opts } = parseArgs();
 const root = projectRoot(opts);
-await loadEnv(root);
+await loadEnv(root, opts);
+await applyKeyFromStdin(opts);
 
 const script = await readJson(path.join(root, 'script.json'));
 const problems = validateScript(script);

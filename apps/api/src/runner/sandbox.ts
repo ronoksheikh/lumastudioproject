@@ -53,20 +53,31 @@ export function nodeInstallDir(): string | null {
   return path.dirname(bin);
 }
 
+/** Directory holding the Chromium install (CHROME_PATH may be a symlink into e.g. /ms-playwright/…). */
+export function chromeInstallDir(): string | null {
+  if (!config.chromePath) return null;
+  try {
+    return path.dirname(fs.realpathSync(config.chromePath));
+  } catch {
+    return null;
+  }
+}
+
 /** Directories made visible read-only inside bubblewrap (only those that exist). */
 const RO_DIRS = ['/usr', '/bin', '/sbin', '/lib', '/lib64', '/etc/ssl', '/etc/ca-certificates', '/etc/fonts', '/usr/share/fonts'];
 const RO_FILES = ['/etc/resolv.conf', '/etc/hosts', '/etc/nsswitch.conf', '/etc/ld.so.cache', '/etc/passwd', '/etc/group', '/etc/localtime', '/etc/alternatives'];
 
 /** Wraps `bash -lc <cmd>` so the command only sees system tools, the shared packages and its own project dir. */
-export function bwrapArgv(opts: { bwrap: string; projectDir: string; sharedModules: string; extraRo?: string[] }, inner: string[]): string[] {
+export function bwrapArgv(opts: { bwrap: string; projectDir: string; sharedModules: string; extraRo?: string[]; cwd?: string }, inner: string[]): string[] {
   const a: string[] = [opts.bwrap, '--die-with-parent', '--unshare-pid', '--unshare-ipc', '--unshare-uts', '--unshare-cgroup-try', '--new-session'];
   for (const d of RO_DIRS) if (fs.existsSync(d)) a.push('--ro-bind', d, d);
   for (const f of RO_FILES) if (fs.existsSync(f)) a.push('--ro-bind', f, f);
   const node = nodeInstallDir();
-  for (const d of [...(opts.extraRo ?? []), ...(node ? [node] : [])]) if (fs.existsSync(d)) a.push('--ro-bind', d, d);
+  const chrome = chromeInstallDir();
+  for (const d of [...(opts.extraRo ?? []), ...(node ? [node] : []), ...(chrome ? [chrome] : [])]) if (fs.existsSync(d)) a.push('--ro-bind', d, d);
   if (fs.existsSync(opts.sharedModules)) a.push('--ro-bind', opts.sharedModules, opts.sharedModules);
   a.push('--dev', '/dev', '--proc', '/proc', '--tmpfs', '/tmp');
-  a.push('--bind', opts.projectDir, opts.projectDir, '--chdir', opts.projectDir);
+  a.push('--bind', opts.projectDir, opts.projectDir, '--chdir', opts.cwd ?? opts.projectDir);
   a.push('--', ...inner);
   return a;
 }

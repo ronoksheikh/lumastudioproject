@@ -6,6 +6,9 @@ import path from 'node:path';
 
 export const scriptsDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
+/** Flags that never take a value (so a positional argument after them stays positional). */
+const BOOLEAN_FLAGS = new Set(['placeholder', 'key-stdin', 'no-env', 'video-only', 'page', 'json', 'list', 'help']);
+
 /** `--key value` and `--flag` options plus positional arguments. */
 export function parseArgs(argv = process.argv.slice(2)) {
   const opts = {};
@@ -15,7 +18,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     if (a.startsWith('--')) {
       const key = a.slice(2);
       const next = argv[i + 1];
-      if (next !== undefined && !next.startsWith('--')) {
+      if (!BOOLEAN_FLAGS.has(key) && next !== undefined && !next.startsWith('--')) {
         opts[key] = next;
         i++;
       } else opts[key] = true;
@@ -30,7 +33,8 @@ export function projectRoot(opts) {
 }
 
 /** Loads KEY=value pairs from <root>/.env into process.env (existing variables win). */
-export async function loadEnv(root) {
+export async function loadEnv(root, opts = {}) {
+  if (opts['no-env']) return; // Luma Studio runs these scripts itself and never trusts a project's .env
   try {
     const raw = await readFile(path.join(root, '.env'), 'utf8');
     for (const line of raw.split('\n')) {
@@ -76,4 +80,13 @@ export async function importPkg(name, root) {
   } catch (e) {
     throw new Error(`Cannot find package "${name}" (looked in the project and in NODE_PATH). Run \`npm install ${name}\` in the project. (${e.code ?? e.message})`);
   }
+}
+
+/** Reads the ElevenLabs key from stdin (`--key-stdin`) so it never appears in a process environment or argv. */
+export async function applyKeyFromStdin(opts) {
+  if (!opts['key-stdin']) return;
+  const chunks = [];
+  for await (const c of process.stdin) chunks.push(c);
+  const key = Buffer.concat(chunks).toString('utf8').trim();
+  if (key) process.env.ELEVENLABS_API_KEY = key;
 }

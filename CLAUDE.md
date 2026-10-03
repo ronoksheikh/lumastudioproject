@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Layout:
 
-- `apps/api` — Fastify app (config, SQLite/Drizzle in `src/db`, routes). `apps/web` — Vite + React SPA. `packages/shared` — constants/zod schemas shared by both (TypeScript source, bundled into the api by tsup). `packages/prompts` — versioned agent prompts. `template/` — the video template copied into every project. `docker/runtime-deps` — the shared `/opt/luma/node_modules` package list.
+- `apps/api` — Fastify app: `src/db` (SQLite/Drizzle), `auth`, `projects` (dirs/git/service), `providers` (BYO model keys), `settings` (ElevenLabs), `uploads`, `preview` (separate-origin file server), `runner` (sandboxed exec + file tools), `cpu` (budget), `agent` (loop, tools, run registry, SSE routes). `apps/web` — Vite + React SPA. `packages/shared` — constants/zod schemas shared by both (TypeScript source, bundled into the api by tsup). `packages/prompts` — versioned agent prompts. `template/` — the video template copied into every project. `docker/runtime-deps` — the shared `/opt/luma/node_modules` package list.
 - `plan.md` — the build plan.
 - `reference-ads/` — three finished, standalone ad projects. Per `plan.md` §2 they are the ground truth for how a "Lumademy-quality" video is made, and Phase 1 extracts them into one reusable template (use `lumademy-explainer-ad` as the base: newest and cleanest).
 - `Lumademy_Brand_Kit/` — logos (SVG/PNG), social assets, and `03_Colors_and_Guidelines/Brand_Guidelines.md`.
@@ -23,9 +23,11 @@ pnpm dev                              # api (tsx watch, :8080) + web (vite, :518
 pnpm build && pnpm start              # production build; api serves apps/web/dist
 pnpm typecheck
 pnpm test                             # vitest (api)
-pnpm --filter @luma/api exec vitest run src/app.test.ts   # single test file
+pnpm --filter @luma/api exec vitest run src/agent/agent.test.ts   # single test file (tests run serially; some spawn real sandboxed processes)
 pnpm db:generate                      # after editing apps/api/src/db/schema.ts -> new SQL in apps/api/drizzle (committed; applied on start)
 ```
+
+Agent runs use a mock OpenAI-compatible server from `apps/api/src/test/helpers.ts` (`startMockLlm`) — no network or API keys needed. Template scripts have their own tests: `cd template && npm test`.
 
 Configuration is via env (see `.env.example`, parsed in `apps/api/src/config.ts`). `docker compose up` builds the single `luma-studio` image (Dockerfile at the root).
 

@@ -168,5 +168,7 @@ export const renders = sqliteTable(
 export const memories = sqliteTable('memories', {
   projectId: text('project_id').primaryKey().references(() => projects.id, { onDelete: 'cascade' }),
   summary: text('summary').notNull(),
+  /** rowid of the last message folded into the summary (messages after it are sent verbatim) */
+  uptoRowid: integer('upto_rowid').notNull().default(0),
   updatedAt: integer('updated_at').notNull().default(now),
 });

@@ -1,0 +1,1 @@
+ALTER TABLE `memories` ADD `upto_rowid` integer DEFAULT 0 NOT NULL;

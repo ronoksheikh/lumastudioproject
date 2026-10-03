@@ -24,6 +24,8 @@ export interface ExecOptions {
   secrets?: readonly string[];
   /** resource limits */
   limits?: Partial<Limits>;
+  /** working directory (absolute, inside the project); default: the project root */
+  cwd?: string;
 }
 
 export interface Limits {
@@ -70,7 +72,7 @@ export function execInProject(project: ProjectRef, command: string, opts: ExecOp
   }
 
   const inner = ['prlimit', `--nproc=${limits.nproc}`, `--fsize=${limits.fsize}`, `--cpu=${limits.cpu}`, '--', 'nice', '-n', '10', 'bash', '-lc', command];
-  const argv = sb.bwrap ? bwrapArgv({ bwrap: sb.bwrap, projectDir: project.dir, sharedModules: config.sharedModules }, inner) : inner;
+  const argv = sb.bwrap ? bwrapArgv({ bwrap: sb.bwrap, projectDir: project.dir, sharedModules: config.sharedModules, cwd: opts.cwd }, inner) : inner;
   const env = buildCommandEnv(project.dir, opts.env);
   const secrets = opts.secrets ?? [];
 
@@ -82,7 +84,7 @@ export function execInProject(project: ProjectRef, command: string, opts: ExecOp
     let finished = false;
 
     const child = spawn(argv[0]!, argv.slice(1), {
-      cwd: project.dir,
+      cwd: opts.cwd ?? project.dir,
       env,
       detached: true, // own process group so we can kill the whole tree
       stdio: ['ignore', 'pipe', 'pipe'],

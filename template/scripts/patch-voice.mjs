@@ -9,7 +9,7 @@ import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { parseArgs, projectRoot, loadEnv, readJson, round3, ELEVEN_BASE } from './lib/common.mjs';
+import { parseArgs, projectRoot, loadEnv, applyKeyFromStdin, readJson, round3, ELEVEN_BASE } from './lib/common.mjs';
 
 const { opts, pos } = parseArgs();
 const id = pos[0];
@@ -18,7 +18,8 @@ if (!id) {
   process.exit(1);
 }
 const root = projectRoot(opts);
-await loadEnv(root);
+await loadEnv(root, opts);
+await applyKeyFromStdin(opts);
 const apiKey = process.env.ELEVENLABS_API_KEY;
 if (!apiKey) throw new Error('Missing ELEVENLABS_API_KEY');
 
