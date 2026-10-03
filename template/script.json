@@ -1,0 +1,21 @@
+{
+  "voice": {
+    "model_id": "eleven_v4",
+    "language_code": "en",
+    "voice_id": "EXAVITQu4vr4xnSDxMaL",
+    "voice_settings": {
+      "stability": 0.5,
+      "similarity_boost": 0.8,
+      "style": 0.25,
+      "use_speaker_boost": true,
+      "speed": 1.15
+    },
+    "tempo": 1
+  },
+  "segments": [
+    { "id": "title", "text": "This whole video was built from a single prompt." },
+    { "id": "map", "text": "Any country, any city. One smooth zoom." },
+    { "id": "chart", "text": "Growth at a glance. Up and to the right." },
+    { "id": "cta", "text": "Make yours today." }
+  ]
+}

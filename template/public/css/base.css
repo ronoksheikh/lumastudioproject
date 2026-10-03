@@ -1,0 +1,134 @@
+/* Luma engine base styles — tokens (overridden from brand.json at runtime), stage, layers, fx.
+   Scene styles go in scenes.css; recipe styles live in recipes.css. */
+:root {
+  --sky: #5daeff;
+  --blue: #2970ec;
+  --royal: #1557d1;
+  --deep: #07358f;
+  --navy: #10234b;
+  --night: #071738;
+  --off: #eff5ff;
+  --ice: #bfe2ff;
+  --grad: linear-gradient(135deg, var(--sky) 0%, var(--blue) 37%, var(--royal) 72%, var(--deep) 100%);
+  --font-display: Inter, system-ui, sans-serif;
+  --font-bn: 'Anek Bangla', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  /* stage size in px, set by main.js from project.json (unitless on purpose) */
+  --stage-w: 1920;
+  --stage-h: 1080;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #02060f; overflow: hidden; }
+body { font-family: var(--font-display); -webkit-font-smoothing: antialiased; }
+
+#stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--stage-w) * 1px);
+  height: calc(var(--stage-h) * 1px);
+  overflow: hidden;
+  background: var(--night);
+  transform-origin: center;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+body.ready #stage { opacity: 1; }
+#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#scenes, #fx { position: absolute; inset: 0; pointer-events: none; }
+#scenes { perspective: 1800px; }
+
+.bn { font-family: var(--font-bn); }
+.en { font-family: var(--font-display); }
+.mono { font-family: var(--font-mono); }
+
+.scene { position: absolute; inset: 0; color: #fff; visibility: hidden; }
+
+/* masked word reveal — padding keeps Bengali matras/descenders inside the mask */
+.w { display: inline-block; overflow: hidden; vertical-align: top; padding: 0.16em 0.05em 0.24em; margin: -0.16em -0.05em -0.24em; }
+.wi { display: inline-block; will-change: transform; }
+.c { display: inline-block; will-change: transform; }
+.ico { width: 1em; height: 1em; display: block; }
+
+/* ---------------- fx ---------------- */
+.vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(2, 8, 30, 0.45) 100%); }
+/* grain is moved by main.js as a function of t (no CSS animation: frames must be reproducible) */
+.grain {
+  position: absolute;
+  inset: -50%;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+
+#captions {
+  position: absolute;
+  left: 50%;
+  bottom: 54px;
+  transform: translateX(-50%);
+  max-width: calc(var(--stage-w) * 0.78125px);
+  padding: 14px 28px 18px;
+  border-radius: 18px;
+  background: rgba(3, 10, 29, 0.55);
+  backdrop-filter: blur(10px);
+  font: 600 42px/1.35 var(--font-bn);
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+  pointer-events: none;
+}
+#captions:empty { display: none; }
+#captions span.on { color: #fff; }
+
+/* ---------------- start overlay + hud ---------------- */
+#start {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  background: radial-gradient(circle at 50% 45%, rgba(7, 23, 56, 0.35), rgba(2, 6, 15, 0.82));
+  backdrop-filter: blur(6px);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  cursor: pointer;
+  font-family: Inter, sans-serif;
+  transition: opacity 0.35s;
+}
+#start.hidden { opacity: 0; pointer-events: none; }
+.play-ring {
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--grad);
+  box-shadow: 0 0 0 10px rgba(93, 174, 255, 0.18), 0 20px 60px rgba(41, 112, 236, 0.55);
+  transition: transform 0.25s;
+}
+.play-ring svg { width: 52px; height: 52px; margin-left: 8px; }
+#start:hover .play-ring { transform: scale(1.06); }
+.start-label { font-size: 22px; font-weight: 600; letter-spacing: 0.02em; }
+.start-hint { font-size: 13px; opacity: 0.55; letter-spacing: 0.02em; }
+
+#hud {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.6));
+  color: #fff;
+  font: 500 12px var(--font-mono);
+}
+#hud:hover { opacity: 1; }
+#hud .bar { flex: 1; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.2); cursor: pointer; overflow: hidden; }
+#hud .fill { height: 100%; background: var(--sky); transform-origin: left; transform: scaleX(0); }

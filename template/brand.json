@@ -1,0 +1,25 @@
+{
+  "name": "Lumademy",
+  "colors": {
+    "sky": "#5DAEFF",
+    "blue": "#2970EC",
+    "royal": "#1557D1",
+    "deep": "#07358F",
+    "navy": "#10234B",
+    "night": "#071738",
+    "nightA": "#101E46",
+    "nightB": "#030A1D",
+    "off": "#EFF5FF",
+    "ice": "#BFE2FF",
+    "white": "#FFFFFF"
+  },
+  "fonts": {
+    "display": "Inter",
+    "bengali": "Anek Bangla",
+    "mono": "JetBrains Mono"
+  },
+  "logo": {
+    "icon": "assets/Lumademy_Icon_White.svg",
+    "lockup": "assets/Lumademy_All_White.svg"
+  }
+}
