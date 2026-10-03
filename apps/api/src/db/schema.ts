@@ -70,11 +70,13 @@ export const projects = sqliteTable(
     title: text('title').notNull(),
     aspect: text('aspect').notNull().default('16:9'),
     status: text('status').notNull().default('active'),
+    /** Unix uid the project's files belong to and its commands run as (unique per project: isolation between students). */
+    uid: integer('uid'),
     createdAt: createdAt(),
     updatedAt: integer('updated_at').notNull().default(now),
     deletedAt: integer('deleted_at'),
   },
-  (t) => [index('projects_user_idx').on(t.userId)],
+  (t) => [index('projects_user_idx').on(t.userId), uniqueIndex('projects_uid_idx').on(t.uid)],
 );
 
 export const messages = sqliteTable(

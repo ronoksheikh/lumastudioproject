@@ -11,6 +11,8 @@ import { healthRoutes } from './routes/health.js';
 export interface AppContext {
   db: DB;
   sqlite: import('better-sqlite3').Database;
+  /** heavy-job gate; optional so tests can build the app without timers */
+  cpu?: ReturnType<typeof import('./cpu/index.js').createCpuBudget>;
 }
 
 export async function buildApp(ctx: AppContext) {

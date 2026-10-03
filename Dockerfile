@@ -42,6 +42,7 @@ COPY packages/prompts ./prompts
 
 ENV PORT=8080 DATA_DIR=/data WEB_DIST=/app/web CHROME_PATH=/usr/local/bin/chromium \
     NODE_PATH=/opt/luma/node_modules LUMA_TEMPLATE_DIR=/app/template LUMA_PROMPTS_DIR=/app/prompts
+RUN mkdir -p /data && chmod 711 /data  # traversable, not listable: every project uid reaches only its own folder
 VOLUME /data
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD curl -fsS http://localhost:8080/api/health || exit 1

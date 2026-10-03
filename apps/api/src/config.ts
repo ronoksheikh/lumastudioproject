@@ -19,6 +19,19 @@ const schema = z.object({
   LOG_LEVEL: z.string().default('info'),
   /** Where the built SPA lives (apps/web/dist). */
   WEB_DIST: z.string().optional(),
+  /** The Luma video template copied into every new project. */
+  LUMA_TEMPLATE_DIR: z.string().optional(),
+  /** Versioned prompts (packages/prompts). */
+  LUMA_PROMPTS_DIR: z.string().optional(),
+  /** Shared base packages every project can import (three, gsap, puppeteer-core…). */
+  SHARED_MODULES: z.string().default('/opt/luma/node_modules'),
+  CHROME_PATH: z.string().optional(),
+  /** Agent command isolation: auto = per-project uid when root + bubblewrap when usable; uid | bwrap | none force a mode. */
+  SANDBOX: z.enum(['auto', 'uid', 'bwrap', 'none']).default('auto'),
+  /** First unix uid handed to projects (each project gets its own). */
+  PROJECT_UID_BASE: num(100000),
+  /** Per-project disk cap in MB (project folder incl. node_modules). */
+  PROJECT_QUOTA_MB: num(2048),
 });
 
 const env = schema.parse(process.env);
@@ -40,6 +53,13 @@ export const config = {
   cmdTimeoutS: env.CMD_TIMEOUT_S,
   logLevel: env.LOG_LEVEL,
   webDist: env.WEB_DIST ?? path.resolve(process.cwd(), '../web/dist'),
+  templateDir: env.LUMA_TEMPLATE_DIR ?? path.resolve(process.cwd(), '../../template'),
+  promptsDir: env.LUMA_PROMPTS_DIR ?? path.resolve(process.cwd(), '../../packages/prompts'),
+  sharedModules: env.SHARED_MODULES,
+  chromePath: env.CHROME_PATH,
+  sandbox: env.SANDBOX,
+  projectUidBase: env.PROJECT_UID_BASE,
+  projectQuotaMb: env.PROJECT_QUOTA_MB,
   cores,
 };
 export type Config = typeof config;
