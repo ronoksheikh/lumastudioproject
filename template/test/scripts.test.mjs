@@ -201,3 +201,29 @@ test('check passes on the starter example and flags a bad word reference', async
     await rm(p, { recursive: true, force: true });
   }
 });
+
+test('Phosphor icons: the engine helper renders them and check flags unknown names', async (t) => {
+  const p = await newProject();
+  try {
+    assert.equal(node('use-example.mjs', p, ['starter']).status, 0);
+    assert.equal(node('generate-voice.mjs', p, ['--placeholder']).status, 0);
+    const scene = path.join(p, 'public/js/scenes/00-title.js');
+    let src = await readFile(scene, 'utf8');
+    src = src.replace("import { icons, q } from '../lib/core.js';", "import { icons, q } from '../lib/core.js';\nimport { phosphor } from '../lib/icons.js';")
+      .replace('export default function title(ctx) {', "export default async function title(ctx) {\n  const rocket = await phosphor('rocket-launch', 'bold');")
+      .replace('${icons.spark} MADE WITH LUMA STUDIO', '${rocket} MADE WITH LUMA STUDIO');
+    await writeFile(scene, src);
+    const env = { ...process.env, NODE_PATH: path.join(template, 'node_modules') };
+    const ok = spawnSync('node', [path.join(template, 'scripts/check.mjs'), '--root', p, '--json', '--page'], { encoding: 'utf8', env });
+    if (/No Chrome|Cannot find package "puppeteer-core"/.test(ok.stdout + ok.stderr)) return t.skip('no browser');
+    const report = JSON.parse(ok.stdout);
+    assert.equal(ok.status, 0, ok.stdout);
+    assert.ok(report.info.some((i) => i.startsWith('page builds')), ok.stdout);
+    await writeFile(scene, src.replace("'rocket-launch', 'bold'", "'rocket-lunch', 'bold'"));
+    const bad = spawnSync('node', [path.join(template, 'scripts/check.mjs'), '--root', p, '--json'], { encoding: 'utf8', env });
+    assert.equal(bad.status, 1);
+    assert.ok(JSON.parse(bad.stdout).errors.some((e) => e.includes('Phosphor icon "rocket-lunch" (bold) does not exist')), bad.stdout);
+  } finally {
+    await rm(p, { recursive: true, force: true });
+  }
+});

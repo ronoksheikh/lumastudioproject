@@ -10,6 +10,7 @@ Status: engineering review, **not legal advice**. One item needs a written answe
 | **Natural Earth data** (inside world-atlas) | Public domain | Yes. |
 | **Fonts**: Inter, Anek Bangla, JetBrains Mono | SIL OFL 1.1 | Yes: may be bundled and served; may not be sold on their own. Vendored as woff2 in `template/assets/fonts`. |
 | **ffmpeg / libx264** | GPL (Debian build) | Yes for server-side use: students receive MP4 output, not the binaries. Output files carry no GPL obligations. If the image is ever redistributed, GPL source obligations apply to that image. |
+| **Phosphor icons** — `@phosphor-icons/react` (Studio UI) and `@phosphor-icons/core` (SVGs for videos, a shared runtime package served at `/vendor/@phosphor-icons/core/…`, used by `template/public/js/lib/icons.js`) | MIT (© Phosphor Icons) | Yes: icons may be used in rendered videos and bundled in the app; keep the MIT notice (it ships inside the npm packages). |
 | **Chromium / Playwright / puppeteer-core** | BSD-style / Apache-2.0 | Yes. |
 | **Lumademy logos and brand kit** | Ours | Yes. The template ships the white icon/lock-up only. |
 | **ElevenLabs** | Their terms; students use **their own** API keys | The student contracts with ElevenLabs. Check the plan they use allows commercial use if they publish the video; the Studio's Voice settings page links to their terms. We never use a shared key. |

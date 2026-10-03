@@ -3,6 +3,7 @@
   "private": true,
   "description": "Shared base packages for every Luma project (/opt/luma/node_modules). Keep in sync with template/package.json.",
   "dependencies": {
+    "@phosphor-icons/core": "^2.1.1",
     "d3-geo": "^3.1.1",
     "gsap": "^3.15.0",
     "puppeteer-core": "^25.12.0",

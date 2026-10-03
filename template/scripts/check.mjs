@@ -12,7 +12,7 @@
 import { readFile, readdir, access } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { parseArgs, projectRoot, readJson, validateScript, overlayFile } from './lib/common.mjs';
+import { parseArgs, projectRoot, readJson, validateScript, overlayFile, resolvePkg } from './lib/common.mjs';
 
 const { opts } = parseArgs();
 const root = projectRoot(opts);
@@ -126,6 +126,15 @@ for (const f of sceneFiles) {
   // relative imports must resolve
   for (const m of src.matchAll(/from\s+['"](\.[^'"]+)['"]/g)) {
     if (!existsRel(path.relative(root, path.resolve(path.dirname(file), m[1])))) err(`${rel(file)}:${lineOf(src, m.index)}: import not found: ${m[1]}`);
+  }
+  // Phosphor icon names (lib/icons.js) must exist in the shared package
+  for (const m of src.matchAll(/\bphosphor\(\s*['"]([^'"]+)['"](?:\s*,\s*['"]([^'"]+)['"])?/g)) {
+    const [, name, weight = 'regular'] = m;
+    try {
+      resolvePkg(`@phosphor-icons/core/assets/${weight}/${name}${weight === 'regular' ? '' : `-${weight}`}.svg`, root);
+    } catch {
+      err(`${rel(file)}:${lineOf(src, m.index)}: Phosphor icon "${name}" (${weight}) does not exist — names are kebab-case like "rocket-launch"; weights: thin light regular bold fill duotone`);
+    }
   }
   // assets
   for (const m of src.matchAll(/['"`]((?:\/)?assets\/[^'"`$\s]+)['"`]/g)) {
