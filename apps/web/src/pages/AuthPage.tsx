@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Card, FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
+import { FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
 import { Button } from '../components/Button';
 import { useCallback, useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
@@ -41,48 +41,40 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
   if (signup && cfg.data && !signupOpen) return <Navigate to="/login" replace />;
 
   return (
-    <div className="luma-gradient grid min-h-full place-items-center px-4 py-10">
-      <div className="w-full max-w-md">
-        <div className="mb-6 flex justify-center">
-          <Logo variant="white" className="h-9" />
-        </div>
-        <Card className="p-2">
-          <Card.Header>
-            <Card.Title className="text-xl">{signup ? 'Create your Luma Studio account' : 'Welcome back'}</Card.Title>
-            <Card.Description>{signup ? 'Make AI motion-graphics videos from a single prompt.' : 'Log in to keep building your videos.'}</Card.Description>
-          </Card.Header>
-          <Card.Content>
-            <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-              <TextField type="email" value={email} onChange={setEmail} isRequired name="email">
-                <Label>Email</Label>
-                <Input placeholder="you@example.com" autoComplete="email" />
-              </TextField>
-              <TextField type="password" value={password} onChange={setPassword} isRequired name="password" isInvalid={signup && password.length > 0 && password.length < 8}>
-                <Label>Password</Label>
-                <Input placeholder={signup ? 'At least 8 characters' : 'Your password'} autoComplete={signup ? 'new-password' : 'current-password'} />
-                <FieldError>Use at least 8 characters.</FieldError>
-              </TextField>
-              {siteKey && <Captcha siteKey={siteKey} onToken={onToken} />}
-              {error && (
-                <p role="alert" className="rounded-lg bg-[#fdecec] px-3 py-2 text-sm text-[#7f1d1d]">{error}</p>
-              )}
-              <Button type="submit" variant="primary" isDisabled={busy || !email || !password || (!!siteKey && !captcha)} className="w-full">
-                {busy ? <Spinner size="sm" color="current" /> : signup ? 'Create account' : 'Log in'}
-              </Button>
-            </form>
-          </Card.Content>
-          <Card.Footer className="justify-center text-sm text-[#5b6b8f]">
-            {signup ? (
-              <span>Already have an account? <Link to="/login" className="font-semibold text-[#2970ec]">Log in</Link></span>
-            ) : signupOpen ? (
-              <span>New here? <Link to="/signup" className="font-semibold text-[#2970ec]">Create an account</Link></span>
-            ) : (
-              <span className="text-center">No account yet? Enrol in the course at <a href="https://lumademy.com" className="font-semibold text-[#2970ec]">lumademy.com</a> — your Luma Studio login is emailed to you.</span>
-            )}
-          </Card.Footer>
-        </Card>
-        <p className="mt-6 text-center text-xs text-white/80">For Lumademy AI Motion Graphics Crash Course students.</p>
-      </div>
+    <div className="flex min-h-full flex-col bg-white px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-10">
+      <main className="mx-auto flex w-full max-w-[360px] flex-1 flex-col justify-center">
+        <Logo variant="blue" className="mb-10 h-7 self-start" />
+        <h1 className="text-[28px] font-semibold tracking-tight text-[#1f2937]">{signup ? 'Create your account' : 'Log in to Luma Studio'}</h1>
+        <p className="mt-1.5 text-[15px] text-[#5b6b8f]">{signup ? 'Make motion-graphics videos from a single prompt.' : 'Welcome back. Pick up where you left off.'}</p>
+
+        <form onSubmit={submit} className="mt-8 flex flex-col gap-4" noValidate>
+          <TextField type="email" value={email} onChange={setEmail} isRequired name="email">
+            <Label>Email</Label>
+            <Input placeholder="you@example.com" autoComplete="email" />
+          </TextField>
+          <TextField type="password" value={password} onChange={setPassword} isRequired name="password" isInvalid={signup && password.length > 0 && password.length < 8}>
+            <Label>Password</Label>
+            <Input placeholder={signup ? 'At least 8 characters' : 'Your password'} autoComplete={signup ? 'new-password' : 'current-password'} />
+            <FieldError>Use at least 8 characters.</FieldError>
+          </TextField>
+          {siteKey && <Captcha siteKey={siteKey} onToken={onToken} />}
+          {error && <p role="alert" className="text-sm text-[#b42318]">{error}</p>}
+          <Button type="submit" variant="primary" size="lg" isDisabled={busy || !email || !password || (!!siteKey && !captcha)} className="mt-2 w-full">
+            {busy ? <Spinner size="sm" color="current" /> : signup ? 'Create account' : 'Log in'}
+          </Button>
+        </form>
+
+        <p className="mt-6 text-sm text-[#5b6b8f]">
+          {signup ? (
+            <>Already have an account? <Link to="/login" className="font-medium text-[#2970ec]">Log in</Link></>
+          ) : signupOpen ? (
+            <>New here? <Link to="/signup" className="font-medium text-[#2970ec]">Create an account</Link></>
+          ) : (
+            <>No account yet? Enrol at <a href="https://lumademy.com" className="font-medium text-[#2970ec]">lumademy.com</a> — your login is emailed to you.</>
+          )}
+        </p>
+      </main>
+      <footer className="mx-auto w-full max-w-[360px] pt-10 text-xs text-[#8a97b5]">Luma Studio · for Lumademy AI Motion Graphics Crash Course students</footer>
     </div>
   );
 }

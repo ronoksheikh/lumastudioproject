@@ -2,6 +2,7 @@
 import { and, eq } from 'drizzle-orm';
 import type BetterSqlite3 from 'better-sqlite3';
 import type { DB } from '../db/index.js';
+import type { ReasoningEffort } from '../providers/reasoning.js';
 import { runs } from '../db/schema.js';
 import { conflict, HttpError } from '../http/errors.js';
 import { providerApiKey, getProvider } from '../providers/service.js';
@@ -117,7 +118,7 @@ export class RunRegistry {
         }
         const out = await runAgent(this.deps, {
           runId, projectId: project.id, userId, project: ref, aspect: project.aspect,
-          provider: { baseUrl: provider.baseUrl, apiKey: llmKey, model: provider.model, contextWindow: provider.contextWindow, supportsVision: provider.supportsVision },
+          provider: { baseUrl: provider.baseUrl, apiKey: llmKey, model: provider.model, contextWindow: provider.contextWindow, supportsVision: provider.supportsVision, reasoningEffort: provider.reasoningEffort as ReasoningEffort | null, thinkingBudget: provider.thinkingBudget },
           userMessage: { rowid: userRow.rowid, text: opts.text, parts },
           elevenKey: () => getSecret(this.db, userId, 'elevenlabs')?.value ?? null,
           secrets, signal: controller.signal, bus,

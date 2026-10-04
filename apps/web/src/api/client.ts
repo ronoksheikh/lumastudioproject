@@ -1,6 +1,6 @@
 import type { RunEvent } from '@luma/shared';
 import type {
-  CommitDetail, CommitSummary, ProjectFile, TerminalEntry, ConversationMessage, ModelConfig, Project, RenderRecord, RunInfo, TestResult, TreeEntry, UploadRecord, User, VoicePrefs, VoiceSettings,
+  CommitDetail, CommitSummary, ProjectFile, TerminalEntry, ConversationMessage, ModelConfig, Project, RenderRecord, RunInfo, TestResult, TreeEntry, UploadRecord, User, VoicePrefs, VoiceSettings, ReasoningEffort,
 } from './types';
 
 export class ApiError extends Error {
@@ -143,8 +143,9 @@ export const api = {
 
   // ---- settings ----
   models: () => get<{ models: ModelConfig[] }>('/api/settings/models'),
-  addModel: (m: { name: string; baseUrl: string; apiKey: string; model: string; contextWindow?: number }) => post<{ model: ModelConfig }>('/api/settings/models', m),
-  updateModel: (id: string, m: Partial<{ name: string; baseUrl: string; apiKey: string; model: string; contextWindow: number; isDefault: boolean }>) =>
+  addModel: (m: { name: string; baseUrl: string; apiKey: string; model: string; contextWindow?: number; reasoningEffort?: ReasoningEffort | null; thinkingBudget?: number | null }) => post<{ model: ModelConfig }>('/api/settings/models', m),
+  availableModels: (b: { baseUrl: string; apiKey?: string; id?: string }) => post<{ models: Array<{ id: string; name?: string; contextWindow?: number }>; error?: string }>('/api/settings/models/available', b),
+  updateModel: (id: string, m: Partial<{ name: string; baseUrl: string; apiKey: string; model: string; contextWindow: number; isDefault: boolean; reasoningEffort: ReasoningEffort | null; thinkingBudget: number | null }>) =>
     patch<{ model: ModelConfig }>(`/api/settings/models/${id}`, m),
   deleteModel: (id: string) => del<{ ok: true }>(`/api/settings/models/${id}`),
   testModel: (id: string) => post<{ result: TestResult; model: ModelConfig }>(`/api/settings/models/${id}/test`),

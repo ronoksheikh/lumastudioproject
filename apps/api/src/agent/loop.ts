@@ -26,6 +26,7 @@ const FRAME_CHECKS: Record<AgentPrefs['frameChecks'], string> = {
   light: '## Frame checks: LIGHT (the student\'s setting, to save tokens)\nYou may call preview_frames ONCE per message: pick the ≤ 8 most important moments. Rely on `npm run check -- --page` for the rest.',
   off: '## Frame checks: OFF (the student\'s setting, to save tokens)\npreview_frames is not available. Verify with `npm run check -- --page` (cheap: build errors, console errors, static checks), then ask the student to watch the Preview tab and tell you what looks wrong — they can use "Attach this frame" to point at a moment. List the 2–4 moments most worth watching (times + what should happen there).',
 };
+import { reasoningParams, rejectsReasoning, type ReasoningEffort } from '../providers/reasoning.js';
 import { buildSystemPrompt, fillPromptVars } from './prompts.js';
 import { describeOverrides, getVoicePrefs, getAgentPrefs, getAgentPrompt, type AgentPrefs } from '../settings/service.js';
 import { collectTurn, type AssistantTurn } from './stream.js';
@@ -47,7 +48,7 @@ export interface RunInput {
   userId: string;
   project: ProjectRef;
   aspect: string;
-  provider: { baseUrl: string; apiKey: string; model: string; contextWindow: number; supportsVision: boolean };
+  provider: { baseUrl: string; apiKey: string; model: string; contextWindow: number; supportsVision: boolean; reasoningEffort?: ReasoningEffort | null; thinkingBudget?: number | null };
   /** the already persisted user message; `parts` is what the model sees (may include images) */
   userMessage: { rowid: number; text: string; parts: OpenAI.Chat.Completions.ChatCompletionContentPart[] | null };
   elevenKey: () => string | null;
@@ -64,7 +65,7 @@ export interface RunOutcome {
   finalText: string;
 }
 
-type Flags = { noStreamOptions?: boolean; noMaxTokens?: boolean };
+type Flags = { noStreamOptions?: boolean; noMaxTokens?: boolean; noReasoning?: boolean };
 const providerFlags = new Map<string, Flags>();
 
 const sleep = (ms: number, signal?: AbortSignal) =>
@@ -102,7 +103,8 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
   const { bus, signal, project } = input;
   const store = new ConvoStore(sqlite, input.projectId);
   const client = makeClient({ baseUrl: input.provider.baseUrl, apiKey: input.provider.apiKey });
-  const flagKey = `${input.provider.baseUrl}|${input.provider.model}`;
+  // per endpoint + model + thinking setting: changing the setting gives it a fresh chance
+  const flagKey = `${input.provider.baseUrl}|${input.provider.model}|${input.provider.reasoningEffort ?? ''}|${input.provider.thinkingBudget ?? ''}`;
   const flags: Flags = providerFlags.get(flagKey) ?? {};
   providerFlags.set(flagKey, flags);
 
@@ -179,6 +181,8 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
             stream: true,
             ...(flags.noStreamOptions ? {} : { stream_options: { include_usage: true } }),
             ...(flags.noMaxTokens ? {} : { max_tokens: Math.min(32000, Math.max(4096, Math.floor(input.provider.contextWindow * 0.15))) }),
+            // the student's thinking setting (Settings → Models), in this provider's dialect
+            ...(flags.noReasoning ? {} : (reasoningParams(input.provider.baseUrl, input.provider.reasoningEffort ?? null, input.provider.thinkingBudget ?? null) as object)),
           };
           const stream = await client.chat.completions.create(params, { signal });
           turn = await collectTurn(
@@ -192,6 +196,11 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
           if (e instanceof OpenAI.APIError && e.status === 400) {
             if (/stream_options/i.test(e.message) && !flags.noStreamOptions) {
               flags.noStreamOptions = true;
+              continue;
+            }
+            if (!flags.noReasoning && (input.provider.reasoningEffort || input.provider.thinkingBudget != null) && rejectsReasoning(e.message)) {
+              flags.noReasoning = true;
+              bus.emit('run.error', { message: 'This model doesn’t accept the thinking setting from Settings → Models — continuing without it.', retryable: true });
               continue;
             }
             if (/max_(completion_)?tokens/i.test(e.message) && !flags.noMaxTokens) {

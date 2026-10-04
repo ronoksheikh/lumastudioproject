@@ -14,7 +14,7 @@ export function publicProvider(p: ProviderRow) {
   return {
     id: p.id, name: p.name, baseUrl: p.baseUrl, model: p.model, apiKeyHint: p.apiKeyHint,
     supportsTools: p.supportsTools, supportsVision: p.supportsVision, supportsReasoningStream: p.supportsReasoningStream,
-    contextWindow: p.contextWindow, isDefault: p.isDefault, createdAt: p.createdAt,
+    contextWindow: p.contextWindow, reasoningEffort: p.reasoningEffort, thinkingBudget: p.thinkingBudget, isDefault: p.isDefault, createdAt: p.createdAt,
   };
 }
 
@@ -29,11 +29,12 @@ export function getProvider(db: DB, userId: string, id: string): ProviderRow {
 /** Decrypts the key — only for the agent runtime and test calls; the value must never leave the server. */
 export const providerApiKey = (p: ProviderRow) => decrypt(p.apiKeyEnc, loadSecrets().masterKey);
 
-export function createProvider(db: DB, userId: string, input: { name: string; baseUrl: string; apiKey: string; model: string; contextWindow?: number }) {
+export function createProvider(db: DB, userId: string, input: { name: string; baseUrl: string; apiKey: string; model: string; contextWindow?: number; reasoningEffort?: string | null; thinkingBudget?: number | null }) {
   const id = newId();
   const isFirst = listProviders(db, userId).length === 0;
   db.insert(providerConfigs).values({
     id, userId, name: input.name, baseUrl: input.baseUrl.replace(/\/+$/, ''), model: input.model, contextWindow: input.contextWindow ?? 128000,
+    reasoningEffort: input.reasoningEffort ?? null, thinkingBudget: input.thinkingBudget ?? null,
     apiKeyEnc: encrypt(input.apiKey, loadSecrets().masterKey), apiKeyHint: keyHint(input.apiKey), isDefault: isFirst,
   }).run();
   return getProvider(db, userId, id);
@@ -41,11 +42,13 @@ export function createProvider(db: DB, userId: string, input: { name: string; ba
 
 export function updateProvider(
   db: DB, p: ProviderRow,
-  patch: { name?: string; baseUrl?: string; apiKey?: string; model?: string; contextWindow?: number },
+  patch: { name?: string; baseUrl?: string; apiKey?: string; model?: string; contextWindow?: number; reasoningEffort?: string | null; thinkingBudget?: number | null },
 ) {
   const set: Partial<typeof providerConfigs.$inferInsert> = {};
   if (patch.name !== undefined) set.name = patch.name;
   if (patch.contextWindow !== undefined) set.contextWindow = patch.contextWindow;
+  if (patch.reasoningEffort !== undefined) set.reasoningEffort = patch.reasoningEffort;
+  if (patch.thinkingBudget !== undefined) set.thinkingBudget = patch.thinkingBudget;
   const endpointChanged = (patch.baseUrl !== undefined && patch.baseUrl.replace(/\/+$/, '') !== p.baseUrl) || (patch.model !== undefined && patch.model !== p.model) || patch.apiKey !== undefined;
   if (patch.baseUrl !== undefined) set.baseUrl = patch.baseUrl.replace(/\/+$/, '');
   if (patch.model !== undefined) set.model = patch.model;
