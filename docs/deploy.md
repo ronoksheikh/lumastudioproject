@@ -32,7 +32,7 @@ openssl rand -base64 32     # → SESSION_SECRET
 
 Set `NODE_ENV=production`, `APP_ORIGIN=https://studio.example.com`, `PREVIEW_ORIGIN=https://preview.example.com`,
 `APP_HOST`, `PREVIEW_HOST`, `CPUS` (≈ 0.9 × cores) and `MEM_LIMIT`. Optional: `HCAPTCHA_SITEKEY/SECRET`,
-`METRICS_TOKEN`, `ERROR_TRACKING_DSN`, `SIGNUP_ENABLED=0` for a closed beta. Keep `.env` out of git and back
+`METRICS_TOKEN`, `ERROR_TRACKING_DSN`, `PROVISION_API_KEY` (accounts come from lumademy.com — see `docs/provisioning.md`; sign-up is closed unless `SIGNUP_ENABLED=1`). Keep `.env` out of git and back
 `MASTER_KEY` up somewhere other than the server.
 
 ```

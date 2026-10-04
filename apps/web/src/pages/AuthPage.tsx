@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
 import { Button } from '../components/Button';
 import { useCallback, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { ApiError, api, setCsrf } from '../api/client';
 import { Captcha } from '../components/Captcha';
 import { Logo } from '../components/Logo';
@@ -15,7 +15,8 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
   const qc = useQueryClient();
   const nav = useNavigate();
   const signup = mode === 'signup';
-  const cfg = useQuery({ queryKey: ['auth-config'], queryFn: api.authConfig, enabled: signup, staleTime: Infinity });
+  const cfg = useQuery({ queryKey: ['auth-config'], queryFn: api.authConfig, staleTime: Infinity });
+  const signupOpen = cfg.data?.signupEnabled === true;
   const siteKey = signup ? cfg.data?.captchaSiteKey ?? null : null;
   const [captcha, setCaptcha] = useState('');
   const onToken = useCallback((t: string) => setCaptcha(t), []);
@@ -35,6 +36,9 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
       setBusy(false);
     }
   };
+
+  // accounts come from lumademy.com when sign-up is closed: /signup just shows the login
+  if (signup && cfg.data && !signupOpen) return <Navigate to="/login" replace />;
 
   return (
     <div className="luma-gradient grid min-h-full place-items-center px-4 py-10">
@@ -70,12 +74,14 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
           <Card.Footer className="justify-center text-sm text-[#5b6b8f]">
             {signup ? (
               <span>Already have an account? <Link to="/login" className="font-semibold text-[#2970ec]">Log in</Link></span>
-            ) : (
+            ) : signupOpen ? (
               <span>New here? <Link to="/signup" className="font-semibold text-[#2970ec]">Create an account</Link></span>
+            ) : (
+              <span className="text-center">No account yet? Enrol in the course at <a href="https://lumademy.com" className="font-semibold text-[#2970ec]">lumademy.com</a> — your Luma Studio login is emailed to you.</span>
             )}
           </Card.Footer>
         </Card>
-        <p className="mt-6 text-center text-xs text-white/80">Free for Lumademy AI Motion Graphics Crash Course students.</p>
+        <p className="mt-6 text-center text-xs text-white/80">For Lumademy AI Motion Graphics Crash Course students.</p>
       </div>
     </div>
   );

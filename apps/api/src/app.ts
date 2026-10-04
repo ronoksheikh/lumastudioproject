@@ -7,6 +7,7 @@ import Fastify, { type FastifyBaseLogger, type FastifyInstance, type FastifyRequ
 import { agentRoutes } from './agent/routes.js';
 import type { RunRegistry } from './agent/registry.js';
 import { authRoutes } from './auth/routes.js';
+import { provisionRoutes } from './auth/provision.js';
 import { registerAuth } from './auth/plugin.js';
 import { config } from './config.js';
 import type { DB } from './db/index.js';
@@ -74,6 +75,7 @@ export async function buildApp(ctx: AppContext) {
       await healthRoutes(api, ctx);
       await metricsRoutes(api, ctx);
       await authRoutes(api, ctx);
+      await provisionRoutes(api, ctx);
       await projectRoutes(api, ctx);
       await providerRoutes(api, ctx);
       await settingsRoutes(api, ctx);

@@ -48,6 +48,7 @@ export async function startStack(opts: { port?: number } = {}): Promise<Stack> {
 
   const env = {
     ...process.env,
+    SIGNUP_ENABLED: '1', // the journey starts at /signup
     NODE_ENV: 'development',
     PORT: String(port),
     DATA_DIR: dataDir,
