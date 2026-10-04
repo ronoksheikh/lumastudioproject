@@ -55,6 +55,7 @@ export const toolSchemas = {
     preset: z.enum(['draft', 'final']).describe('draft = 1080p30 fast review render, final = 1080p60 high quality'),
     mode: z.enum(['free', 'fast']).optional().describe('free = the daily free render time on our server (slower); fast = the student\'s paid fast render hours. Omit unless the student chose — you are told when you must ask.'),
   }),
+  account_usage: z.object({}),
   offer_render_hours: z.object({
     reason: z.string().min(5).max(300).describe('One short sentence the student sees, e.g. "Today\'s free render time is used up."'),
     hours: z.number().int().min(1).max(20).optional().describe('Suggested number of hours (default 1)'),
@@ -104,6 +105,7 @@ const descriptions: Record<ToolName, string> = {
   list_voices: 'List the ElevenLabs voices the student\'s account can use (name, voice_id, gender/age/accent, languages, whether usable on their plan) and their plan tier + characters left. Call it before choosing script.json voice settings.',
   patch_voice: 'Re-record ONE segment after editing its text in script.json and splice it into the existing audio. Later timings shift automatically.',
   preview_frames: 'Render the video at the given timeline seconds and return screenshots (and layout problems found in the page). Use it to check every scene.',
+  account_usage: 'The student\'s current usage: free render time used/left today, fast render hours left, storage. Use it when they ask about their limits or before a long render.',
   offer_render_hours: 'Show the student a card in the chat to buy fast render hours (paid, via bKash/Nagad/cards). Use it when render time is used up, or when the student wants faster renders — not unprompted.',
   render_video: 'Queue an MP4 render (draft or final). The student sees live progress; returns when the render is done. Free renders use the daily free time on our server; fast renders use paid fast render hours.',
   ask_user: 'Ask the student a question and wait for the answer. Use only when you are genuinely blocked; otherwise choose sensible defaults.',

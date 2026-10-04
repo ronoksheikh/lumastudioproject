@@ -6,6 +6,7 @@ import { AuthPage } from './pages/AuthPage';
 import { ProjectPage } from './pages/ProjectPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { AdminPage } from './pages/AdminPage';
 
 export function App() {
   const me = useMe();
@@ -34,6 +35,7 @@ export function App() {
         <Route path="/projects/:id" element={<ProjectPage />} />
         <Route path="/settings" element={<Navigate to="/settings/models" replace />} />
         <Route path="/settings/:tab" element={<SettingsPage />} />
+        <Route path="/admin" element={user.isAdmin ? <AdminPage /> : <Navigate to="/" replace />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/signup" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />

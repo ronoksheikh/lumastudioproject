@@ -1,5 +1,6 @@
 import { toolSchemas, type ToolArgs, type ToolName } from '@luma/shared';
 import { saveLesson } from '../lessons.js';
+import { describeUsage } from '../../quota/service.js';
 import { shareAsset, useAsset } from '../library.js';
 import { ToolError } from '../../runner/files.js';
 import { bash } from './bash.js';
@@ -36,6 +37,7 @@ const handlers: { [N in ToolName]: Handler<N> } = {
   preview_frames: previewFrames,
   render_video: renderVideo,
   offer_render_hours: offerRenderHours,
+  account_usage: (ctx) => ok(describeUsage(ctx.db, ctx.userId), 'Checked usage'),
   ask_user: askUser,
   web_fetch: webFetch,
   read_guide: readGuide,

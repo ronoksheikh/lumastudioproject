@@ -7,10 +7,17 @@ import { redactSecrets } from '../../security/redact.js';
 import { diffSnapshots, snapshot } from '../workspace.js';
 import { fail, ok, type ToolContext, type ToolResult } from './types.js';
 
-/** Commands that eat CPU (rendering, browsers, installs) wait for a CPU-budget slot. */
-export const HEAVY = /\b(ffmpeg|ffprobe|chromium|chrome|puppeteer|export-mp4|preview-frames|npm\s+(run\s+)?(export|install|i|ci)\b|npx|pdftoppm|check\.mjs\s+.*--page|npm\s+run\s+check\s+--\s+.*--page)/i;
+/**
+ * Rendering and frame capture belong to render_video / preview_frames (queued, quota-checked, run once). Starting
+ * a browser or the export scripts from the terminal would bypass that, load the server and make other students
+ * wait — so those commands are refused. `npm run check -- --page` (a quick page build) is fine.
+ */
+export const FORBIDDEN_RENDER = /\b(export-mp4(\.mjs)?|render\.mjs|preview-frames(\.mjs)?|npm\s+run\s+export)\b|\b(chromium(-browser)?|google-chrome(-stable)?|chrome|headless_shell)\b[^\n|;&]*--(headless|screenshot|print-to-pdf|remote-debugging-port)/i;
 
 export async function bash(ctx: ToolContext, a: ToolArgs<'bash'>): Promise<ToolResult> {
+  if (FORBIDDEN_RENDER.test(a.command)) {
+    return fail('Rendering, screenshots and browser automation are not allowed from the terminal. Use render_video for MP4s and preview_frames to look at frames (they are queued fairly and count against the student\'s render time). `npm run check -- --page` is fine for a quick page check.');
+  }
   let cwd: string | undefined;
   if (a.cwd && a.cwd !== '.') {
     try {
@@ -33,13 +40,7 @@ export async function bash(ctx: ToolContext, a: ToolArgs<'bash'>): Promise<ToolR
 
   let result;
   try {
-    if (ctx.cpu && HEAVY.test(a.command)) {
-      result = await ctx.cpu.run(run, {
-        label: 'bash',
-        signal: ctx.signal,
-        onPosition: (n) => ctx.bus.delta('tool.output.delta', { callId: ctx.callId, stream: 'stderr', text: `[queued — the server is busy (position ${n})]\n` }),
-      });
-    } else result = await run();
+    result = await run(); // terminal commands never wait in the render queue
   } catch (e) {
     if ((e as Error).name === 'AbortError') return fail('Stopped.');
     throw e;

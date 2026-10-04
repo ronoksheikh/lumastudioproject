@@ -40,6 +40,31 @@ export interface AgentPromptSettings {
   defaultPrompt: string;
 }
 
+interface Sales { amountBdt: number; orders: number; hours: number }
+export interface AdminOverview {
+  now: number;
+  renders: {
+    running: number;
+    queued: number;
+    active: Array<{ id: string; status: string; pool: string; preset: string; progress: number; user: string; project: string; startedAt: number | null; createdAt: number; worker: string | null }>;
+    last24h: { done: number; failed: number; freeHours: number; fastHours: number };
+    totalDone: number;
+    failedRecent: Array<{ id: string; user: string; project: string; error: string; at: number | null }>;
+  };
+  agents: { running: number; runsLast24h: number };
+  cpu: { usage: number; budget: number; running: number; queued: number; maxSlots: number } | null;
+  workers: Array<{ id: string; name: string; disabled: boolean; online: boolean; lastSeenAt: number | null }>;
+  sales: {
+    today: Sales; last7d: Sales; last30d: Sales; allTime: Sales;
+    pending: number; failed: number; fastHoursOutstanding: number; paymentsEnabled: boolean; pricePerHourBdt: number;
+    recent: Array<{ id: string; user: string; hours: number; amountBdt: number; status: string; provider: string; method: string | null; invoice: string | null; trxId: string | null; createdAt: number; paidAt: number | null }>;
+  };
+  users: { total: number; banned: number; new7d: number; active24h: number };
+  projects: { total: number };
+  disk: { totalBytes: number; freeBytes: number } | null;
+}
+export interface AdminUser { id: string; email: string; banned: boolean; createdAt: number; projects: number; freeSecondsUsed24h: number; fastSecondsLeft: number; spentBdt: number }
+
 export interface RenderQuotas {
   freeRender: { secondsPerDay: number | null; secondsLeft: number | null };
   fastRender: { pricePerHourBdt: number; maxHours: number; secondsLeft: number; paymentsEnabled: boolean };
@@ -62,6 +87,12 @@ export const api = {
   authConfig: () => get<{ signupEnabled: boolean; captchaSiteKey: string | null }>('/api/auth/config'),
   signup: (email: string, password: string, captcha?: string) => post<{ user: User; csrfToken: string }>('/api/auth/signup', { email, password, captcha }),
   usage: () => get<{ usage: { diskBytes: number; diskLimitBytes: number | null } & RenderQuotas }>('/api/usage'),
+  // ---- admin (ADMIN_EMAILS only) ----
+  adminOverview: () => get<AdminOverview>('/api/admin/overview'),
+  adminUsers: (q: string) => get<{ users: AdminUser[] }>(`/api/admin/users${qs({ q: q || undefined })}`),
+  adminGrantHours: (id: string, hours: number) => post<{ ok: true }>(`/api/admin/users/${id}/grant-hours`, { hours }),
+  adminBan: (id: string, banned: boolean) => post<{ ok: true }>(`/api/admin/users/${id}/ban`, { banned }),
+  adminCheckPayment: (invoice: string) => post<{ status: string }>(`/api/admin/payments/${invoice}/check`),
   buyRenderHours: (b: { hours: number; phone: string; returnTo: string }) => post<{ paymentUrl: string; invoiceNumber: string; priceBdt: number }>('/api/billing/render-hours', b),
   login: (email: string, password: string) => post<{ user: User; csrfToken: string }>('/api/auth/login', { email, password }),
   logout: () => post<{ ok: true }>('/api/auth/logout'),
