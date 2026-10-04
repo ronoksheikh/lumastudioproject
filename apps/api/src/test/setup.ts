@@ -9,6 +9,7 @@ if (!process.env.DATA_DIR) {
   process.env.DATA_DIR = dir;
 }
 process.env.NODE_ENV = 'test';
+process.env.SIGNUP_ENABLED ??= '1'; // tests create their users through /auth/signup
 process.env.LOG_LEVEL ??= 'silent';
 process.env.ALLOW_PRIVATE_PROVIDER_URLS = '1'; // mock model servers listen on 127.0.0.1
 process.env.MASTER_KEY ??= Buffer.alloc(32, 7).toString('base64');

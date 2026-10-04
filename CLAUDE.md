@@ -49,6 +49,8 @@ Agent runs use a mock OpenAI-compatible server from `apps/api/src/test/helpers.t
 
 **Process cleanup.** Commands and pristine scripts run as the project's uid are counted per uid (`trackUid` in `runner/exec.ts`); a finished command reaps leftover uid processes (`pkill -U`) only when no other command of that project is still running, so a render, a preview capture and an agent command can overlap safely (a stopped command's SIGKILL escalation is cancelled once it has exited).
 
+**Accounts.** Public sign-up is off by default (`SIGNUP_ENABLED=0`; tests and e2e turn it on). lumademy.com's backend creates accounts with `POST /api/provision/users` (`auth/provision.ts`, `Authorization: Bearer PROVISION_API_KEY`, returns a generated password for new emails, `resetPassword` re-issues one; `/revoke` and `/restore` ban/unban for refunds). Docs: `docs/provisioning.md`.
+
 **Hardening.** Quotas live in `quota/service.ts` (disk per user, render seconds per day; checked at project create, upload, run start and render enqueue); `maintenance/` has the project purge and nightly SQLite backup (scheduled from `index.ts`); `security/captcha.ts` is the optional hCaptcha; `observability/` has the Prometheus-style metrics (`/api/metrics`, token-gated) and a Sentry-compatible error reporter; `cli/admin.ts` (`pnpm --filter @luma/api admin …`, `node dist/admin.js` in the image) bans users, purges, backs up and rotates `MASTER_KEY`. `docker/egress.sh` (run by `entrypoint.sh`) blocks private/metadata networks for project uids. Ops and deploy notes: `docs/deploy.md`; licences: `docs/licenses.md`.
 
 Configuration is via env (see `.env.example`, parsed in `apps/api/src/config.ts`). `docker compose up` builds the single `luma-studio` image (Dockerfile at the root).

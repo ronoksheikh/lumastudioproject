@@ -52,8 +52,10 @@ const schema = z.object({
   AGENT_LESSONS: z.enum(['auto', 'review', 'off']).default('auto'),
   /** shared asset library (share_asset/use_asset): 1 = on, 0 = off */
   SHARED_LIBRARY: z.enum(['0', '1']).default('1'),
-  /** Set to 1 to allow signup (closed beta switch). */
-  SIGNUP_ENABLED: z.enum(['0', '1']).default('1'),
+  /** Public sign-up. Off by default: accounts are created by lumademy.com through the provisioning API. */
+  SIGNUP_ENABLED: z.enum(['0', '1']).default('0'),
+  /** Secret for POST /api/provision/* (lumademy.com's backend creates student accounts with it). Unset = API off. */
+  PROVISION_API_KEY: z.string().min(24).optional(),
   /** Quotas. 0 turns a limit off. */
   USER_QUOTA_MB: num(5120),
   RENDER_MINUTES_PER_DAY: num(60),
@@ -115,6 +117,7 @@ export const config = {
   previewTokenTtlS: env.PREVIEW_TOKEN_TTL_S,
   rateLimitDisabled: env.RATE_LIMIT_DISABLED === '1' || env.NODE_ENV === 'test',
   signupEnabled: env.SIGNUP_ENABLED === '1',
+  provisionApiKey: env.PROVISION_API_KEY ?? null,
   agentMaxSteps: env.AGENT_MAX_STEPS,
   agentMaxOutputTokens: env.AGENT_MAX_OUTPUT_TOKENS,
   maxRunsPerUser: env.MAX_RUNS_PER_USER,
