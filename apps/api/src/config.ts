@@ -55,7 +55,7 @@ const schema = z.object({
   /** Public sign-up. Off by default: accounts are created by lumademy.com through the provisioning API. */
   SIGNUP_ENABLED: z.enum(['0', '1']).default('0'),
   /** Secret for POST /api/provision/* (lumademy.com's backend creates student accounts with it). Unset = API off. */
-  PROVISION_API_KEY: z.string().min(24).optional(),
+  PROVISION_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(24, 'PROVISION_API_KEY must be at least 24 characters').optional()),
   /** Quotas. 0 turns a limit off. */
   USER_QUOTA_MB: num(5120),
   RENDER_MINUTES_PER_DAY: num(60),
