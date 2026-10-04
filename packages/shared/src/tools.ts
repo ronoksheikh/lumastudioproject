@@ -53,6 +53,11 @@ export const toolSchemas = {
   }),
   render_video: z.object({
     preset: z.enum(['draft', 'final']).describe('draft = 1080p30 fast review render, final = 1080p60 high quality'),
+    mode: z.enum(['free', 'fast']).optional().describe('free = the daily free render time on our server (slower); fast = the student\'s paid fast render hours. Omit unless the student chose — you are told when you must ask.'),
+  }),
+  offer_render_hours: z.object({
+    reason: z.string().min(5).max(300).describe('One short sentence the student sees, e.g. "Today\'s free render time is used up."'),
+    hours: z.number().int().min(1).max(20).optional().describe('Suggested number of hours (default 1)'),
   }),
   ask_user: z.object({
     question: z.string().min(1).max(500),
@@ -99,7 +104,8 @@ const descriptions: Record<ToolName, string> = {
   list_voices: 'List the ElevenLabs voices the student\'s account can use (name, voice_id, gender/age/accent, languages, whether usable on their plan) and their plan tier + characters left. Call it before choosing script.json voice settings.',
   patch_voice: 'Re-record ONE segment after editing its text in script.json and splice it into the existing audio. Later timings shift automatically.',
   preview_frames: 'Render the video at the given timeline seconds and return screenshots (and layout problems found in the page). Use it to check every scene.',
-  render_video: 'Queue an MP4 render (draft or final). The student sees live progress; returns when the render is done.',
+  offer_render_hours: 'Show the student a card in the chat to buy fast render hours (paid, via bKash/Nagad/cards). Use it when render time is used up, or when the student wants faster renders — not unprompted.',
+  render_video: 'Queue an MP4 render (draft or final). The student sees live progress; returns when the render is done. Free renders use the daily free time on our server; fast renders use paid fast render hours.',
   ask_user: 'Ask the student a question and wait for the answer. Use only when you are genuinely blocked; otherwise choose sensible defaults.',
   web_fetch: 'Fetch a web page or text file (HTML converted to readable text, truncated).',
   save_lesson: 'Save a SHARED lesson every future run sees (all students): a reusable fact you discovered the hard way — a provider/plan limit, an API quirk, a fix for a recurring error, an engine gotcha. Example: "ElevenLabs free plan: library voices fail via the API (402 paid_plan_required) — use premade voices from list_voices." Not for one student\'s preferences or project details, never personal data or keys. Check the shared lessons in your prompt first; correct a wrong one with `replaces`.',

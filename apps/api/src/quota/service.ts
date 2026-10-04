@@ -1,5 +1,5 @@
 // Per-user limits: disk (all of a student's projects, including node_modules and renders) and render time per day.
-import { and, desc, eq, gte, inArray } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray } from 'drizzle-orm';
 import { config } from '../config.js';
 import type { DB } from '../db/index.js';
 import { projects, renderBoosts, renderJobs } from '../db/schema.js';
@@ -39,76 +39,103 @@ export function assertDiskAvailable(db: DB, userId: string) {
   }
 }
 
-/** The newest paid render-hours pack that still has time left, if any. */
-export function activeBoost(db: DB, userId: string) {
+// ---------------- render time: two quotas ----------------
+// FREE: RENDER_MINUTES_PER_DAY (default 5 h) of rendering on this server in any rolling 24 hours.
+// FAST: paid hours on the fast remote render workers (RENDER_HOUR_PRICE_BDT per hour, bought through PayStation),
+// kept until used. When a student has both, the agent asks which one to use (render_video `mode`).
+
+/** Paid packs with time left, oldest first (time is used from the oldest pack). */
+export function paidPacks(db: DB, userId: string) {
   return db.select().from(renderBoosts)
     .where(and(eq(renderBoosts.userId, userId), eq(renderBoosts.status, 'paid')))
-    .orderBy(desc(renderBoosts.paidAt)).all()
-    .find((b) => b.usedSeconds < b.seconds) ?? null;
+    .orderBy(asc(renderBoosts.paidAt)).all()
+    .filter((b) => b.usedSeconds < b.seconds);
 }
 
-/**
- * Seconds of LOCAL render time used in the current window: the last 24 hours, or since the latest paid pack
- * (buying render hours resets the daily allowance). Running jobs count up to now.
- */
+/** Seconds of fast (remote) render time the student has left across all paid packs. */
+export const fastSecondsLeft = (db: DB, userId: string) => paidPacks(db, userId).reduce((sum, b) => sum + (b.seconds - b.usedSeconds), 0);
+
+/** Seconds of FREE (local) render time used in the last 24 hours. Running jobs count up to now. */
 export function renderSecondsToday(db: DB, userId: string, now = Date.now()): number {
-  const lastPaid = db.select({ paidAt: renderBoosts.paidAt }).from(renderBoosts)
-    .where(and(eq(renderBoosts.userId, userId), eq(renderBoosts.status, 'paid'))).orderBy(desc(renderBoosts.paidAt)).get()?.paidAt ?? 0;
-  const since = Math.max(now - 86_400_000, lastPaid);
   const rows = db
     .select({ startedAt: renderJobs.startedAt, finishedAt: renderJobs.finishedAt })
     .from(renderJobs)
-    .where(and(eq(renderJobs.userId, userId), eq(renderJobs.pool, 'local'), gte(renderJobs.startedAt, since), inArray(renderJobs.status, ['running', 'done', 'error'])))
+    .where(and(eq(renderJobs.userId, userId), eq(renderJobs.pool, 'local'), gte(renderJobs.startedAt, now - 86_400_000), inArray(renderJobs.status, ['running', 'done', 'error'])))
     .all();
   return rows.reduce((sum, r) => sum + Math.max(0, ((r.finishedAt ?? now) - (r.startedAt ?? now)) / 1000), 0);
 }
+
+/** Free seconds left today (Infinity when the free quota is unlimited). */
+export function freeSecondsLeft(db: DB, userId: string): number {
+  if (!config.renderSecondsPerDay) return Infinity;
+  return Math.max(0, config.renderSecondsPerDay - renderSecondsToday(db, userId));
+}
+
+export type RenderMode = 'free' | 'fast';
 
 export interface RenderRoute {
   pool: 'local' | 'remote';
   boostId: string | null;
 }
 
+const fmtTime = (s: number) => (s === Infinity ? 'unlimited' : s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : `${Math.max(1, Math.round(s / 60))} min`);
+
 /**
- * Where the next render runs. A student with paid render hours left renders on the fast remote workers
- * (billed to the pack); otherwise here, within the daily allowance. Over the allowance → an error that
- * offers the paid hours (payment processing is added later; see /api/billing).
+ * Where the next render runs. `mode` is the student's choice; without one: the only quota they have, or — when
+ * they have both — a `choose_render_mode` error so the agent asks them. Both empty → `render_limit`.
  */
-export function assertRenderAllowed(db: DB, userId: string): RenderRoute {
+export function assertRenderAllowed(db: DB, userId: string, mode?: RenderMode): RenderRoute {
   assertDiskAvailable(db, userId);
-  const boost = activeBoost(db, userId);
-  if (boost) return { pool: 'remote', boostId: boost.id };
-  if (!config.renderSecondsPerDay) return { pool: 'local', boostId: null };
-  const used = renderSecondsToday(db, userId);
-  if (used >= config.renderSecondsPerDay) {
-    throw new QuotaError(
-      `You have used today's free render time on this server. Keep editing in the preview — the allowance refills over 24 hours — or get 1 hour of rendering on our fast render servers for ${config.renderBoostPriceBdt} BDT (Settings → Account → Fast render hours).`,
-      'render_limit',
-    );
+  const free = freeSecondsLeft(db, userId);
+  const fast = fastSecondsLeft(db, userId);
+  const fastRoute = (): RenderRoute => ({ pool: 'remote', boostId: paidPacks(db, userId)[0]!.id });
+  const buy = `Fast render hours cost ${config.renderHourPriceBdt} BDT per hour (Settings → Account → Fast render hours).`;
+  if (mode === 'fast') {
+    if (fast > 0) return fastRoute();
+    throw new QuotaError(`No fast render hours left. ${buy}${free > 0 ? ` Free render time left today: ${fmtTime(free)}.` : ''}`, 'no_fast_hours');
   }
-  return { pool: 'local', boostId: null };
+  if (mode === 'free') {
+    if (free > 0) return { pool: 'local', boostId: null };
+    throw new QuotaError(`Today's free render time (${fmtTime(config.renderSecondsPerDay)} per 24 hours) is used up; it refills over 24 hours.${fast > 0 ? ` Fast render hours left: ${fmtTime(fast)}.` : ` ${buy}`}`, 'render_limit');
+  }
+  if (free > 0 && fast > 0) {
+    throw new QuotaError(`Choose a render type: free (on our server, slower — ${fmtTime(free)} left today) or fast (fast render servers — ${fmtTime(fast)} of fast hours left).`, 'choose_render_mode');
+  }
+  if (free > 0) return { pool: 'local', boostId: null };
+  if (fast > 0) return fastRoute();
+  throw new QuotaError(`Today's free render time is used up (it refills over 24 hours) and there are no fast render hours left. ${buy}`, 'render_limit');
 }
 
-/** Bill a finished remote render to its pack. */
+/** Bill a finished fast render: from its pack first, any overflow from the next packs. */
 export function chargeBoost(db: DB, boostId: string | null, seconds: number) {
   if (!boostId || seconds <= 0) return;
-  const b = db.select().from(renderBoosts).where(eq(renderBoosts.id, boostId)).get();
-  if (!b) return;
-  db.update(renderBoosts).set({ usedSeconds: Math.min(b.seconds, b.usedSeconds + Math.ceil(seconds)) }).where(eq(renderBoosts.id, boostId)).run();
+  const first = db.select().from(renderBoosts).where(eq(renderBoosts.id, boostId)).get();
+  if (!first) return;
+  let left = Math.ceil(seconds);
+  const packs = [first, ...paidPacks(db, first.userId).filter((p) => p.id !== first.id)];
+  for (const p of packs) {
+    if (left <= 0) break;
+    const take = Math.min(left, p.seconds - p.usedSeconds);
+    if (take <= 0) continue;
+    db.update(renderBoosts).set({ usedSeconds: p.usedSeconds + take }).where(eq(renderBoosts.id, p.id)).run();
+    left -= take;
+  }
 }
 
 export function usageFor(db: DB, userId: string) {
-  const boost = activeBoost(db, userId);
-  const pending = db.select({ id: renderBoosts.id }).from(renderBoosts).where(and(eq(renderBoosts.userId, userId), eq(renderBoosts.status, 'pending'))).get();
+  const free = freeSecondsLeft(db, userId);
   return {
     diskBytes: userDiskBytes(db, userId),
     diskLimitBytes: config.userQuotaBytes || null,
-    /** whether today's free render time on this server is used up (the minutes themselves are not shown) */
-    renderLimitReached: !!config.renderSecondsPerDay && renderSecondsToday(db, userId) >= config.renderSecondsPerDay,
+    freeRender: {
+      secondsPerDay: config.renderSecondsPerDay || null,
+      secondsLeft: free === Infinity ? null : Math.round(free),
+    },
     fastRender: {
-      priceBdt: config.renderBoostPriceBdt,
-      packMinutes: Math.round(config.renderBoostSeconds / 60),
-      secondsLeft: boost ? boost.seconds - boost.usedSeconds : 0,
-      pendingPurchase: !!pending,
+      pricePerHourBdt: config.renderHourPriceBdt,
+      maxHours: config.renderHoursMaxPerOrder,
+      secondsLeft: fastSecondsLeft(db, userId),
+      paymentsEnabled: !!config.paystation,
     },
   };
 }

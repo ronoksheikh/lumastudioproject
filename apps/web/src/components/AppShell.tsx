@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, Dropdown } from '@heroui/react';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
+import { toast } from '@heroui/react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api, setCsrf } from '../api/client';
 import type { User } from '../api/types';
@@ -46,8 +47,25 @@ export function AccountMenu({ user }: { user: User }) {
  * Home and Settings get a slim top bar (logo + account). Inside a project there is no global header at all:
  * the project page shows only project-level UI (back, title, tabs, run status).
  */
+/** Back from PayStation: ?payment=paid|pending|failed → a toast, then the parameter is removed. */
+function usePaymentReturn() {
+  const { search, pathname } = useLocation();
+  const nav = useNavigate();
+  const qc = useQueryClient();
+  useEffect(() => {
+    const p = new URLSearchParams(search).get('payment');
+    if (!p) return;
+    if (p === 'paid') toast.success('Payment received — your fast render hours are ready.');
+    else if (p === 'pending') toast.info?.('Payment is being confirmed. Your hours appear as soon as PayStation confirms it.');
+    else toast.danger('The payment did not go through. Nothing was charged for render hours — try again.');
+    void qc.invalidateQueries({ queryKey: ['usage'] });
+    nav(pathname, { replace: true });
+  }, [search, pathname, nav, qc]);
+}
+
 export function AppShell({ user, children }: { user: User; children: ReactNode }) {
   const { pathname } = useLocation();
+  usePaymentReturn();
   if (pathname.startsWith('/projects/')) return <main className="h-full overflow-hidden">{children}</main>;
   return (
     <div className="flex h-full flex-col">

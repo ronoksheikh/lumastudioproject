@@ -5,7 +5,7 @@ import { api } from '../api/client';
 import type { ConversationMessage, MessageAttachment, MessageFrame } from '../api/types';
 import type { FrameChip } from './preview-context';
 import type { Block, TurnState } from '../lib/reduce';
-import { AskCard, AssistantText, CommitLine, Notice, Thinking, ToolCard } from './Blocks';
+import { AskCard, AssistantText, CommitLine, Notice, OfferCard, Thinking, ToolCard } from './Blocks';
 import { Icon } from './Icon';
 
 export function PlanCard({ items }: { items: PlanItem[] }) {
@@ -45,6 +45,7 @@ function BlockView({ b, live, isLastReasoning, canAnswer, onAnswer }: { b: Block
     case 'ask': return <AskCard block={b} canAnswer={canAnswer} onAnswer={onAnswer} />;
     case 'commit': return <CommitLine block={b} />;
     case 'notice': return <Notice block={b} />;
+    case 'offer': return <OfferCard block={b} />;
   }
 }
 

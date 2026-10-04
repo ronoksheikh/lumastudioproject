@@ -1,27 +1,18 @@
 # Fast render hours and remote render workers
 
-Every student renders on the Studio server itself, within a daily allowance (`RENDER_MINUTES_PER_DAY`, default 60
-minutes in a rolling 24 hours). The minutes are not shown in the UI. When they are used up, `render_video` says
-so and offers **fast render hours**: 1 hour (`RENDER_BOOST_MINUTES`) for 100 BDT (`RENDER_BOOST_PRICE_BDT`).
+Students have two render quotas (details and the payment flow: `docs/payments.md`):
 
-A paid pack:
-- resets the daily allowance on this server (the window restarts at the moment it was paid), and
-- sends the student's renders to the **remote render workers** until the hour is used (billed by wall-clock
-  render time per job). If no worker is online, the job renders here instead (still billed to the pack, not the
-  allowance) so nobody waits on a missing machine.
+- **Free:** `RENDER_MINUTES_PER_DAY` (default 300 = 5 hours) of rendering on the Studio server in any rolling
+  24 hours.
+- **Fast:** paid hours (`RENDER_HOUR_PRICE_BDT`, default 100 BDT per hour, bought through PayStation, any number of
+  hours per order up to `RENDER_HOURS_MAX_PER_ORDER`). They never expire. Jobs using them render on the **remote
+  render workers** and are billed by wall-clock render time, oldest pack first. If no worker is online, a fast job
+  renders here instead (still billed to the fast hours) so nobody waits on a missing machine.
 
-## Payments (not built yet)
+When a student has both, the agent asks which one to use (`render_video` `mode: "free" | "fast"`).
 
-Settings → Account → Fast render hours → "Buy 1 hour" creates a `pending` purchase (`POST /api/billing/render-boost`).
-Until the payment gateway exists, an operator activates it:
-
-```
-node dist/admin.js boosts pending          # list requests (id, email)
-node dist/admin.js boost-paid <id> [ref]   # mark paid → active immediately
-node dist/admin.js boost-grant <email> 60  # give minutes without a purchase
-```
-
-The gateway's callback should do exactly what `markBoostPaid` in `apps/api/src/cli/commands.ts` does.
+Operators can still hand out hours: `boost-grant <email> [minutes]`, or `boost-paid <id>` for a purchase paid
+outside PayStation; `payment-check <invoice>` re-checks a PayStation invoice whose IPN never arrived.
 
 ## Running a worker
 

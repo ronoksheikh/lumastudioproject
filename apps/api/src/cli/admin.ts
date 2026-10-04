@@ -8,13 +8,15 @@
 //   workers                    list render workers (last seen, disabled)
 //   worker-disable|worker-enable|worker-remove <id|name>
 //   boosts [pending|paid]      list fast-render-hour purchases
-//   boost-paid <id> [ref]      mark a pending purchase paid (until the payment gateway does it)
-//   boost-grant <email> [min]  give someone fast render minutes (default RENDER_BOOST_MINUTES)
+//   boost-paid <id> [ref]      mark a pending purchase paid by hand (e.g. paid outside PayStation)
+//   payment-check <invoice>    re-check a PayStation invoice now and credit it if paid (a missed IPN)
+//   boost-grant <email> [min]  give someone fast render minutes (default 60)
 //   lessons [active|pending|archived]   the agent's shared lessons
 //   lesson-approve <id> | lesson-archive <id> | lesson-add <topic> <text>
 //   assets                     the shared library (fonts, sounds, data, snippets)
 //   asset-remove <id>          take an item out of the library (projects keep their copies)
 import { createDb, runMigrations } from '../db/index.js';
+import { settleInvoice } from '../billing/routes.js';
 import { listAssets, removeAsset } from '../agent/library.js';
 import { addLesson, LESSON_TOPICS, listLessons, setLessonStatus, type LessonTopic } from '../agent/lessons.js';
 import { config } from '../config.js';
@@ -76,6 +78,12 @@ try {
     case 'boosts':
       for (const { b, email } of listBoosts(db, arg)) console.log(`${b.id}  ${email}  ${b.status}  ${b.priceBdt} BDT  ${Math.round(b.usedSeconds / 60)}/${Math.round(b.seconds / 60)} min  ${new Date(b.createdAt).toISOString().slice(0, 16)}`);
       break;
+    case 'payment-check': {
+      if (!arg) throw new Error('usage: payment-check <invoice-number>');
+      const r = await settleInvoice(db, arg);
+      console.log(r ? `${arg}: ${r.status}` : `no purchase with invoice ${arg}`);
+      break;
+    }
     case 'boost-paid':
       if (!arg) throw new Error('usage: boost-paid <id> [payment-ref]');
       if (!markBoostPaid(db, arg, arg2)) throw new Error(`no pending purchase ${arg}`);
@@ -83,7 +91,7 @@ try {
       break;
     case 'boost-grant': {
       if (!arg) throw new Error('usage: boost-grant <email> [minutes]');
-      const id = grantBoost(db, arg, arg2 ? Number(arg2) : config.renderBoostSeconds / 60);
+      const id = grantBoost(db, arg, arg2 ? Number(arg2) : 60);
       if (!id) throw new Error(`no such user: ${arg}`);
       console.log(`granted (${id})`);
       break;
@@ -112,7 +120,7 @@ try {
       break;
     }
     default:
-      console.log('commands: users | ban <email> | unban <email> | purge [--days N] | backup | rotate-key | worker-add <name> | workers | worker-disable|worker-enable|worker-remove <id|name> | boosts [status] | boost-paid <id> [ref] | boost-grant <email> [min] | lessons [status] | lesson-approve|lesson-archive <id> | lesson-add <topic> <text> | assets | asset-remove <id>');
+      console.log('commands: users | ban <email> | unban <email> | purge [--days N] | backup | rotate-key | worker-add <name> | workers | worker-disable|worker-enable|worker-remove <id|name> | boosts [status] | boost-paid <id> [ref] | payment-check <invoice> | boost-grant <email> [min] | lessons [status] | lesson-approve|lesson-archive <id> | lesson-add <topic> <text> | assets | asset-remove <id>');
       process.exitCode = cmd ? 2 : 0;
   }
 } catch (e) {
