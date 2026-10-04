@@ -157,12 +157,19 @@ export const renderBoosts = sqliteTable(
     seconds: integer('seconds').notNull(),
     usedSeconds: integer('used_seconds').notNull().default(0),
     priceBdt: integer('price_bdt').notNull(),
-    status: text('status').notNull().default('pending'), // pending | paid | cancelled
+    status: text('status').notNull().default('pending'), // pending | paid | failed | cancelled
+    /** PayStation trx_id (or "granted"/"manual") */
     paymentRef: text('payment_ref'),
+    provider: text('provider').notNull().default('manual'), // paystation | manual | grant
+    /** our invoice number sent to PayStation (unique) */
+    invoiceNumber: text('invoice_number'),
+    paymentMethod: text('payment_method'), // bKash, Nagad, Visa… as reported by PayStation
+    /** where the student goes back to after paying (a path inside the app) */
+    returnTo: text('return_to'),
     createdAt: createdAt(),
     paidAt: integer('paid_at'),
   },
-  (t) => [index('render_boosts_user_idx').on(t.userId, t.status)],
+  (t) => [index('render_boosts_user_idx').on(t.userId, t.status), uniqueIndex('render_boosts_invoice_idx').on(t.invoiceNumber)],
 );
 
 /** Machines (a VPS, any computer) that render "remote" jobs; they authenticate with a bearer token. */

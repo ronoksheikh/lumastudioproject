@@ -40,11 +40,9 @@ export interface AgentPromptSettings {
   defaultPrompt: string;
 }
 
-export interface FastRender {
-  priceBdt: number;
-  packMinutes: number;
-  secondsLeft: number;
-  pendingPurchase: boolean;
+export interface RenderQuotas {
+  freeRender: { secondsPerDay: number | null; secondsLeft: number | null };
+  fastRender: { pricePerHourBdt: number; maxHours: number; secondsLeft: number; paymentsEnabled: boolean };
 }
 
 const post = <T>(url: string, body: unknown = {}) => request<T>('POST', url, body);
@@ -63,8 +61,8 @@ export const api = {
   me: () => get<{ user: User | null; csrfToken?: string }>('/api/auth/me'),
   authConfig: () => get<{ signupEnabled: boolean; captchaSiteKey: string | null }>('/api/auth/config'),
   signup: (email: string, password: string, captcha?: string) => post<{ user: User; csrfToken: string }>('/api/auth/signup', { email, password, captcha }),
-  usage: () => get<{ usage: { diskBytes: number; diskLimitBytes: number | null; renderLimitReached: boolean; fastRender: FastRender } }>('/api/usage'),
-  buyRenderHour: () => post<{ id: string; status: 'pending'; priceBdt: number; message: string }>('/api/billing/render-boost'),
+  usage: () => get<{ usage: { diskBytes: number; diskLimitBytes: number | null } & RenderQuotas }>('/api/usage'),
+  buyRenderHours: (b: { hours: number; phone: string; returnTo: string }) => post<{ paymentUrl: string; invoiceNumber: string; priceBdt: number }>('/api/billing/render-hours', b),
   login: (email: string, password: string) => post<{ user: User; csrfToken: string }>('/api/auth/login', { email, password }),
   logout: () => post<{ ok: true }>('/api/auth/logout'),
   changePassword: (currentPassword: string, newPassword: string) => post<{ ok: true }>('/api/auth/password', { currentPassword, newPassword }),
@@ -140,7 +138,7 @@ export function openRunStream(projectId: string, runId: string, after: number, o
     es.onmessage = () => {}; // typed events below
     const types = [
       'run.started', 'reasoning.delta', 'message.delta', 'plan.updated', 'tool.call', 'tool.output.delta', 'tool.result', 'file.changed', 'voice.ready',
-      'preview.frames', 'render.queued', 'render.progress', 'render.done', 'ask_user', 'git.commit', 'run.error', 'run.finished',
+      'preview.frames', 'render.queued', 'render.progress', 'render.done', 'ask_user', 'billing.offer', 'git.commit', 'run.error', 'run.finished',
     ];
     for (const t of types) {
       es.addEventListener(t, (m) => {

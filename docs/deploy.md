@@ -53,7 +53,7 @@ docker compose logs -f luma-studio     # "egress blocklist active …" and "cpu 
 
 ## 5. Limits (all in `.env`)
 
-One running agent and one render per student; `USER_QUOTA_MB` storage (default 5120); `RENDER_MINUTES_PER_DAY` (60);
+One running agent and one render per student; `USER_QUOTA_MB` storage (default 5120); `RENDER_MINUTES_PER_DAY` (300 = 5 h free per 24 h; paid fast hours on top, see `docs/payments.md`);
 `RENDER_TIMEOUT_MIN` (90); `UPLOAD_MAX_MB`; deleted projects are purged after `PURGE_AFTER_DAYS` (7). Students see
 their allowance in Settings → Account.
 

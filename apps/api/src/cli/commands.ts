@@ -85,6 +85,6 @@ export function grantBoost(db: DB, email: string, minutes: number): string | nul
   const u = db.select().from(users).where(eq(users.email, email.trim().toLowerCase())).get();
   if (!u) return null;
   const id = newId();
-  db.insert(renderBoosts).values({ id, userId: u.id, seconds: Math.round(minutes * 60), priceBdt: 0, status: 'paid', paidAt: Date.now(), paymentRef: 'granted' }).run();
+  db.insert(renderBoosts).values({ id, userId: u.id, seconds: Math.round(minutes * 60), priceBdt: 0, status: 'paid', provider: 'grant', paidAt: Date.now(), paymentRef: 'granted' }).run();
   return id;
 }

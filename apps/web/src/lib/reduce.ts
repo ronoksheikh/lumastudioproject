@@ -31,6 +31,7 @@ export type Block =
       endedAt?: number;
     }
   | { kind: 'ask'; id: number; question: string; options: string[]; answer?: string }
+  | ({ kind: 'offer'; id: number } & EventDataMap['billing.offer'])
   | { kind: 'commit'; id: number; sha: string; message: string; files: string[] }
   | { kind: 'notice'; id: number; message: string; retryable: boolean };
 
@@ -151,6 +152,8 @@ export function reduceEvent(turn: TurnState, e: RunEvent): TurnState {
       const d = e.data as EventDataMap['ask_user'];
       return { ...t, blocks: [...blocks, { kind: 'ask', id: e.id, question: d.question, options: d.options }] };
     }
+    case 'billing.offer':
+      return { ...t, blocks: [...blocks, { kind: 'offer', id: e.id, ...(e.data as EventDataMap['billing.offer']) }] };
     case 'git.commit': {
       const d = e.data as EventDataMap['git.commit'];
       return { ...t, blocks: [...blocks, { kind: 'commit', id: e.id, sha: d.sha, message: d.message, files: d.files }] };

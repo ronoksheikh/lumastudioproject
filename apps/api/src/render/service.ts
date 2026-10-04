@@ -10,7 +10,7 @@ import { runPristineScript } from '../agent/tools/scripts.js';
 import { fail, ok, type RenderService, type ToolResult } from '../agent/tools/types.js';
 import { config } from '../config.js';
 import { conflict } from '../http/errors.js';
-import { assertRenderAllowed, chargeBoost } from '../quota/service.js';
+import { assertRenderAllowed, chargeBoost, QuotaError, type RenderMode } from '../quota/service.js';
 import { logger } from '../logger.js';
 import { inc, observe } from '../observability/metrics.js';
 import type { CpuBudget } from '../cpu/budget.js';
@@ -74,8 +74,8 @@ export class RenderQueue implements RenderService {
    * Inserts a queued job: one active render per PROJECT (students work on several projects at once). Paid
    * render hours route it to the fast remote workers, otherwise it renders here within the daily allowance.
    */
-  enqueue(args: { projectId: string; userId: string; runId?: string | null; preset: Preset }): string {
-    const route = assertRenderAllowed(this.db, args.userId);
+  enqueue(args: { projectId: string; userId: string; runId?: string | null; preset: Preset; mode?: RenderMode }): string {
+    const route = assertRenderAllowed(this.db, args.userId, args.mode);
     const busy = this.db
       .select({ id: renderJobs.id })
       .from(renderJobs)
@@ -167,11 +167,18 @@ export class RenderQueue implements RenderService {
   }
 
   /** The render_video tool: queue, stream progress to the run, and wait for the result. */
-  async render(a: { projectId: string; userId: string; runId: string; preset: Preset; signal: AbortSignal; bus: RunBus }): Promise<ToolResult> {
+  async render(a: { projectId: string; userId: string; runId: string; preset: Preset; mode?: RenderMode; signal: AbortSignal; bus: RunBus }): Promise<ToolResult> {
     let jobId: string;
     try {
       jobId = this.enqueue(a);
     } catch (e) {
+      // quota answers carry what the agent should do next
+      if (e instanceof QuotaError && e.code === 'choose_render_mode') {
+        return fail(`${e.message}\nAsk the student which one to use (ask_user with options like "Free render (slower)" and "Fast render (uses fast hours)"), then call render_video again with mode "free" or "fast".`);
+      }
+      if (e instanceof QuotaError && (e.code === 'render_limit' || e.code === 'no_fast_hours')) {
+        return fail(`${e.message}\nTell the student, and call offer_render_hours so they get a button to buy fast render hours right in the chat. Keep editing with the preview meanwhile.`);
+      }
       return fail((e as Error).message);
     }
     a.bus.emit('render.queued', { jobId, position: this.position(jobId) });

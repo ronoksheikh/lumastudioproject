@@ -6,6 +6,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import type { ModelConfig, TestResult, VoicePrefs } from '../api/types';
 import { Icon } from '../components/Icon';
+import { BuyRenderHours, fmtRenderTime } from '../components/BuyRenderHours';
 import { useMe, useModels, useVoice } from '../lib/hooks';
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Something went wrong');
@@ -279,34 +280,32 @@ function UsageCard() {
 
 /** Paid hours on the fast render servers. Payment processing comes later: a purchase is saved as pending. */
 function FastRenderCard() {
-  const qc = useQueryClient();
   const q = useQuery({ queryKey: ['usage'], queryFn: () => api.usage().then((r) => r.usage), staleTime: 30_000 });
-  const buy = useMutation({
-    mutationFn: () => api.buyRenderHour(),
-    onSuccess: (r) => { toast.success(r.message); void qc.invalidateQueries({ queryKey: ['usage'] }); },
-    onError: (e) => toast.danger(msg(e)),
-  });
   const u = q.data;
   if (!u) return null;
-  const f = u.fastRender;
-  const left = Math.ceil(f.secondsLeft / 60);
+  const free = u.freeRender;
+  const fast = u.fastRender;
   return (
-    <Card className="max-w-lg p-2">
+    <Card className="max-w-lg p-2" id="render-time">
       <Card.Header>
-        <Card.Title className="flex items-center gap-2"><Icon name="lightning" /> Fast render hours</Card.Title>
-        <Card.Description>
-          Rendering here is free every day. {u.renderLimitReached ? <b>You have used today’s free render time.</b> : 'When today’s free time runs out,'} {u.renderLimitReached ? 'Get' : 'get'} {f.packMinutes} minutes on our super-fast render servers for ৳{f.priceBdt} — it also resets your daily free time.
-        </Card.Description>
+        <Card.Title className="flex items-center gap-2"><Icon name="lightning" /> Render time</Card.Title>
+        <Card.Description>Every day you get free render time on our server. Fast render hours run on powerful render servers and never expire. When you have both, Luma asks which one to use.</Card.Description>
       </Card.Header>
-      <Card.Content className="flex flex-col gap-2 text-sm">
-        {f.secondsLeft > 0 && <p><Chip size="sm" color="success"><Chip.Label>Active</Chip.Label></Chip> {left} min of fast rendering left — your renders go to the fast servers.</p>}
-        {f.pendingPurchase && <p className="text-[#5b6b8f]">Your purchase is waiting for payment. Online payment is coming soon; the Lumademy team activates it once paid.</p>}
+      <Card.Content className="flex flex-col gap-4 text-sm">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl bg-[#eff5ff] p-3">
+            <p className="text-xs text-[#5b6b8f]">Free today</p>
+            <p className="text-lg font-bold text-[#1557d1]">{free.secondsLeft == null ? 'Unlimited' : fmtRenderTime(free.secondsLeft)}</p>
+            {free.secondsPerDay && <p className="text-xs text-[#5b6b8f]">of {fmtRenderTime(free.secondsPerDay)} per 24 h</p>}
+          </div>
+          <div className="rounded-xl bg-[#eff5ff] p-3">
+            <p className="text-xs text-[#5b6b8f]">Fast hours</p>
+            <p className="text-lg font-bold text-[#1557d1]">{fmtRenderTime(fast.secondsLeft)}</p>
+            <p className="text-xs text-[#5b6b8f]">left, no expiry</p>
+          </div>
+        </div>
+        <BuyRenderHours pricePerHourBdt={fast.pricePerHourBdt} maxHours={fast.maxHours} paymentsEnabled={fast.paymentsEnabled} returnTo="/settings/account" />
       </Card.Content>
-      <Card.Footer className="justify-end">
-        <Button variant="primary" isDisabled={buy.isPending || f.pendingPurchase} onPress={() => buy.mutate()}>
-          {f.pendingPurchase ? 'Payment pending' : `Buy ${f.packMinutes} min · ৳${f.priceBdt}`}
-        </Button>
-      </Card.Footer>
     </Card>
   );
 }

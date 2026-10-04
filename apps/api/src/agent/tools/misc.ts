@@ -6,6 +6,7 @@ import { fail, ok, type ToolContext, type ToolResult } from './types.js';
 import { truncateMiddle } from '../../runner/truncate.js';
 import fs from 'node:fs';
 import { notPlayableReason } from '../../projects/content.js';
+import { usageFor } from '../../quota/service.js';
 import path from 'node:path';
 
 export function updatePlan(ctx: ToolContext, a: ToolArgs<'update_plan'>): ToolResult {
@@ -63,5 +64,26 @@ export async function renderVideo(ctx: ToolContext, a: ToolArgs<'render_video'>)
   const empty = notPlayableReason(ctx.project.dir);
   if (empty) return fail(empty);
   if (!ctx.render) return fail('Rendering is not available on this server yet.');
-  return ctx.render.render({ projectId: ctx.projectId, userId: ctx.userId, runId: ctx.runId, preset: a.preset, signal: ctx.signal, bus: ctx.bus });
+  return ctx.render.render({ projectId: ctx.projectId, userId: ctx.userId, runId: ctx.runId, preset: a.preset, mode: a.mode, signal: ctx.signal, bus: ctx.bus });
+}
+
+/** A buy card for fast render hours in the chat (the student pays on PayStation and comes back to the project). */
+export function offerRenderHours(ctx: ToolContext, a: ToolArgs<'offer_render_hours'>): ToolResult {
+  const u = usageFor(ctx.db, ctx.userId);
+  const hours = Math.min(a.hours ?? 1, u.fastRender.maxHours);
+  ctx.bus.emit('billing.offer', {
+    reason: a.reason,
+    suggestedHours: hours,
+    pricePerHourBdt: u.fastRender.pricePerHourBdt,
+    maxHours: u.fastRender.maxHours,
+    paymentsEnabled: u.fastRender.paymentsEnabled,
+    freeSecondsLeft: u.freeRender.secondsLeft,
+    fastSecondsLeft: u.fastRender.secondsLeft,
+  });
+  return ok(
+    u.fastRender.paymentsEnabled
+      ? `The student now sees a card to buy fast render hours (${u.fastRender.pricePerHourBdt} BDT per hour). Once they pay they come back here; then render with mode "fast".`
+      : 'The student sees the card, but online payment is not set up on this server yet — tell them to contact Lumademy support.',
+    'Offered fast render hours',
+  );
 }

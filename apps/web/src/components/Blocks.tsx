@@ -8,6 +8,7 @@ import { splitOutput, stripAnsi } from '../lib/reduce';
 import { DiffView } from './DiffView';
 import { Icon, type IconName } from './Icon';
 import { usePreview } from './preview-context';
+import { BuyRenderHours, fmtRenderTime } from './BuyRenderHours';
 
 type ToolBlock = Extract<Block, { kind: 'tool' }>;
 
@@ -280,5 +281,28 @@ export function Notice({ block }: { block: Extract<Block, { kind: 'notice' }> })
     <p role="status" className={`flex items-start gap-2 rounded-lg px-3 py-2 text-sm ${block.retryable ? 'bg-[#fff7e6] text-[#7a4a00]' : 'bg-[#fdecec] text-[#7f1d1d]'}`}>
       <Icon name="warn" size={16} className="mt-0.5 flex-none" /> {block.message}
     </p>
+  );
+}
+
+/** The agent's "buy fast render hours" card (offer_render_hours). Paying brings the student back to this project. */
+export function OfferCard({ block }: { block: Extract<Block, { kind: 'offer' }> }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl border-2 border-[#5daeff] bg-[#eff5ff] p-3" role="group" aria-label="Fast render hours">
+      <p className="flex items-start gap-2 text-sm font-semibold text-[#1557d1]"><Icon name="lightning" size={16} className="mt-0.5 flex-none" />{block.reason}</p>
+      <p className="mt-1 text-xs text-[#5b6b8f]">
+        {block.freeSecondsLeft != null && `Free render time left today: ${fmtRenderTime(block.freeSecondsLeft)}. `}
+        {block.fastSecondsLeft > 0 ? `Fast hours left: ${fmtRenderTime(block.fastSecondsLeft)}.` : 'Fast render hours render on our powerful servers.'}
+      </p>
+      {open ? (
+        <div className="mt-3">
+          <BuyRenderHours pricePerHourBdt={block.pricePerHourBdt} maxHours={block.maxHours} initialHours={block.suggestedHours} paymentsEnabled={block.paymentsEnabled} returnTo={window.location.pathname} />
+        </div>
+      ) : (
+        <Button className="mt-3" variant="primary" size="sm" onPress={() => setOpen(true)}>
+          <Icon name="lightning" size={14} /> Buy fast render hours · ৳{block.pricePerHourBdt}/hour
+        </Button>
+      )}
+    </div>
   );
 }

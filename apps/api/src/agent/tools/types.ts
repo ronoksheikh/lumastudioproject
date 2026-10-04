@@ -21,7 +21,7 @@ export interface ToolResult {
 }
 
 export interface RenderService {
-  render(args: { projectId: string; userId: string; runId: string; preset: 'draft' | 'final'; signal: AbortSignal; bus: RunBus }): Promise<ToolResult>;
+  render(args: { projectId: string; userId: string; runId: string; preset: 'draft' | 'final'; mode?: 'free' | 'fast'; signal: AbortSignal; bus: RunBus }): Promise<ToolResult>;
 }
 
 export interface ToolContext {

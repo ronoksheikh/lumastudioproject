@@ -20,6 +20,8 @@ export interface EventDataMap {
   'render.progress': { jobId: string; frame: number; total: number; eta?: number; position?: number };
   'render.done': { jobId: string; url: string; contactSheetUrl?: string; durationS?: number };
   ask_user: { question: string; options: string[] };
+  /** the agent offers fast render hours: the chat shows a buy card */
+  'billing.offer': { reason: string; suggestedHours: number; pricePerHourBdt: number; maxHours: number; paymentsEnabled: boolean; freeSecondsLeft: number | null; fastSecondsLeft: number };
   'git.commit': { sha: string; message: string; files: string[] };
   'run.error': { message: string; retryable: boolean };
   'run.finished': { usage: { input: number; output: number }; stopReason: StopReason };
