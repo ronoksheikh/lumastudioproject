@@ -139,3 +139,19 @@ export function usageFor(db: DB, userId: string) {
     },
   };
 }
+
+/** Plain-language account usage for the agent (system prompt + the account_usage tool). */
+export function describeUsage(db: DB, userId: string): string {
+  const u = usageFor(db, userId);
+  const usedFree = renderSecondsToday(db, userId);
+  const free = u.freeRender.secondsPerDay
+    ? `Free render time: ${fmtTime(usedFree)} used of ${fmtTime(u.freeRender.secondsPerDay)} in the last 24 hours, ${fmtTime(u.freeRender.secondsLeft ?? 0)} left (it refills continuously as old renders pass 24 hours).`
+    : 'Free render time: unlimited.';
+  const packs = db.select().from(renderBoosts).where(and(eq(renderBoosts.userId, userId), eq(renderBoosts.status, 'paid'))).all();
+  const bought = packs.reduce((s, p) => s + p.seconds, 0);
+  const fast = bought
+    ? `Fast render hours: ${fmtTime(u.fastRender.secondsLeft)} left of ${fmtTime(bought)} bought (never expire).`
+    : `Fast render hours: none bought yet (${u.fastRender.pricePerHourBdt} BDT per hour${u.fastRender.paymentsEnabled ? ', offer_render_hours shows a buy card' : ''}).`;
+  const disk = u.diskLimitBytes ? `Storage: ${fmtGb(u.diskBytes)} of ${fmtGb(u.diskLimitBytes)} used.` : `Storage: ${fmtGb(u.diskBytes)} used.`;
+  return `${free}\n${fast}\n${disk}`;
+}

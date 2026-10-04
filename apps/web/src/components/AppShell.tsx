@@ -31,9 +31,10 @@ export function AccountMenu({ user }: { user: User }) {
           </Avatar>
         </Dropdown.Trigger>
         <Dropdown.Popover>
-          <Dropdown.Menu onAction={(key) => (key === 'logout' ? void logout() : nav(key === 'settings' ? '/settings/models' : '/settings/account'))}>
+          <Dropdown.Menu onAction={(key) => (key === 'logout' ? void logout() : nav(key === 'settings' ? '/settings/models' : key === 'admin' ? '/admin' : '/settings/account'))}>
             <Dropdown.Item id="who" textValue={user.email} isDisabled><span className="text-xs text-[#5b6b8f]">{user.email}</span></Dropdown.Item>
             <Dropdown.Item id="account" textValue="Account">Account</Dropdown.Item>
+            {user.isAdmin ? <Dropdown.Item id="admin" textValue="Admin panel">Admin panel</Dropdown.Item> : null}
             <Dropdown.Item id="settings" textValue="Settings">Models &amp; voice</Dropdown.Item>
             <Dropdown.Item id="logout" textValue="Log out">Log out</Dropdown.Item>
           </Dropdown.Menu>

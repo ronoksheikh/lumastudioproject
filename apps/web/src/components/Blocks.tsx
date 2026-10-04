@@ -28,6 +28,8 @@ const TOOL_META: Record<string, { icon: IconName; label: string }> = {
   read_guide: { icon: 'guide', label: 'Guide' },
   list_voices: { icon: 'mic', label: 'Voices' },
   compact_context: { icon: 'brain', label: 'Tidy memory' },
+  account_usage: { icon: 'list', label: 'Usage' },
+  offer_render_hours: { icon: 'lightning', label: 'Render hours' },
   save_lesson: { icon: 'brain', label: 'Learned' },
   share_asset: { icon: 'folder', label: 'Shared to library' },
   use_asset: { icon: 'folder', label: 'From library' },

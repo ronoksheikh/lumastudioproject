@@ -51,6 +51,10 @@ Agent runs use a mock OpenAI-compatible server from `apps/api/src/test/helpers.t
 
 **Accounts.** Public sign-up is off by default (`SIGNUP_ENABLED=0`; tests and e2e turn it on). lumademy.com's backend creates accounts with `POST /api/provision/users` (`auth/provision.ts`, `Authorization: Bearer PROVISION_API_KEY`, returns a generated password for new emails, `resetPassword` re-issues one; `/revoke` and `/restore` ban/unban for refunds). Docs: `docs/provisioning.md`.
 
+**Admin panel.** `/admin` in the app for `ADMIN_EMAILS` (`admin/routes.ts`, `/api/admin/*`, `isAdmin` on `/auth/me`): live renders (running/queued, free/fast, worker, progress), agent runs, CPU/disk, workers, PayStation sales (today/7d/30d/all, pending/failed, recent purchases with re-check), fast hours outstanding, failed renders, and a Students tab (usage, spend, grant hours, suspend). Refreshes every 5 s.
+
+**Terminal vs rendering.** Terminal commands never wait in the CPU queue (only render_video/preview_frames do). `bash` refuses rendering/capture from the terminal (`FORBIDDEN_RENDER`: export-mp4, render.mjs, preview-frames, headless Chrome flags); the system prompt forbids it too. The agent sees the student's usage (`describeUsage` in the prompt, `account_usage` tool).
+
 **Hardening.** Quotas live in `quota/service.ts` (disk per user, render seconds per day; checked at project create, upload, run start and render enqueue); `maintenance/` has the project purge and nightly SQLite backup (scheduled from `index.ts`); `security/captcha.ts` is the optional hCaptcha; `observability/` has the Prometheus-style metrics (`/api/metrics`, token-gated) and a Sentry-compatible error reporter; `cli/admin.ts` (`pnpm --filter @luma/api admin …`, `node dist/admin.js` in the image) bans users, purges, backs up and rotates `MASTER_KEY`. `docker/egress.sh` (run by `entrypoint.sh`) blocks private/metadata networks for project uids. Ops and deploy notes: `docs/deploy.md`; licences: `docs/licenses.md`.
 
 Configuration is via env (see `.env.example`, parsed in `apps/api/src/config.ts`). `docker compose up` builds the single `luma-studio` image (Dockerfile at the root).

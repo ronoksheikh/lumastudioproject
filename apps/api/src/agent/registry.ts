@@ -187,6 +187,11 @@ export class RunRegistry {
     await Promise.allSettled(all.map((a) => a.done));
   }
 
+  /** Agent runs going right now (admin panel). */
+  activeRuns(): Array<{ projectId: string; userId: string; runId: string }> {
+    return [...this.active.entries()].map(([projectId, a]) => ({ projectId, userId: a.userId, runId: a.runId }));
+  }
+
   isActive(projectId: string): boolean {
     return this.active.has(projectId);
   }

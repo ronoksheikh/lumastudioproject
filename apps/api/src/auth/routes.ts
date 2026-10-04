@@ -48,7 +48,7 @@ export async function authRoutes(app: FastifyInstance, ctx: AppContext) {
     if (!(await verifyPassword(user.passwordHash, body.password))) throw new HttpError(401, 'bad_credentials', 'Wrong email or password');
     if (user.banned) throw forbidden('This account has been suspended');
     const s = startSession(reply, user.id);
-    return { user: { id: user.id, email: user.email }, csrfToken: s.csrfToken };
+    return { user: { id: user.id, email: user.email, isAdmin: config.adminEmails.has(user.email.toLowerCase()) }, csrfToken: s.csrfToken };
   });
 
   app.post('/auth/logout', async (req, reply) => {
@@ -60,7 +60,7 @@ export async function authRoutes(app: FastifyInstance, ctx: AppContext) {
   /** Who am I + the CSRF token the SPA must echo in `x-csrf-token` on every mutation. */
   app.get('/auth/me', async (req) => {
     if (!req.auth) return { user: null };
-    return { user: req.auth.user, csrfToken: req.auth.csrfToken };
+    return { user: { ...req.auth.user, isAdmin: config.adminEmails.has(req.auth.user.email.toLowerCase()) }, csrfToken: req.auth.csrfToken };
   });
 
   app.post('/auth/password', { preHandler: requireAuth }, async (req) => {

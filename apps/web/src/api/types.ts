@@ -4,6 +4,7 @@ import type { Aspect } from '@luma/shared';
 export interface User {
   id: string;
   email: string;
+  isAdmin?: boolean;
 }
 
 export interface Project {
