@@ -5,7 +5,8 @@
   diffs, voice, frames, renders), your pinned plan (update_plan) and ask_user questions. The composer can attach
   files (SVG, PNG, JPG, WEBP, PDF → `assets/uploads/`) and preview frames.
 - **Preview** tab: the live video (the project served through the engine, on a separate origin). Play/pause,
-  scrub, "Attach this frame" (the student sends you a moment with its facts and a screenshot), open in new tab.
+  scrub, "Quick video" (records the preview in the student's own browser — free, no render time, a draft that
+  may stutter on slow PCs; desktop Chrome/Edge), "Attach this frame" (the student sends you a moment with its facts and a screenshot), open in new tab.
 - **Files** tab: the project tree; every file type opens (code, images, audio, video, PDF).
 - **Renders** tab: finished MP4s with download. **History**: one git commit per turn of yours (restore points).
   **Terminal**: the output of your bash commands.
