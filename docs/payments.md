@@ -56,3 +56,12 @@ node dist/admin.js payment-check <invoice>          # re-check with PayStation n
 node dist/admin.js boost-paid <id> [ref]            # mark a purchase paid by hand (paid outside PayStation)
 node dist/admin.js boost-grant <email> [minutes]    # give fast minutes for free
 ```
+
+## Add-ons (one-time)
+| Add-on | Price | What the student gets |
+|---|---|---|
+| **Luma Studio API** | `ADDON_API_PRICE_BDT` (500) | API keys (Settings → Add-ons) for the documented API at `/docs/api` (readable by anyone) |
+| **Source code** | `ADDON_SOURCE_PRICE_BDT` (2000) | After paying, the WhatsApp number `SOURCE_CODE_WHATSAPP` (+8801744136934) to message for the code |
+
+Bought the same way as render hours (`POST /api/billing/addons/:addon` → PayStation → callback/IPN → `settleInvoice`,
+which now settles both `render_boosts` and `addon_purchases`). Admins can grant one in /admin → Students.

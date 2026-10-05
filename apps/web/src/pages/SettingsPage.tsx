@@ -7,6 +7,7 @@ import { api, ApiError } from '../api/client';
 import type { ModelConfig, ReasoningEffort, TestResult, VoicePrefs } from '../api/types';
 import { Icon } from '../components/Icon';
 import { ModelPicker, ThinkingFields } from '../components/ModelFields';
+import { AddonsTab } from '../components/Addons';
 import { BuyRenderHours, fmtRenderTime } from '../components/BuyRenderHours';
 import { useMe, useModels, useVoice } from '../lib/hooks';
 
@@ -430,6 +431,7 @@ const TABS: Array<[string, string, ReactNode]> = [
   ['models', 'Models', <ModelsTab key="m" />],
   ['voice', 'Voice', <VoiceTab key="v" />],
   ['agent', 'Agent', <AgentTab key="g" />],
+  ['addons', 'Add-ons', <AddonsTab key="d" />],
   ['account', 'Account', <AccountTab key="a" />],
 ];
 

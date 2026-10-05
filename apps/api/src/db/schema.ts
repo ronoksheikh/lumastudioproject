@@ -267,3 +267,58 @@ export const sharedAssets = sqliteTable(
   },
   (t) => [index('shared_assets_status_idx').on(t.status), index('shared_assets_sha_idx').on(t.sha256)],
 );
+
+/** One-time add-ons bought through PayStation: 'api' (Luma Studio API access) and 'source' (the source code). */
+export const addonPurchases = sqliteTable(
+  'addon_purchases',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    addon: text('addon').notNull(), // api | source
+    priceBdt: integer('price_bdt').notNull(),
+    status: text('status').notNull().default('pending'), // pending | paid | failed | cancelled
+    provider: text('provider').notNull().default('paystation'), // paystation | grant
+    invoiceNumber: text('invoice_number'),
+    paymentRef: text('payment_ref'),
+    paymentMethod: text('payment_method'),
+    returnTo: text('return_to'),
+    createdAt: createdAt(),
+    paidAt: integer('paid_at'),
+  },
+  (t) => [index('addon_purchases_user_idx').on(t.userId, t.addon, t.status), uniqueIndex('addon_purchases_invoice_idx').on(t.invoiceNumber)],
+);
+
+/** Keys for the public Luma Studio API (Authorization: Bearer lsk_…); only the hash is stored. */
+export const apiKeys = sqliteTable(
+  'api_keys',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    prefix: text('prefix').notNull(), // first characters, to recognise it in the list
+    createdAt: createdAt(),
+    lastUsedAt: integer('last_used_at'),
+    revokedAt: integer('revoked_at'),
+  },
+  (t) => [uniqueIndex('api_keys_hash_idx').on(t.tokenHash), index('api_keys_user_idx').on(t.userId)],
+);
+
+/** Improvements: bug reports and suggestions from students, with screenshots; admins set the status and reply. */
+export const feedback = sqliteTable(
+  'feedback',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(), // bug | suggestion
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    /** JSON array of screenshot file names in DATA_DIR/feedback/<id>/ */
+    screenshots: text('screenshots').notNull().default('[]'),
+    status: text('status').notNull().default('new'), // new | reviewed | in_progress | done | declined
+    adminNote: text('admin_note'),
+    createdAt: createdAt(),
+    updatedAt: integer('updated_at'),
+  },
+  (t) => [index('feedback_user_idx').on(t.userId), index('feedback_status_idx').on(t.status)],
+);

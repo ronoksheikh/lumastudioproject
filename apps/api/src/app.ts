@@ -22,6 +22,9 @@ import { settingsRoutes } from './settings/routes.js';
 import { uploadRoutes } from './uploads/routes.js';
 import { billingRoutes } from './billing/routes.js';
 import { adminRoutes } from './admin/routes.js';
+import { apiKeyRoutes } from './auth/api-keys.js';
+import { feedbackRoutes } from './feedback/routes.js';
+import { renderRoutes } from './render/routes.js';
 import { workerRoutes } from './render/workers.js';
 
 export interface AppContext {
@@ -83,6 +86,9 @@ export async function buildApp(ctx: AppContext) {
       await uploadRoutes(api, ctx);
       await billingRoutes(api, ctx);
       await adminRoutes(api, ctx);
+      await apiKeyRoutes(api, ctx);
+      await feedbackRoutes(api, ctx);
+      await renderRoutes(api, ctx);
       await workerRoutes(api, ctx);
       if (ctx.agent) await agentRoutes(api, ctx);
     },

@@ -31,9 +31,11 @@ export function AccountMenu({ user }: { user: User }) {
           </Avatar>
         </Dropdown.Trigger>
         <Dropdown.Popover>
-          <Dropdown.Menu onAction={(key) => (key === 'logout' ? void logout() : nav(key === 'settings' ? '/settings/models' : key === 'admin' ? '/admin' : '/settings/account'))}>
+          <Dropdown.Menu onAction={(key) => (key === 'logout' ? void logout() : nav(({ settings: '/settings/models', admin: '/admin', addons: '/settings/addons', improvements: '/improvements' } as Record<string, string>)[String(key)] ?? '/settings/account'))}>
             <Dropdown.Item id="who" textValue={user.email} isDisabled><span className="text-xs text-[#5b6b8f]">{user.email}</span></Dropdown.Item>
             <Dropdown.Item id="account" textValue="Account">Account</Dropdown.Item>
+            <Dropdown.Item id="addons" textValue="Add-ons">Add-ons &amp; API</Dropdown.Item>
+            <Dropdown.Item id="improvements" textValue="Improvements">Report a problem / suggest</Dropdown.Item>
             {user.isAdmin ? <Dropdown.Item id="admin" textValue="Admin panel">Admin panel</Dropdown.Item> : null}
             <Dropdown.Item id="settings" textValue="Settings">Models &amp; voice</Dropdown.Item>
             <Dropdown.Item id="logout" textValue="Log out">Log out</Dropdown.Item>
@@ -56,10 +58,11 @@ function usePaymentReturn() {
   useEffect(() => {
     const p = new URLSearchParams(search).get('payment');
     if (!p) return;
-    if (p === 'paid') toast.success('Payment received — your fast render hours are ready.');
+    if (p === 'paid') toast.success(pathname.endsWith('/addons') ? 'Payment received — your add-on is active.' : 'Payment received — your fast render hours are ready.');
     else if (p === 'pending') toast.info?.('Payment is being confirmed. Your hours appear as soon as PayStation confirms it.');
     else toast.danger('The payment did not go through. Nothing was charged for render hours — try again.');
     void qc.invalidateQueries({ queryKey: ['usage'] });
+    void qc.invalidateQueries({ queryKey: ['addons'] });
     nav(pathname, { replace: true });
   }, [search, pathname, nav, qc]);
 }

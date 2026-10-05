@@ -57,13 +57,19 @@ export interface AdminOverview {
   sales: {
     today: Sales; last7d: Sales; last30d: Sales; allTime: Sales;
     pending: number; failed: number; fastHoursOutstanding: number; paymentsEnabled: boolean; pricePerHourBdt: number;
-    recent: Array<{ id: string; user: string; hours: number; amountBdt: number; status: string; provider: string; method: string | null; invoice: string | null; trxId: string | null; createdAt: number; paidAt: number | null }>;
+    addonsSold: { api: number; source: number };
+    recent: Array<{ id: string; user: string; item: string; hours: number; amountBdt: number; status: string; provider: string; method: string | null; invoice: string | null; trxId: string | null; createdAt: number; paidAt: number | null }>;
   };
   users: { total: number; banned: number; new7d: number; active24h: number };
   projects: { total: number };
   disk: { totalBytes: number; freeBytes: number } | null;
 }
-export interface AdminUser { id: string; email: string; banned: boolean; createdAt: number; projects: number; freeSecondsUsed24h: number; fastSecondsLeft: number; spentBdt: number }
+export interface AdminUser { id: string; email: string; banned: boolean; createdAt: number; projects: number; freeSecondsUsed24h: number; fastSecondsLeft: number; spentBdt: number; addons: Array<'api' | 'source'> }
+
+export interface Addon { id: 'api' | 'source'; name: string; description: string; priceBdt: number; owned: boolean; paymentsEnabled: boolean; whatsapp?: string }
+export interface ApiKeyInfo { id: string; name: string; prefix: string; createdAt: number; lastUsedAt: number | null }
+export type FeedbackStatus = 'new' | 'reviewed' | 'in_progress' | 'done' | 'declined';
+export interface FeedbackItem { id: string; kind: 'bug' | 'suggestion'; title: string; body: string; status: FeedbackStatus; adminNote: string | null; screenshots: string[]; createdAt: number; updatedAt: number | null; user?: string }
 
 export interface RenderQuotas {
   freeRender: { secondsPerDay: number | null; secondsLeft: number | null };
@@ -87,6 +93,17 @@ export const api = {
   authConfig: () => get<{ signupEnabled: boolean; captchaSiteKey: string | null }>('/api/auth/config'),
   signup: (email: string, password: string, captcha?: string) => post<{ user: User; csrfToken: string }>('/api/auth/signup', { email, password, captcha }),
   usage: () => get<{ usage: { diskBytes: number; diskLimitBytes: number | null } & RenderQuotas }>('/api/usage'),
+  // ---- add-ons, API keys, improvements ----
+  addons: () => get<{ addons: Addon[] }>('/api/billing/addons'),
+  buyAddon: (id: string, b: { phone: string; returnTo: string }) => post<{ paymentUrl: string }>(`/api/billing/addons/${id}`, b),
+  apiKeys: () => get<{ hasAddon: boolean; keys: ApiKeyInfo[] }>('/api/settings/api-keys'),
+  createApiKey: (name: string) => post<ApiKeyInfo & { key: string }>('/api/settings/api-keys', { name }),
+  revokeApiKey: (id: string) => del<{ ok: true }>(`/api/settings/api-keys/${id}`),
+  myFeedback: () => get<{ items: FeedbackItem[] }>('/api/feedback'),
+  sendFeedback: (form: FormData) => request<{ item: FeedbackItem }>('POST', '/api/feedback', undefined, form),
+  adminFeedback: (status?: string) => get<{ items: FeedbackItem[] }>(`/api/admin/feedback${qs({ status })}`),
+  adminUpdateFeedback: (id: string, b: { status?: string; adminNote?: string | null }) => patch<{ item: FeedbackItem }>(`/api/admin/feedback/${id}`, b),
+  adminGrantAddon: (id: string, addon: 'api' | 'source') => post<{ ok: true }>(`/api/admin/users/${id}/grant-addon`, { addon }),
   // ---- admin (ADMIN_EMAILS only) ----
   adminOverview: () => get<AdminOverview>('/api/admin/overview'),
   adminUsers: (q: string) => get<{ users: AdminUser[] }>(`/api/admin/users${qs({ q: q || undefined })}`),

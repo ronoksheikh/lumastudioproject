@@ -4,6 +4,7 @@ import type { DB } from '../db/index.js';
 import { forbidden, unauthorized } from '../http/errors.js';
 import { safeEqual } from '../security/crypto.js';
 import { loadSession } from './service.js';
+import { API_KEY_PREFIX, KEY_BLOCKED, userForApiKey } from './api-keys.js';
 
 export const SESSION_COOKIE = 'luma_session';
 
@@ -12,6 +13,8 @@ export interface AuthInfo {
   sessionId: string;
   csrfToken: string;
   token: string;
+  /** signed in with a Luma Studio API key (Authorization: Bearer lsk_…), not a browser session */
+  apiKeyId?: string;
 }
 
 declare module 'fastify' {
@@ -47,11 +50,20 @@ export function registerAuth(app: FastifyInstance, db: DB) {
         req.auth = { user: { id: row.user.id, email: row.user.email }, sessionId: row.session.id, csrfToken: row.session.csrfToken, token };
       }
     }
+    // the Luma Studio API: a bearer key instead of the session cookie (server-to-server, so no CSRF token)
+    const bearer = req.headers.authorization;
+    if (!req.auth && typeof bearer === 'string' && bearer.startsWith(`Bearer ${API_KEY_PREFIX}`)) {
+      const u = userForApiKey(db, bearer.slice(7).trim());
+      if (u) {
+        if (KEY_BLOCKED.test(req.url)) throw forbidden('API keys cannot use this endpoint');
+        req.auth = { user: { id: u.id, email: u.email }, sessionId: `api-key:${u.keyId}`, csrfToken: '', token: '', apiKeyId: u.keyId };
+      }
+    }
     if (UNSAFE.has(req.method)) {
       // defence in depth on top of SameSite=Lax: a browser always sends Origin on cross-site POSTs
       const origin = req.headers.origin;
       if (origin && origin !== appOrigin()) throw forbidden('Cross-origin request blocked');
-      if (req.auth) {
+      if (req.auth && !req.auth.apiKeyId) {
         const header = req.headers['x-csrf-token'];
         if (typeof header !== 'string' || !safeEqual(header, req.auth.csrfToken)) throw forbidden('Missing or invalid CSRF token');
       }

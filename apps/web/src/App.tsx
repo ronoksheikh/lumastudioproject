@@ -7,6 +7,8 @@ import { ProjectPage } from './pages/ProjectPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AdminPage } from './pages/AdminPage';
+import { DocsPage } from './pages/DocsPage';
+import { ImprovementsPage } from './pages/ImprovementsPage';
 
 export function App() {
   const me = useMe();
@@ -23,6 +25,7 @@ export function App() {
     return (
       <Routes>
         <Route path="/login" element={<AuthPage mode="login" />} />
+        <Route path="/docs/api" element={<DocsPage signedIn={false} />} />
         <Route path="/signup" element={<AuthPage mode="signup" />} />
         <Route path="*" element={<Navigate to="/login" replace state={{ from: loc.pathname }} />} />
       </Routes>
@@ -35,6 +38,8 @@ export function App() {
         <Route path="/projects/:id" element={<ProjectPage />} />
         <Route path="/settings" element={<Navigate to="/settings/models" replace />} />
         <Route path="/settings/:tab" element={<SettingsPage />} />
+        <Route path="/docs/api" element={<DocsPage signedIn />} />
+        <Route path="/improvements" element={<ImprovementsPage />} />
         <Route path="/admin" element={user.isAdmin ? <AdminPage /> : <Navigate to="/" replace />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/signup" element={<Navigate to="/" replace />} />

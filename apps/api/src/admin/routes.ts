@@ -8,9 +8,11 @@ import type { AppContext } from '../app.js';
 import { authUser, requireAuth } from '../auth/plugin.js';
 import { deleteUserSessions } from '../auth/service.js';
 import { settleInvoice } from '../billing/routes.js';
+import { grantAddon, hasAddon } from '../billing/addons.js';
+import { newId } from '../util/id.js';
 import { grantBoost } from '../cli/commands.js';
 import { config } from '../config.js';
-import { projects, renderBoosts, renderJobs, renders, renderWorkers, runs, users } from '../db/schema.js';
+import { addonPurchases, projects, renderBoosts, renderJobs, renders, renderWorkers, runs, users } from '../db/schema.js';
 import { forbidden, notFound } from '../http/errors.js';
 import { parse } from '../http/validate.js';
 import { fastSecondsLeft, renderSecondsToday } from '../quota/service.js';
@@ -43,14 +45,24 @@ export async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
     const failedRecent = db.select().from(renderJobs).where(and(eq(renderJobs.status, 'error'), gte(renderJobs.finishedAt, now - 7 * DAY))).orderBy(desc(renderJobs.finishedAt)).limit(10).all();
 
     // ---- sales ----
-    const paid = db.select().from(renderBoosts).where(and(eq(renderBoosts.status, 'paid'), eq(renderBoosts.provider, 'paystation'))).all();
+    const paidHours = db.select().from(renderBoosts).where(and(eq(renderBoosts.status, 'paid'), eq(renderBoosts.provider, 'paystation'))).all();
+    const paidAddons = db.select().from(addonPurchases).where(and(eq(addonPurchases.status, 'paid'), eq(addonPurchases.provider, 'paystation'))).all();
+    const paid = [
+      ...paidHours.map((p) => ({ priceBdt: p.priceBdt, paidAt: p.paidAt, seconds: p.seconds })),
+      ...paidAddons.map((p) => ({ priceBdt: p.priceBdt, paidAt: p.paidAt, seconds: 0 })),
+    ];
     const sum = (since: number) => {
       const rows = paid.filter((p) => (p.paidAt ?? 0) >= since);
       return { amountBdt: rows.reduce((s, p) => s + p.priceBdt, 0), orders: rows.length, hours: rows.reduce((s, p) => s + p.seconds, 0) / 3600 };
     };
-    const count = (status: string) => db.select({ n: sql<number>`count(*)` }).from(renderBoosts).where(eq(renderBoosts.status, status)).get()?.n ?? 0;
+    const count = (status: string) => (db.select({ n: sql<number>`count(*)` }).from(renderBoosts).where(eq(renderBoosts.status, status)).get()?.n ?? 0)
+      + (db.select({ n: sql<number>`count(*)` }).from(addonPurchases).where(eq(addonPurchases.status, status)).get()?.n ?? 0);
     const allPaid = db.select().from(renderBoosts).where(eq(renderBoosts.status, 'paid')).all();
-    const recentPurchases = db.select().from(renderBoosts).orderBy(desc(renderBoosts.createdAt)).limit(25).all();
+    const recentPurchases = [
+      ...db.select().from(renderBoosts).orderBy(desc(renderBoosts.createdAt)).limit(25).all().map((p) => ({ ...p, item: `${p.seconds / 3600} h fast render` })),
+      ...db.select().from(addonPurchases).orderBy(desc(addonPurchases.createdAt)).limit(25).all().map((p) => ({ ...p, seconds: 0, item: p.addon === 'api' ? 'API add-on' : 'Source code add-on' })),
+    ].sort((a, b) => b.createdAt - a.createdAt).slice(0, 30);
+    const addonCounts = { api: paidAddons.filter((p) => p.addon === 'api').length, source: paidAddons.filter((p) => p.addon === 'source').length };
 
     // ---- users / usage ----
     const userRows = db.select({ id: users.id, banned: users.banned, createdAt: users.createdAt }).from(users).all();
@@ -90,9 +102,10 @@ export async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
         pending: count('pending'), failed: count('failed'),
         fastHoursOutstanding: allPaid.reduce((s, p) => s + (p.seconds - p.usedSeconds), 0) / 3600,
         paymentsEnabled: !!config.paystation,
+        addonsSold: addonCounts,
         pricePerHourBdt: config.renderHourPriceBdt,
         recent: recentPurchases.map((p) => ({
-          id: p.id, user: email.get(p.userId) ?? '?', hours: p.seconds / 3600, amountBdt: p.priceBdt, status: p.status, provider: p.provider,
+          id: p.id, user: email.get(p.userId) ?? '?', item: p.item, hours: p.seconds / 3600, amountBdt: p.priceBdt, status: p.status, provider: p.provider,
           method: p.paymentMethod, invoice: p.invoiceNumber, trxId: p.paymentRef, createdAt: p.createdAt, paidAt: p.paidAt,
         })),
       },
@@ -116,7 +129,9 @@ export async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
         projects: db.select({ n: sql<number>`count(*)` }).from(projects).where(and(eq(projects.userId, u.id), isNull(projects.deletedAt))).get()?.n ?? 0,
         freeSecondsUsed24h: Math.round(renderSecondsToday(db, u.id)),
         fastSecondsLeft: fastSecondsLeft(db, u.id),
-        spentBdt: db.select({ s: sql<number>`coalesce(sum(${renderBoosts.priceBdt}), 0)` }).from(renderBoosts).where(and(eq(renderBoosts.userId, u.id), eq(renderBoosts.status, 'paid'))).get()?.s ?? 0,
+        addons: (['api', 'source'] as const).filter((a) => hasAddon(db, u.id, a)),
+        spentBdt: (db.select({ s: sql<number>`coalesce(sum(${renderBoosts.priceBdt}), 0)` }).from(renderBoosts).where(and(eq(renderBoosts.userId, u.id), eq(renderBoosts.status, 'paid'))).get()?.s ?? 0)
+          + (db.select({ s: sql<number>`coalesce(sum(${addonPurchases.priceBdt}), 0)` }).from(addonPurchases).where(and(eq(addonPurchases.userId, u.id), eq(addonPurchases.status, 'paid'))).get()?.s ?? 0),
       })),
     };
   });
@@ -127,6 +142,14 @@ export async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
     const u = db.select().from(users).where(eq(users.id, id)).get();
     if (!u) throw notFound('No such user');
     grantBoost(db, u.email, hours * 60);
+    return { ok: true };
+  });
+
+  app.post('/admin/users/:id/grant-addon', admin, async (req) => {
+    const { id } = req.params as { id: string };
+    const { addon } = parse(z.object({ addon: z.enum(['api', 'source']) }), req.body);
+    if (!db.select().from(users).where(eq(users.id, id)).get()) throw notFound('No such user');
+    if (!hasAddon(db, id, addon)) grantAddon(db, id, addon, newId());
     return { ok: true };
   });
 

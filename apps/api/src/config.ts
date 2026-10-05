@@ -65,6 +65,10 @@ const schema = z.object({
   /** price of one fast render hour (BDT) and the most hours one order can buy */
   RENDER_HOUR_PRICE_BDT: num(100),
   RENDER_HOURS_MAX_PER_ORDER: num(20),
+  /** one-time add-ons (BDT): API access and the source code; the WhatsApp number source-code buyers message */
+  ADDON_API_PRICE_BDT: num(500),
+  ADDON_SOURCE_PRICE_BDT: num(2000),
+  SOURCE_CODE_WHATSAPP: z.string().default('+8801744136934'),
   /** PayStation (payment gateway): live/sandbox, merchant id + password; unset = buying is off */
   PAYSTATION_ENV: z.enum(['sandbox', 'live']).default('sandbox'),
   PAYSTATION_MERCHANT_ID: z.string().optional(),
@@ -134,6 +138,9 @@ export const config = {
   userQuotaBytes: env.USER_QUOTA_MB * 1024 * 1024,
   renderSecondsPerDay: env.RENDER_MINUTES_PER_DAY * 60,
   renderHourPriceBdt: env.RENDER_HOUR_PRICE_BDT,
+  addonApiPriceBdt: env.ADDON_API_PRICE_BDT,
+  addonSourcePriceBdt: env.ADDON_SOURCE_PRICE_BDT,
+  sourceCodeWhatsapp: env.SOURCE_CODE_WHATSAPP,
   renderHoursMaxPerOrder: env.RENDER_HOURS_MAX_PER_ORDER,
   paystation: env.PAYSTATION_MERCHANT_ID && env.PAYSTATION_PASSWORD
     ? { merchantId: env.PAYSTATION_MERCHANT_ID, password: env.PAYSTATION_PASSWORD, base: env.PAYSTATION_ENV === 'live' ? 'https://api.paystation.com.bd' : 'https://sandbox.paystation.com.bd' }
