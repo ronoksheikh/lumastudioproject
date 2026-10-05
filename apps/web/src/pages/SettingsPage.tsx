@@ -4,8 +4,9 @@ import { Button } from '../components/Button';
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
-import type { ModelConfig, TestResult, VoicePrefs } from '../api/types';
+import type { ModelConfig, ReasoningEffort, TestResult, VoicePrefs } from '../api/types';
 import { Icon } from '../components/Icon';
+import { ModelPicker, ThinkingFields } from '../components/ModelFields';
 import { BuyRenderHours, fmtRenderTime } from '../components/BuyRenderHours';
 import { useMe, useModels, useVoice } from '../lib/hooks';
 
@@ -44,6 +45,8 @@ function AddModel({ onDone }: { onDone: () => void }) {
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
+  const [contextWindow, setContextWindow] = useState<number | undefined>(undefined);
+  const [thinking, setThinking] = useState<{ reasoningEffort: ReasoningEffort | null; thinkingBudget: number | null }>({ reasoningEffort: null, thinkingBudget: null });
   const [result, setResult] = useState<TestResult | null>(null);
   const [preset, setPreset] = useState<(typeof PRESETS)[number] | null>(null);
   const qc = useQueryClient();
@@ -52,7 +55,7 @@ function AddModel({ onDone }: { onDone: () => void }) {
   const test = useMutation({ mutationFn: () => api.testModelValues({ baseUrl, apiKey, model }), onSuccess: (r) => setResult(r.result), onError: (e) => toast.danger(msg(e)) });
   const save = useMutation({
     mutationFn: async () => {
-      const { model: saved } = await api.addModel({ name: name || model, baseUrl, apiKey, model });
+      const { model: saved } = await api.addModel({ name: name || model, baseUrl, apiKey, model, ...(contextWindow ? { contextWindow: Math.max(4096, contextWindow) } : {}), ...thinking });
       await api.testModel(saved.id); // stores what the model supports
       return saved;
     },
@@ -93,9 +96,8 @@ function AddModel({ onDone }: { onDone: () => void }) {
           <Label>API key</Label><Input placeholder="sk-…" autoComplete="off" />
           <Description>Stored encrypted. Only the last 4 characters are ever shown again.</Description>
         </TextField>
-        <TextField value={model} onChange={(v) => { setModel(v); setResult(null); }} isRequired>
-          <Label>Model</Label><Input placeholder="anthropic/claude-sonnet-4.5" autoComplete="off" />
-        </TextField>
+        <ModelPicker baseUrl={baseUrl} apiKey={apiKey} value={model} onChange={(v) => { setModel(v); setResult(null); }} onContext={setContextWindow} />
+        <ThinkingFields effort={thinking.reasoningEffort} budget={thinking.thinkingBudget} onChange={setThinking} />
         {result && <ResultBox r={result} />}
       </Card.Content>
       <Card.Footer className="justify-end gap-2">
@@ -114,6 +116,11 @@ function ModelRow({ m }: { m: ModelConfig }) {
   const refresh = () => qc.invalidateQueries({ queryKey: ['models'] });
   const test = useMutation({ mutationFn: () => api.testModel(m.id), onSuccess: (r) => { setResult(r.result); void refresh(); }, onError: (e) => toast.danger(msg(e)) });
   const makeDefault = useMutation({ mutationFn: () => api.updateModel(m.id, { isDefault: true }), onSuccess: () => void refresh() });
+  const saveThinking = useMutation({
+    mutationFn: (v: { reasoningEffort: ReasoningEffort | null; thinkingBudget: number | null }) => api.updateModel(m.id, v),
+    onSuccess: () => void refresh(),
+    onError: (e) => toast.danger(msg(e)),
+  });
   const remove = useMutation({ mutationFn: () => api.deleteModel(m.id), onSuccess: () => void refresh(), onError: (e) => toast.danger(msg(e)) });
   return (
     <Card className="p-2">
@@ -126,6 +133,18 @@ function ModelRow({ m }: { m: ModelConfig }) {
         <Caps m={m} />
       </Card.Header>
       {!m.supportsTools && !result && <Card.Content><p className="text-sm text-[#7a4a00]">Not tested yet — press “Test” before using this model.</p></Card.Content>}
+      <Card.Content>
+        <details>
+          <summary className="cursor-pointer text-sm font-medium text-[#1557d1]">Thinking: {m.reasoningEffort ? `effort ${m.reasoningEffort}` : 'provider default'}{m.thinkingBudget != null ? ` · budget ${m.thinkingBudget.toLocaleString()} tokens` : ''}</summary>
+          <div className="mt-3">
+            <ThinkingFields
+              effort={m.reasoningEffort}
+              budget={m.thinkingBudget}
+              onChange={(v) => saveThinking.mutate(v)}
+            />
+          </div>
+        </details>
+      </Card.Content>
       {result && <Card.Content><ResultBox r={result} /></Card.Content>}
       <Card.Footer className="justify-end gap-2">
         {!m.isDefault && <Button size="sm" variant="tertiary" onPress={() => makeDefault.mutate()}>Make default</Button>}

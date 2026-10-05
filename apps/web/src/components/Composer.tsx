@@ -33,6 +33,15 @@ export function Composer({ projectId, frames = [], onRemoveFrame, models, modelI
   onStop: () => void;
 }) {
   const [text, setText] = useState('');
+  // the empty chat's example briefs fill the box (not sent: the student edits the [placeholders] first)
+  useEffect(() => {
+    const onPrompt = (e: Event) => {
+      setText((e as CustomEvent<string>).detail);
+      requestAnimationFrame(() => area.current?.focus());
+    };
+    window.addEventListener('luma:prompt', onPrompt);
+    return () => window.removeEventListener('luma:prompt', onPrompt);
+  }, []);
   const [files, setFiles] = useState<Attachment[]>([]);
   const [sending, setSending] = useState(false);
   const [drag, setDrag] = useState(false);

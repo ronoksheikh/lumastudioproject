@@ -71,6 +71,14 @@ export function TurnView({ turn, onAnswer }: { turn: TurnState; onAnswer: (a: st
   );
 }
 
+/** Example briefs: length, format, audience, voice and the ending — what makes the agent's first draft good. */
+const STARTERS = [
+  { title: 'Course ad', text: 'A 30-second 16:9 ad for my course "[course name]": a strong hook in the first 3 seconds, 3 benefits, the price ৳[price], ending with "Enrol now". Bengali voice, modern and energetic.' },
+  { title: 'Logo intro', text: 'Animate my logo (attached SVG) in a 5-second intro with a satisfying sound made in code — no voice.' },
+  { title: 'Reel', text: 'A 9:16 reel: 5 AI tools every student should know, one per scene with a fast cut on each, English voice, about 20 seconds.' },
+  { title: 'Explainer', text: 'A 45-second explainer about how ChatGPT works for beginners: a calm narrator, simple animated diagrams, one idea per scene.' },
+];
+
 export function ChatList({ projectId, messages, turns, pending, onAnswer }: {
   projectId: string;
   messages: ConversationMessage[];
@@ -105,6 +113,16 @@ export function ChatList({ projectId, messages, turns, pending, onAnswer }: {
             <Icon name="spark" size={22} className="mx-auto mb-2 text-[#2970ec]" />
             <h2 className="text-base font-semibold text-[#1557d1]">What should we make?</h2>
             <p className="mt-1 text-sm text-[#5b6b8f]">Describe your video — a script, a topic, a style. Attach your logo (SVG/PNG) or a brand PDF if you have one. Luma writes the script, records the voice, builds the animation and renders the MP4.</p>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-[#8a97b5]">Good briefs make better videos — start from one</p>
+            <div className="mt-2 flex flex-col gap-2 text-left">
+              {STARTERS.map((s) => (
+                <button key={s.title} type="button" onClick={() => window.dispatchEvent(new CustomEvent('luma:prompt', { detail: s.text }))}
+                  className="rounded-xl border border-[#d6e2f5] bg-white px-3 py-2 text-sm transition-colors hover:border-[#2970EC] hover:bg-[#eff5ff]">
+                  <span className="font-semibold text-[#1557d1]">{s.title}</span>
+                  <span className="block text-[#5b6b8f]">{s.text}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {messages.map((m) => (

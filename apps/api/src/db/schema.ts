@@ -43,6 +43,10 @@ export const providerConfigs = sqliteTable(
     supportsVision: integer('supports_vision', { mode: 'boolean' }).notNull().default(false),
     supportsReasoningStream: integer('supports_reasoning_stream', { mode: 'boolean' }).notNull().default(false),
     contextWindow: integer('context_window').notNull().default(128000),
+    /** reasoning effort sent to the provider (none|minimal|low|medium|high|xhigh); null = provider default */
+    reasoningEffort: text('reasoning_effort'),
+    /** thinking budget in tokens (providers that take one); null = provider default */
+    thinkingBudget: integer('thinking_budget'),
     isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
     createdAt: createdAt(),
   },

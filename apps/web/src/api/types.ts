@@ -30,8 +30,12 @@ export interface ModelConfig {
   supportsVision: boolean;
   supportsReasoningStream: boolean;
   contextWindow: number;
+  reasoningEffort: ReasoningEffort | null;
+  thinkingBudget: number | null;
   isDefault: boolean;
 }
+
+export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
 export interface TestResult {
   ok: boolean;
