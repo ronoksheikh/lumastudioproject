@@ -85,3 +85,13 @@ body { font-family: var(--font-sans); background: var(--background); color: var(
 @keyframes luma-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .pulse { animation: luma-pulse 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+
+/* API docs page */
+.docs h1 { font-size: 2rem; color: #1557d1; margin-top: 0; }
+.docs h2 { font-size: 1.35rem; color: #1557d1; margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1.25rem; }
+.docs table { width: 100%; border-collapse: collapse; margin: .75rem 0; font-size: .85rem; display: block; overflow-x: auto; }
+.docs th, .docs td { border-bottom: 1px solid #e3ecfb; padding: .45rem .6rem; text-align: left; vertical-align: top; }
+.docs th { color: #5b6b8f; font-weight: 600; }
+.docs pre { background: #f5f8ff; border: 1px solid var(--border); border-radius: .75rem; padding: .9rem 1rem; overflow-x: auto; font-size: .8rem; }
+.docs code { font-family: var(--font-mono); font-size: .85em; }
+.docs blockquote { border-left: 3px solid #2970ec; background: #eff5ff; margin: 1rem 0; padding: .6rem 1rem; border-radius: 0 .5rem .5rem 0; }

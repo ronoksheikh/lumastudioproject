@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, Chip, Input, ProgressBar, Skeleton, Tabs, TextField, toast } from '@heroui/react';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ApiError, api, type AdminOverview, type AdminUser } from '../api/client';
+import { ApiError, api, type AdminOverview, type AdminUser, type FeedbackStatus } from '../api/client';
+import { FeedbackCard, STATUS } from './ImprovementsPage';
 import { Button } from '../components/Button';
 import { fmtRenderTime } from '../components/BuyRenderHours';
 import { Icon } from '../components/Icon';
@@ -66,6 +67,7 @@ function Overview({ d }: { d: AdminOverview }) {
         <Stat label="Renders (24 h)" value={d.renders.last24h.done} sub={`${d.renders.last24h.failed} failed · ${d.renders.totalDone} all time`} />
         <Stat label="Render hours (24 h)" value={hrs(d.renders.last24h.freeHours + d.renders.last24h.fastHours)} sub={`${hrs(d.renders.last24h.freeHours)} free · ${hrs(d.renders.last24h.fastHours)} fast`} />
         <Stat label="Fast hours owed" value={hrs(d.sales.fastHoursOutstanding)} sub="bought, not used yet" />
+        <Stat label="Add-ons sold" value={d.sales.addonsSold.api + d.sales.addonsSold.source} sub={`${d.sales.addonsSold.api} API · ${d.sales.addonsSold.source} source code`} />
         <Stat label="Render workers" value={`${online}/${d.workers.length}`} sub="online" />
         <Stat label="Server" value={d.cpu ? `${Math.round(d.cpu.usage * 100)}% CPU` : '—'} sub={d.disk ? `${gb(d.disk.freeBytes)} disk free of ${gb(d.disk.totalBytes)}` : undefined} />
       </div>
@@ -97,13 +99,13 @@ function Overview({ d }: { d: AdminOverview }) {
         {d.sales.recent.length === 0 ? <Empty>No purchases yet.</Empty> : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
-              <thead><tr className="text-left text-xs text-[#5b6b8f]"><th className="py-2">When</th><th>Student</th><th>Hours</th><th>Amount</th><th>Status</th><th>Method</th><th>Invoice / trx</th><th /></tr></thead>
+              <thead><tr className="text-left text-xs text-[#5b6b8f]"><th className="py-2">When</th><th>Student</th><th>Item</th><th>Amount</th><th>Status</th><th>Method</th><th>Invoice / trx</th><th /></tr></thead>
               <tbody>
                 {d.sales.recent.map((p) => (
                   <tr key={p.id} className="border-t border-[#eef3fb]">
                     <td className="py-2 text-[#5b6b8f]">{ago(p.createdAt, d.now)}</td>
                     <td>{p.user}</td>
-                    <td>{p.hours}</td>
+                    <td>{p.item}</td>
                     <td className="font-semibold">{p.provider === 'grant' ? 'granted' : bdt(p.amountBdt)}</td>
                     <td>{statusChip(p.status)}</td>
                     <td>{p.method ?? '—'}</td>
@@ -149,6 +151,48 @@ function Overview({ d }: { d: AdminOverview }) {
   );
 }
 
+function Improvements() {
+  const qc = useQueryClient();
+  const [status, setStatus] = useState('');
+  const list = useQuery({ queryKey: ['admin', 'feedback', status], queryFn: () => api.adminFeedback(status || undefined).then((r) => r.items), refetchInterval: 30_000 });
+  const update = useMutation({
+    mutationFn: ({ id, ...b }: { id: string; status?: string; adminNote?: string | null }) => api.adminUpdateFeedback(id, b),
+    onSuccess: () => { toast.success('Saved — the student sees it'); void qc.invalidateQueries({ queryKey: ['admin', 'feedback'] }); },
+    onError: (e) => toast.danger(msg(e)),
+  });
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap gap-2">
+        {[['', 'All'], ['new', 'New'], ['reviewed', 'Reviewed'], ['in_progress', 'Working on it'], ['done', 'Done'], ['declined', 'Not planned']].map(([v, l]) => (
+          <Button key={v} size="sm" variant={status === v ? 'primary' : 'tertiary'} onPress={() => setStatus(v!)}>{l}</Button>
+        ))}
+      </div>
+      {!list.data ? <Skeleton className="h-40 rounded-2xl" /> : list.data.length === 0 ? <Empty>Nothing here.</Empty> : list.data.map((f) => (
+        <FeedbackCard key={f.id} f={f}>
+          <div className="flex flex-col gap-2 border-t border-[#eef3fb] pt-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-[#5b6b8f]">Status:</span>
+              <select className="h-9 rounded-lg border border-[#d6e2f5] bg-white px-2 text-sm" value={f.status} onChange={(e) => update.mutate({ id: f.id, status: e.target.value })}>
+                {(Object.keys(STATUS) as FeedbackStatus[]).map((s) => <option key={s} value={s}>{STATUS[s].label}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <textarea
+                className="min-h-16 flex-1 rounded-lg border border-[#d6e2f5] p-2 text-sm outline-none focus:border-[#2970EC]"
+                placeholder="Reply to the student (they see it under their report)"
+                value={notes[f.id] ?? f.adminNote ?? ''}
+                onChange={(e) => setNotes((n) => ({ ...n, [f.id]: e.target.value }))}
+              />
+              <Button size="sm" variant="secondary" isDisabled={update.isPending || notes[f.id] === undefined} onPress={() => update.mutate({ id: f.id, adminNote: (notes[f.id] ?? '').trim() || null })}>Save reply</Button>
+            </div>
+          </div>
+        </FeedbackCard>
+      ))}
+    </div>
+  );
+}
+
 function Users() {
   const qc = useQueryClient();
   const [q, setQ] = useState('');
@@ -156,6 +200,11 @@ function Users() {
   const grant = useMutation({
     mutationFn: ({ u, hours }: { u: AdminUser; hours: number }) => api.adminGrantHours(u.id, hours),
     onSuccess: () => { toast.success('Fast hours granted'); void qc.invalidateQueries({ queryKey: ['admin'] }); },
+    onError: (e) => toast.danger(msg(e)),
+  });
+  const grantAddon = useMutation({
+    mutationFn: ({ u, addon }: { u: AdminUser; addon: 'api' | 'source' }) => api.adminGrantAddon(u.id, addon),
+    onSuccess: () => { toast.success('Add-on granted'); void qc.invalidateQueries({ queryKey: ['admin'] }); },
     onError: (e) => toast.danger(msg(e)),
   });
   const ban = useMutation({
@@ -172,7 +221,7 @@ function Users() {
             <tbody>
               {list.data.map((u) => (
                 <tr key={u.id} className="border-t border-[#eef3fb]">
-                  <td className="py-2">{u.email} {u.banned && <Chip size="sm" color="danger"><Chip.Label>suspended</Chip.Label></Chip>}</td>
+                  <td className="py-2">{u.email} {u.banned && <Chip size="sm" color="danger"><Chip.Label>suspended</Chip.Label></Chip>}{u.addons.map((a) => <Chip key={a} size="sm" color="accent" className="ml-1"><Chip.Label>{a === 'api' ? 'API' : 'source'}</Chip.Label></Chip>)}</td>
                   <td>{u.projects}</td>
                   <td>{fmtRenderTime(u.freeSecondsUsed24h)}</td>
                   <td>{fmtRenderTime(u.fastSecondsLeft)}</td>
@@ -183,6 +232,10 @@ function Users() {
                       const h = Number(window.prompt(`Grant fast render hours to ${u.email}:`, '1'));
                       if (h > 0) grant.mutate({ u, hours: h });
                     }}>Grant hours</Button>
+                    <Button size="sm" variant="tertiary" isDisabled={grantAddon.isPending} onPress={() => {
+                      const a = window.prompt(`Give ${u.email} an add-on: type "api" or "source"`, 'api');
+                      if (a === 'api' || a === 'source') grantAddon.mutate({ u, addon: a });
+                    }}>Grant add-on</Button>
                     <Button size="sm" variant={u.banned ? 'secondary' : 'danger'} isDisabled={ban.isPending} onPress={() => {
                       if (u.banned || window.confirm(`Suspend ${u.email}? They are signed out and can't log in.`)) ban.mutate({ u, banned: !u.banned });
                     }}>{u.banned ? 'Restore' : 'Suspend'}</Button>
@@ -210,12 +263,14 @@ export function AdminPage() {
             <Tabs.List aria-label="Admin sections">
               <Tabs.Tab id="overview">Overview<Tabs.Indicator /></Tabs.Tab>
               <Tabs.Tab id="users">Students<Tabs.Indicator /></Tabs.Tab>
+              <Tabs.Tab id="improvements">Improvements<Tabs.Indicator /></Tabs.Tab>
             </Tabs.List>
           </Tabs.ListContainer>
           <Tabs.Panel id="overview" className="pt-5">
             {q.error ? <p className="text-sm text-[#b42318]">{msg(q.error)}</p> : !q.data ? <Skeleton className="h-64 rounded-2xl" /> : <Overview d={q.data} />}
           </Tabs.Panel>
           <Tabs.Panel id="users" className="pt-5">{tab === 'users' && <Users />}</Tabs.Panel>
+          <Tabs.Panel id="improvements" className="pt-5">{tab === 'improvements' && <Improvements />}</Tabs.Panel>
         </Tabs>
       </div>
     </div>
