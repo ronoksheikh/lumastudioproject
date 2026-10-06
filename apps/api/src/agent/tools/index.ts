@@ -4,6 +4,8 @@ import { describeUsage } from '../../quota/service.js';
 import { shareAsset, useAsset } from '../library.js';
 import { ToolError } from '../../runner/files.js';
 import { bash } from './bash.js';
+import { checkPreview } from './preview.js';
+import { searchFiles } from './search.js';
 import { editFile, listFiles, readFile, writeFile } from './files.js';
 import { previewFrames } from './frames.js';
 import { readGuide } from './guide.js';
@@ -37,6 +39,8 @@ const handlers: { [N in ToolName]: Handler<N> } = {
   preview_frames: previewFrames,
   render_video: renderVideo,
   offer_render_hours: offerRenderHours,
+  check_preview: checkPreview,
+  search_files: searchFiles,
   account_usage: (ctx) => ok(describeUsage(ctx.db, ctx.userId), 'Checked usage'),
   ask_user: askUser,
   web_fetch: webFetch,

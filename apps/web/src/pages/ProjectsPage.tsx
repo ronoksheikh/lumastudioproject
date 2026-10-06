@@ -63,6 +63,27 @@ function NewProjectModal({ isOpen, onOpenChange }: { isOpen: boolean; onOpenChan
 }
 
 /** The latest render's first frame (top-left tile of its 2×2 contact sheet), else a calm brand tile. */
+const ACTIVITY_STYLE: Record<NonNullable<Project['activity']>['state'], { dot: string; text: string; live?: boolean }> = {
+  working: { dot: 'bg-[#2970ec]', text: 'text-[#1557d1]', live: true },
+  waiting: { dot: 'bg-[#e8a400]', text: 'text-[#7a4a00]', live: true },
+  rendering: { dot: 'bg-[#5daeff]', text: 'text-[#1557d1]', live: true },
+  error: { dot: 'bg-[#d14343]', text: 'text-[#b42318]' },
+  done: { dot: 'bg-[#22a06b]', text: 'text-[#1a7f53]' },
+  ready: { dot: 'bg-[#8a97b5]', text: 'text-[#5b6b8f]' },
+  new: { dot: 'bg-[#c9d3e6]', text: 'text-[#8a97b5]' },
+};
+
+/** "Luma is working", "Rendering 40%", "Waiting for your answer", "Rendered"… on each card. */
+function ActivityBadge({ a }: { a: NonNullable<Project['activity']> }) {
+  const st = ACTIVITY_STYLE[a.state];
+  return (
+    <p className={`mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium ${st.text}`} data-testid="project-activity">
+      <span className={`inline-block h-2 w-2 rounded-full ${st.dot} ${st.live ? 'pulse' : ''}`} />
+      {a.label}
+    </p>
+  );
+}
+
 function Thumb({ project }: { project: Project }) {
   const portrait = project.aspect === '9:16';
   const [broken, setBroken] = useState(false);
@@ -90,6 +111,7 @@ function ProjectCard({ project, onDelete }: { project: Project; onDelete: () => 
         <div className="px-1 pb-1 pt-3">
           <h3 className="truncate text-[15px] font-semibold text-[#1f2937]">{project.title}</h3>
           <p className="mt-0.5 text-xs text-[#5b6b8f]">{project.aspect === '9:16' ? 'Portrait' : 'Landscape'} · edited {timeAgo(project.updatedAt)}</p>
+          {project.activity && <ActivityBadge a={project.activity} />}
         </div>
       </button>
       <div className="absolute right-4 top-4 opacity-100 transition-opacity sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">

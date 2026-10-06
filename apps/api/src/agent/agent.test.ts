@@ -67,7 +67,7 @@ describe('agent loop', () => {
         { name: 'update_plan', args: { items: [{ text: 'Write scene', status: 'doing' }, { text: 'Check', status: 'todo' }] } },
         { name: 'write_file', args: { path: 'public/js/scenes/99-demo.js', content: 'export default function demo() {}\n' } },
       ] },
-      { toolCalls: [{ name: 'bash', args: { command: 'echo hello > out.txt && cat out.txt && ls public/js/scenes' } }] },
+      { toolCalls: [{ name: 'bash', args: { command: 'echo hello | cp /dev/stdin out.txt && cat out.txt && ls public/js/scenes' } }] },
       { toolCalls: [{ name: 'edit_file', args: { path: 'out.txt', old_string: 'hello', new_string: 'hello world' } }] },
       { content: 'All done — the demo scene exists.' },
     ];

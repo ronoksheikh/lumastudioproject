@@ -122,11 +122,12 @@ without a voice (used when there is no `public/audio/timing.json`). script.json 
 | `sound(name, fn(audioCtx, dest, t, gain))` | register your own WebAudio sound (deterministic), then `cue(t, name)` — `read_guide("sound")` |
 | `cueFile(t, url, { gain, offset })` | play an audio file (music, a recorded sting) from `t`; mixed into renders too |
 | `onFrame(fn(t))` | per-frame hook — deterministic code only |
-| `setStage(t, 'white'\|'blue', dur=0.5)` | switch the stage at `t`: white (and no vignette) or the brand-blue gradient |
+| `setStage(t, 'white'\|'blue', dur=0.5)` | switch the stage at `t`: white (and no vignette) or the animated gradient |
+| `setBackground(t, color \| null, { dur, lines, vignette })` | any flat background colour from `t` (e.g. `'#0E0E0E'`); `null` = back to the gradient; `lines`/`vignette` switch the wave lines and vignette |
 | `BG.uNight`, `BG.uWarm` | other background uniforms (deep-blue night, brighter glow) — tween with `tl.to(ctx.BG.uWarm, { value: 1 }, t)` |
 | `P` / `st` | particle uniforms / camera+logo state (use the particles + logo3d recipes) |
 | `brand`, `project` | parsed brand.json / project.json (`brand.logo.lockup`, `brand.logo.icon`) |
-| `initWorld(opts)` | once, in index.js: starting world state |
+| `initWorld(opts)` | once, in index.js: starting world state — `{ night, particles, jitter, background: '#hex', lines: true, vignette: true }` |
 
 ## 5. `lib/core.js`
 

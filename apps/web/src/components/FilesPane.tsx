@@ -179,10 +179,26 @@ export function FilesPane({ projectId, tick }: { projectId: string; tick: number
   const [selected, setSelected] = useState<string | null>(null);
   const toggle = (p: string) => setOpen((o) => { const n = new Set(o); n.has(p) ? n.delete(p) : n.add(p); return n; });
   useEffect(() => { if (!selected && tree.data?.some((e) => e.path === 'script.json')) setSelected('script.json'); }, [tree.data, selected]);
+  const qc = useQueryClient();
+  const picker = useRef<HTMLInputElement>(null);
+  const upload = useMutation({
+    mutationFn: (files: File[]) => api.upload(projectId, files, true),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: ['tree', projectId] });
+      setOpen((o) => new Set([...o, 'assets', 'assets/uploads']));
+      if (r.uploads[0]) setSelected(r.uploads[0].path);
+      toast.success(`${r.uploads.length} file${r.uploads.length > 1 ? 's' : ''} added to assets/uploads — mention them in the chat with @`);
+    },
+    onError: (e) => toast.danger(e instanceof ApiError ? e.message : 'Upload failed'),
+  });
 
   return (
     <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,38%)_minmax(0,1fr)] md:grid-cols-[minmax(160px,34%)_1fr] md:grid-rows-1">
       <nav className="scroll-y border-b border-[var(--border)] p-2 md:border-b-0 md:border-r" aria-label="Project files">
+        <input ref={picker} type="file" multiple hidden accept=".svg,.png,.jpg,.jpeg,.webp,.pdf,.md,.markdown,.txt,.json,.csv,.mp3,.wav,.ogg,.m4a" onChange={(e) => { if (e.target.files?.length) upload.mutate([...e.target.files]); e.target.value = ''; }} />
+        <Button size="sm" variant="secondary" className="mb-2 w-full" isDisabled={upload.isPending} onPress={() => picker.current?.click()}>
+          <Icon name="plus" size={14} /> {upload.isPending ? 'Uploading…' : 'Upload files'}
+        </Button>
         {tree.isLoading ? <Skeleton className="h-40 rounded-lg" /> : <ul role="tree">{nodes.map((n) => <Row key={n.path} n={n} depth={0} open={open} toggle={toggle} selected={selected} onSelect={setSelected} />)}</ul>}
       </nav>
       <div className="min-h-0 min-w-0">

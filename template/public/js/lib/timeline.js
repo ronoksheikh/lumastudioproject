@@ -74,6 +74,25 @@ export function makeContext({ timing, world, scenesRoot, fxRoot, project, brand,
     if (vignette) tl.to(vignette, { opacity: white ? 0 : 1, duration: dur, ease: 'power2.inOut' }, t);
   };
 
+  /**
+   * Any background colour or look, not just the brand gradient: setBackground(t, '#0E0E0E') fades to a flat colour;
+   * setBackground(t, null) goes back to the gradient. Options: lines/vignette (on/off), dur.
+   */
+  const setBackground = (t, color, { dur = 0.5, lines, vignette: vig } = {}) => {
+    const B = world.bg;
+    if (color) {
+      // the colour switches at t (while uFlat fades in); fading from one flat colour to another tweens it
+      const c = new world.THREE.Color(color);
+      tl.to(B.cFlat.value, { r: c.r, g: c.g, b: c.b, duration: dur, ease: 'power2.inOut' }, t);
+    }
+    tl.to(B.uFlat, { value: color ? 1 : 0, duration: dur, ease: 'power2.inOut' }, t);
+    if (lines != null) tl.to(B.uLines, { value: lines ? 1 : 0, duration: dur }, t);
+    if (vig != null) {
+      tl.to(B.uVig, { value: vig ? 1 : 0, duration: dur }, t);
+      if (vignette) tl.to(vignette, { opacity: vig ? 1 : 0, duration: dur }, t);
+    }
+  };
+
   // masked word reveal; opacity keeps Bengali matras from peeking out early
   const wordIn = (wd, t, d = 0.42) => tl.fromTo(wd, { yPercent: 130, opacity: 0 }, { yPercent: 0, opacity: 1, duration: d }, t - 0.03);
   const reveal = (words, id, offset = 0) => words.forEach((wd, i) => wordIn(wd, w(id, offset + i)));
@@ -85,13 +104,22 @@ export function makeContext({ timing, world, scenesRoot, fxRoot, project, brand,
     world, st: world.state, P: world.particles, BG: world.bg,
     project, brand, size, W: size.W, H: size.H,
     scenesRoot, fxRoot,
-    w, wEnd, seg, range, at, cue, cueFile, sound, onFrame, flash, shake, show, add, setStage, q, qa, el, wordIn, reveal, wordsOut,
+    w, wEnd, seg, range, at, cue, cueFile, sound, onFrame, flash, shake, show, add, setStage, setBackground, q, qa, el, wordIn, reveal, wordsOut,
     /** Build-time memory shared by recipes (e.g. which particle target is currently active). */
     memo: { particleTarget: 'scatter' },
     /** Set the world's starting state at t=0. Call once from scenes/index.js. */
-    initWorld({ night = 0, jitter = 0.35, particles = 0.14, particlesFade = 1 } = {}) {
+    initWorld({ night = 0, jitter = 0.35, particles = 0.14, particlesFade = 1, background = null, lines = true, vignette: vig = true } = {}) {
       const { tl: T, BG, P } = ctx;
       T.set(BG.uNight, { value: night }, 0);
+      // starting look: the brand gradient, or any flat colour; wave lines and vignette can be switched off
+      if (background) {
+        const c = new world.THREE.Color(background);
+        T.set(BG.cFlat.value, { r: c.r, g: c.g, b: c.b }, 0);
+      }
+      T.set(BG.uFlat, { value: background ? 1 : 0 }, 0);
+      T.set(BG.uLines, { value: lines ? 1 : 0 }, 0);
+      T.set(BG.uVig, { value: vig ? 1 : 0 }, 0);
+      if (vignette) T.set(vignette, { opacity: vig ? 1 : 0 }, 0);
       T.set(BG.uWhite, { value: 0 }, 0); // setStage() tweens from here
       T.set([P.wSphere, P.wLogo, P.wRing, P.wText], { value: 0 }, 0);
       T.set(P.wScatter, { value: 1 }, 0);

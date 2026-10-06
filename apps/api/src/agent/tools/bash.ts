@@ -14,7 +14,19 @@ import { fail, ok, type ToolContext, type ToolResult } from './types.js';
  */
 export const FORBIDDEN_RENDER = /\b(export-mp4(\.mjs)?|render\.mjs|preview-frames(\.mjs)?|npm\s+run\s+export)\b|\b(chromium(-browser)?|google-chrome(-stable)?|chrome|headless_shell)\b[^\n|;&]*--(headless|screenshot|print-to-pdf|remote-debugging-port)/i;
 
+/** Dev/static servers and watchers: the Preview tab already serves the project; a server here just hangs. */
+export const FORBIDDEN_SERVER = /\bnpm\s+(run\s+)?(dev|start|serve|preview|watch)\b|\b(npx\s+)?(vite|serve|http-server|live-server|webpack-dev-server|browser-sync|nodemon)\b(?!\.)|python3?\s+-m\s+http\.server|\bphp\s+-S\b|\bnode\s+\S*server\.m?js\b|\b(listen|createServer)\s*\(/i;
+
+/** Writing files through the shell (redirects, tee, sed -i, heredocs) — write_file/edit_file show diffs and are safe. */
+export const SHELL_WRITE = /(^|[^<>&|0-9])>>?\s*(?!\s*(\/dev\/(null|stderr|stdout)|&))[^\s|;&]+|\btee\b|\bsed\s+(-[a-z]*i|--in-place)|<<-?\s*['"]?\w+['"]?\s*>/i;
+
 export async function bash(ctx: ToolContext, a: ToolArgs<'bash'>): Promise<ToolResult> {
+  if (FORBIDDEN_SERVER.test(a.command)) {
+    return fail('Starting servers is not allowed here: the Preview tab already shows the video (the student sees it live). To check that the page builds, use check_preview (or `npm run check -- --page`); to look at frames, preview_frames.');
+  }
+  if (SHELL_WRITE.test(a.command)) {
+    return fail('Create and change files with write_file / edit_file, not shell redirects, tee, heredocs or sed -i (the student sees those edits as diffs, and they are checked). Commands that produce files themselves (ffmpeg -o, curl -o, npm install, git) are fine.');
+  }
   if (FORBIDDEN_RENDER.test(a.command)) {
     return fail('Rendering, screenshots and browser automation are not allowed from the terminal. Use render_video for MP4s and preview_frames to look at frames (they are queued fairly and count against the student\'s render time). `npm run check -- --page` is fine for a quick page check.');
   }

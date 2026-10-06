@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { AppContext } from '../app.js';
 import { authUser, requireAuth } from '../auth/plugin.js';
 import { config } from '../config.js';
-import { renders, runs, uploads } from '../db/schema.js';
+import { renderJobs, renders, runs, uploads } from '../db/schema.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PathError, resolveInProject } from '../runner/paths.js';
@@ -16,6 +16,7 @@ import { signPreviewToken } from '../security/crypto.js';
 import { loadSecrets } from '../security/secrets.js';
 import { assertSha, commitAll, gitFileAt, gitLog, gitRestore, gitShow } from './git.js';
 import { capturePng } from './capture.js';
+import { setPreviewReport } from '../agent/preview-report.js';
 import { assertDiskAvailable, forgetUsage, usageFor } from '../quota/service.js';
 import { sendExportFile, sendProjectFile } from '../render/serve.js';
 import { mediaKind, rawContentType } from './file-kinds.js';
@@ -42,7 +43,39 @@ export async function projectRoutes(app: FastifyInstance, ctx: AppContext) {
         .where(inArray(renders.projectId, list.map((p) => p.id))).orderBy(desc(renders.createdAt)).all();
       for (const r of rows) if (!latest.has(r.projectId)) latest.set(r.projectId, `/api/projects/${r.projectId}/renders/${r.id}/sheet`);
     }
-    return { projects: list.map((p) => ({ ...publicProject(p), thumbnailUrl: latest.get(p.id) ?? null })) };
+    // what each project is doing right now, for the home page cards
+    const ids = list.map((p) => p.id);
+    const activeJobs = ids.length ? db.select({ projectId: renderJobs.projectId, status: renderJobs.status, progress: renderJobs.progress }).from(renderJobs)
+      .where(and(inArray(renderJobs.projectId, ids), inArray(renderJobs.status, ['queued', 'running']))).all() : [];
+    const job = new Map(activeJobs.map((j) => [j.projectId, j]));
+    const lastRun = new Map<string, string>();
+    if (ids.length) {
+      for (const r of db.select({ projectId: runs.projectId, status: runs.status }).from(runs).where(inArray(runs.projectId, ids)).orderBy(desc(runs.startedAt)).all()) {
+        if (!lastRun.has(r.projectId)) lastRun.set(r.projectId, r.status);
+      }
+    }
+    const statusOf = (id: string) => {
+      const a = ctx.agent?.activeFor(id);
+      if (a?.pending) return { state: 'waiting' as const, label: 'Waiting for your answer' };
+      if (a) return { state: 'working' as const, label: 'Luma is working' };
+      const j = job.get(id);
+      if (j) return { state: 'rendering' as const, label: j.status === 'queued' ? 'Render queued' : `Rendering ${Math.round(j.progress / 10)}%` };
+      const last = lastRun.get(id);
+      if (last === 'error') return { state: 'error' as const, label: 'Last run had an error' };
+      if (latest.has(id)) return { state: 'done' as const, label: 'Rendered' };
+      if (last) return { state: 'ready' as const, label: last === 'stopped' ? 'Stopped' : 'Ready to preview' };
+      return { state: 'new' as const, label: 'Not started' };
+    };
+    return { projects: list.map((p) => ({ ...publicProject(p), thumbnailUrl: latest.get(p.id) ?? null, activity: statusOf(p.id) })) };
+  });
+
+  /** The Preview tab tells the server what the student's browser shows, so the agent can see preview errors. */
+  app.post('/projects/:id/preview-report', auth, async (req) => {
+    const { id } = req.params as { id: string };
+    getOwnedProject(db, authUser(req).id, id);
+    const body = parse(z.object({ status: z.enum(['ready', 'error', 'empty']), message: z.string().max(4000).optional(), duration: z.number().min(0).max(36000).optional() }), req.body);
+    setPreviewReport(id, body);
+    return { ok: true };
   });
 
   app.get('/usage', auth, async (req) => ({ usage: usageFor(db, authUser(req).id) }));

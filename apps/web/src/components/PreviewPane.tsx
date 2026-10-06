@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../api/client';
 import { Icon } from './Icon';
 import { usePreview } from './preview-context';
-import { captureStage, download, quickVideoSupport, record } from '../lib/quick-video';
+import { captureStage, download, grabStagePng, quickVideoSupport, record } from '../lib/quick-video';
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -30,6 +30,8 @@ export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'
   const [scrub, setScrub] = useState<number | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [recording, setRecording] = useState<null | 'starting' | 'recording'>(null);
+  const projectRef = useRef(projectId);
+  projectRef.current = projectId;
   const stage = useRef<HTMLDivElement>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -46,14 +48,19 @@ export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'
     const onMsg = (e: MessageEvent) => {
       const m = e.data;
       if (!m || m.source !== 'luma-preview' || e.source !== frame.current?.contentWindow) return;
+      // tell the server what the student sees, so the agent can read preview errors (check_preview)
+      const report = (b: Parameters<typeof api.previewReport>[1]) => { void api.previewReport(projectRef.current, b).catch(() => {}); };
       if (m.type === 'ready') {
         setPhase('ready');
         setState((s) => ({ ...s, duration: m.duration }));
+        report({ status: 'ready', duration: Number(m.duration) || 0 });
       } else if (m.type === 'empty') {
         setPhase('empty');
+        report({ status: 'empty' });
       } else if (m.type === 'error') {
         setPhase('error');
         setError(String(m.message));
+        report({ status: 'error', message: String(m.message).slice(0, 4000) });
       } else if (m.type === 'state') setState({ t: m.t, playing: m.playing, duration: m.duration, segment: m.segment ?? null });
     };
     window.addEventListener('message', onMsg);
@@ -72,8 +79,28 @@ export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'
     send({ type: 'seek', t });
     setState((s) => ({ ...s, t, playing: false }));
   };
+  /**
+   * Capture this frame as a PNG. In desktop Chrome/Edge the browser grabs the frame itself (exactly what is on
+   * screen, no server work); elsewhere — or if the student declines the share prompt — the server renders it.
+   */
   const capture = async () => {
     setCapturing(true);
+    if (stateRef.current.playing) send({ type: 'pause' });
+    if (quickVideoSupport().ok && stage.current) {
+      setRecording('starting'); // full-window stage for a sharp frame
+      try {
+        await new Promise((r) => setTimeout(r, 50));
+        const png = await grabStagePng(stage.current);
+        download(png, `frame-${stateRef.current.t.toFixed(2)}s.png`);
+        return;
+      } catch (e) {
+        if ((e as Error).name === 'NotAllowedError') return; // the student cancelled the prompt
+      } finally {
+        setRecording(null);
+        setCapturing(false);
+      }
+      setCapturing(true);
+    }
     try {
       const { url } = await api.captureFrame(projectId, state.t);
       const a = document.createElement('a');

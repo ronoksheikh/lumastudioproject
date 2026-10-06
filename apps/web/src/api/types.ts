@@ -14,6 +14,8 @@ export interface Project {
   status: string;
   createdAt: number;
   updatedAt: number;
+  /** what is happening in the project right now (list only) */
+  activity?: { state: 'working' | 'waiting' | 'rendering' | 'error' | 'done' | 'ready' | 'new'; label: string };
   /** the latest render's contact sheet (list only), shown as the card thumbnail */
   thumbnailUrl?: string | null;
   /** what the project holds so far (GET /projects/:id only); new projects are empty */

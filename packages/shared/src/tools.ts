@@ -56,6 +56,16 @@ export const toolSchemas = {
     mode: z.enum(['free', 'fast']).optional().describe('free = the daily free render time on our server (slower); fast = the student\'s paid fast render hours. Omit unless the student chose — you are told when you must ask.'),
   }),
   account_usage: z.object({}),
+  check_preview: z.object({
+    build: z.boolean().optional().describe('Also build the page in headless Chrome (default true). false = only what the student\'s browser reported.'),
+  }),
+  search_files: z.object({
+    pattern: z.string().min(1).max(300).describe('Text to find (or a regex with regex: true)'),
+    path: z.string().max(400).optional().describe('File or folder to search (default: the whole project)'),
+    glob: z.string().max(60).optional().describe('Only file names matching this, e.g. "*.js"'),
+    regex: z.boolean().optional(),
+    case_sensitive: z.boolean().optional(),
+  }),
   offer_render_hours: z.object({
     reason: z.string().min(5).max(300).describe('One short sentence the student sees, e.g. "Today\'s free render time is used up."'),
     hours: z.number().int().min(1).max(20).optional().describe('Suggested number of hours (default 1)'),
@@ -95,8 +105,8 @@ export type ToolArgs<N extends ToolName> = z.infer<(typeof toolSchemas)[N]>;
 export const TOOL_NAMES = Object.keys(toolSchemas) as ToolName[];
 
 const descriptions: Record<ToolName, string> = {
-  bash: 'Run a shell command in the project folder (node, npm, ffmpeg, git, curl). Output is streamed; long output is truncated in the middle. Each call is a fresh shell — state does not persist between calls.',
-  read_file: 'Read a text file with line numbers, or view an image (png/jpg/webp) if the model supports vision.',
+  bash: 'Run a shell command in the project folder (node, npm, ffmpeg, git, curl). Not for: creating/editing files (use write_file/edit_file), starting servers (the Preview tab is the only preview), rendering or screenshots (render_video / preview_frames). Output is streamed; long output is truncated in the middle. Each call is a fresh shell — state does not persist between calls.',
+  read_file: 'Read a text file with line numbers, or view an image (png/jpg/webp) if the model supports vision. For big files read only the part you need: offset (first line) + limit (number of lines), e.g. lines 100–200.',
   write_file: 'Create or fully overwrite a file. Prefer edit_file for changes to existing files.',
   edit_file: 'Replace exact text in a file. old_string must match once (add context) unless replace_all is true.',
   list_files: 'List files and folders in the project (node_modules, export and .git are hidden).',
@@ -105,6 +115,8 @@ const descriptions: Record<ToolName, string> = {
   list_voices: 'List the ElevenLabs voices the student\'s account can use (name, voice_id, gender/age/accent, languages, whether usable on their plan) and their plan tier + characters left. Call it before choosing script.json voice settings.',
   patch_voice: 'Re-record ONE segment after editing its text in script.json and splice it into the existing audio. Later timings shift automatically.',
   preview_frames: 'Render the video at the given timeline seconds and return screenshots (and layout problems found in the page). Use it to check every scene.',
+  check_preview: 'Why the Preview is (not) working: the error the student\'s browser reported (e.g. "The video can\'t be played yet"), plus a fresh headless build of the page with build errors, failed file requests (with their URLs) and font warnings. Use it whenever the student says the preview is broken, after big edits, and before rendering.',
+  search_files: 'Search the project for text or a regex; returns only matching lines as path:line: text. Use it to find where something is defined, then read_file with offset/limit for just those lines — much cheaper than reading whole files.',
   account_usage: 'The student\'s current usage: free render time used/left today, fast render hours left, storage. Use it when they ask about their limits or before a long render.',
   offer_render_hours: 'Show the student a card in the chat to buy fast render hours (paid, via bKash/Nagad/cards). Use it when render time is used up, or when the student wants faster renders — not unprompted.',
   render_video: 'Queue an MP4 render (draft or final). The student sees live progress; returns when the render is done. Free renders use the daily free time on our server; fast renders use paid fast render hours.',
