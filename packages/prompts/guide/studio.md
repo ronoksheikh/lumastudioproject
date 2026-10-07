@@ -16,8 +16,9 @@
 
 ## "The preview is not showing / is blank / says something failed"
 The preview is just the project in a browser. Diagnose it yourself — don't ask the student to:
-1. `npm run check -- --page` (bash): static checks AND it builds the page in headless Chrome, printing the error
-   and console output. That is exactly what the Preview tab runs.
+1. `check_preview`: the error the student's browser showed (the Preview tab reports it to you) plus a fresh
+   build of the page in headless Chrome — build errors, files that failed to load (with their URLs), font
+   problems. "A network error occurred" = a file the page loads is missing (scene import, image, font, audio).
 2. Typical causes: a syntax error or a bad import in a scene (`../lib/…` path, a missing export, a typo); a scene
    throwing at build time (`w('seg', 12)` past the last word, `range('id')` of a segment that doesn't exist, a
    null `q()` selector); `scenes/index.js` missing a scene or listing a missing file; script.json/timing.json out
@@ -43,3 +44,8 @@ The preview is just the project in a browser. Diagnose it yourself — don't ask
 Long sessions are compacted automatically: older messages become a "project memory" summary (also written to
 `.luma/memory.md`). Call `compact_context` yourself after a long debugging detour or before a new big phase,
 saying what must be kept. Files are the truth: re-read a file before editing it after a compaction.
+
+## Never start a server
+The Preview tab already serves the project. Don't run `npm run dev/start`, vite, http-server, `python -m
+http.server` or your own server scripts — the terminal refuses them and they only hang. Use `check_preview` and
+`preview_frames`.

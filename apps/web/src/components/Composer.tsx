@@ -1,7 +1,7 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Select, Label, ListBox, Spinner, toast } from '@heroui/react';
 import { Button } from './Button';
-import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import type { ModelConfig, UploadRecord } from '../api/types';
@@ -18,7 +18,7 @@ interface Attachment {
   error?: string;
 }
 
-const ACCEPT = '.svg,.png,.jpg,.jpeg,.webp,.pdf,image/svg+xml,image/png,image/jpeg,image/webp,application/pdf';
+const ACCEPT = '.svg,.png,.jpg,.jpeg,.webp,.pdf,.md,.markdown,.txt,.json,.csv,.mp3,.wav,.ogg,.m4a,image/svg+xml,image/png,image/jpeg,image/webp,application/pdf,audio/*';
 
 export function Composer({ projectId, frames = [], onRemoveFrame, models, modelId, onModelChange, running, onSend, onStop }: {
   projectId: string;
@@ -48,6 +48,51 @@ export function Composer({ projectId, frames = [], onRemoveFrame, models, modelI
   const input = useRef<HTMLInputElement>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const qc = useQueryClient();
+
+  // ---- @ mentions: type @ to pick a project file; it goes into the message as @path ----
+  const [mention, setMention] = useState<{ query: string; start: number } | null>(null);
+  const [mentionIdx, setMentionIdx] = useState(0);
+  const tree = useQuery({ queryKey: ['tree', projectId], queryFn: () => api.tree(projectId, '.', 6).then((r) => r.entries), enabled: !!mention, staleTime: 10_000 });
+  const mentionMatches = useMemo(() => {
+    if (!mention) return [];
+    const q = mention.query.toLowerCase();
+    return (tree.data ?? []).filter((e) => e.type === 'file' && e.path.toLowerCase().includes(q))
+      .sort((a, b) => Number(!a.path.startsWith('assets/uploads/')) - Number(!b.path.startsWith('assets/uploads/')) || a.path.length - b.path.length)
+      .slice(0, 8);
+  }, [mention, tree.data]);
+  const onTextChange = (value: string, caret: number) => {
+    setText(value);
+    const m = value.slice(0, caret).match(/(^|\s)@([^\s@]*)$/);
+    setMention(m ? { query: m[2]!, start: caret - m[2]!.length - 1 } : null);
+    setMentionIdx(0);
+  };
+  const pickMention = (path: string) => {
+    if (!mention) return;
+    const end = mention.start + 1 + mention.query.length;
+    const next = `${text.slice(0, mention.start)}@${path} ${text.slice(end)}`;
+    setText(next);
+    setMention(null);
+    requestAnimationFrame(() => {
+      const pos = mention.start + path.length + 2;
+      area.current?.focus();
+      area.current?.setSelectionRange(pos, pos);
+    });
+  };
+  const onMentionKey = (e: KeyboardEvent<HTMLTextAreaElement>): boolean => {
+    if (!mention || !mentionMatches.length) return false;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setMentionIdx((i) => (i + (e.key === 'ArrowDown' ? 1 : -1) + mentionMatches.length) % mentionMatches.length);
+      return true;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      pickMention(mentionMatches[mentionIdx]!.path);
+      return true;
+    }
+    if (e.key === 'Escape') { setMention(null); return true; }
+    return false;
+  };
 
   // files are uploaded into the project as soon as they're attached; ones not sent yet come back after a reload
   useEffect(() => {
@@ -165,17 +210,33 @@ export function Composer({ projectId, frames = [], onRemoveFrame, models, modelI
           ))}
         </ul>
       )}
+      <div className="relative">
+      {mention && mentionMatches.length > 0 && (
+        <ul role="listbox" aria-label="Project files" className="absolute bottom-full left-0 right-0 z-20 mb-1 max-h-64 overflow-auto rounded-xl border border-[#d6e2f5] bg-white p-1 shadow-lg">
+          {mentionMatches.map((f, i) => (
+            <li key={f.path} role="option" aria-selected={i === mentionIdx}>
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pickMention(f.path)}
+                className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm ${i === mentionIdx ? 'bg-[#eff5ff]' : 'hover:bg-[#f5f8ff]'}`}>
+                <Icon name="file" size={13} className="flex-none text-[#2970ec]" />
+                <span className="mono truncate">{f.path}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <textarea
         ref={area}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => onTextChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+        onBlur={() => setTimeout(() => setMention(null), 150)}
         onPaste={onPaste}
-        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey || (!e.shiftKey && !e.nativeEvent.isComposing))) { e.preventDefault(); void submit(); } }}
+        onKeyDown={(e) => { if (onMentionKey(e)) return; if (e.key === 'Enter' && (e.metaKey || e.ctrlKey || (!e.shiftKey && !e.nativeEvent.isComposing))) { e.preventDefault(); void submit(); } }}
         rows={typeof window !== 'undefined' && window.innerWidth < 768 ? 2 : 3}
-        placeholder={running ? 'Luma is working — you can stop it any time…' : 'Describe the video, or ask for a change…  (Enter to send, Shift+Enter for a new line)'}
+        placeholder={running ? 'Luma is working — you can stop it any time…' : 'Describe the video, or ask for a change…  (@ to mention a file · Enter to send)'}
         aria-label="Message to Luma"
         className="block max-h-56 min-h-[4.5rem] w-full resize-y rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none transition-colors placeholder:text-[#8a97b5] focus:border-[#2970ec]"
       />
+      </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <input ref={input} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) void addFiles([...e.target.files]); e.target.value = ''; }} />
         <Button size="sm" variant="tertiary" onPress={() => input.current?.click()} aria-label="Attach files"><Icon name="clip" size={15} /> Attach</Button>

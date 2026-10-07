@@ -9,7 +9,7 @@ import { badRequest, conflict, notFound, tooLarge } from '../http/errors.js';
 import { getOwnedProject, toRef, touchProject } from '../projects/service.js';
 import { sniffUpload, safeName } from './sniff.js';
 import { assertDiskAvailable } from '../quota/service.js';
-import { pendingUploads, projectUploadBytes, removeUpload, saveUpload } from './service.js';
+import { markSent, pendingUploads, projectUploadBytes, removeUpload, saveUpload } from './service.js';
 
 export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
   const { db } = ctx;
@@ -35,8 +35,8 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
         if (part.type !== 'file') continue;
         const buf = await part.toBuffer(); // throws RequestFileTooLargeError past the limit
         if (!buf.length) throw badRequest(`${part.filename || 'file'} is empty`);
-        const type = sniffUpload(buf);
-        if (!type) throw badRequest(`${part.filename || 'file'}: only SVG, PNG, JPG, WEBP and PDF files can be attached`);
+        const type = sniffUpload(buf, part.filename);
+        if (!type) throw badRequest(`${part.filename || 'file'}: only images (SVG, PNG, JPG, WEBP), PDF, text (MD, TXT, JSON, CSV) and audio (MP3, WAV, OGG, M4A) files can be attached`);
         if (used + buf.length > config.uploadProjectMaxBytes) throw tooLarge(`This project's attachments would exceed ${Math.round(config.uploadProjectMaxBytes / 1024 / 1024)} MB`);
         const result = saveUpload(db, ref, buf, type, safeName(part.filename || 'file', type.ext));
         used += buf.length;
@@ -47,6 +47,8 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
       throw e;
     }
     if (!saved.length) throw badRequest('No file received');
+    // ?direct=1: added from the Files tab — a project file, not a chip waiting in the composer
+    if ((req.query as { direct?: string }).direct) markSent(db, project.id, saved.map((u) => u.id));
     touchProject(db, project.id);
     return reply.code(201).send({ uploads: saved });
   });

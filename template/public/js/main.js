@@ -15,9 +15,14 @@ try {
   await boot();
 } catch (err) {
   // surfaced for the export/check tools and for the agent (preview_frames reads window.adError)
-  window.adError = String(err?.stack || err);
   console.error(err);
-  try { parent.postMessage({ source: 'luma-preview', type: 'error', message: String(err?.message || err) }, '*'); } catch { /* not framed */ }
+  let message = String(err?.message || err);
+  // browser network errors don't say WHICH file: add the hint
+  if (/network error|failed to fetch|NetworkError|dynamically imported module|Load failed/i.test(message)) {
+    message += ' — a file the video loads could not be downloaded (a scene import, image, font or audio path). Check the relative paths; the browser console / `npm run check -- --page` names the file.';
+  }
+  window.adError = `${message}\n${String(err?.stack || '')}`;
+  try { parent.postMessage({ source: 'luma-preview', type: 'error', message }, '*'); } catch { /* not framed */ }
   document.body.dataset.error = '1';
   document.body.classList.add('ready');
   throw err;
@@ -93,12 +98,16 @@ async function boot() {
   if (timing.silent) audio.removeAttribute('src');
   else audio.src = 'audio/voiceover.mp3';
   // fonts must be ready before any layout is measured or text is sampled (pitfall #9)
-  await Promise.all([
-    ...[400, 500, 600, 700, 800].map((w) => document.fonts.load(`${w} 100px "Anek Bangla"`, 'আ')),
-    ...[400, 500, 600, 700, 800, 900].map((w) => document.fonts.load(`${w} 100px Inter`)),
-    ...[400, 500].map((w) => document.fonts.load(`${w} 20px "JetBrains Mono"`)),
-  ]);
-  await document.fonts.ready;
+  // a font that fails to download (wrong @font-face url) must not break the whole video: warn and fall back
+  const families = new Set(['Inter', 'Anek Bangla', 'JetBrains Mono', ...Object.values(brand.fonts ?? {})]);
+  for (const f of document.fonts) families.add(String(f.family).replace(/^["']|["']$/g, ''));
+  window.adWarnings = [];
+  await Promise.all([...families].flatMap((fam) => [400, 500, 600, 700, 800].map((wt) =>
+    document.fonts.load(`${wt} 100px "${fam}"`, fam === 'Anek Bangla' ? 'আ' : 'A').catch(() => {
+      const msg = `Font "${fam}" (weight ${wt}) could not be downloaded — check the @font-face url in scenes.css (relative path, file exists). Using a fallback font.`;
+      if (!window.adWarnings.includes(msg)) { window.adWarnings.push(msg); console.warn(msg); }
+    }))));
+  await document.fonts.ready.catch(() => {});
 
   const world = await createWorld(document.getElementById('gl'), { W, H, brand, features: project.features });
   const { tl, cues, frameHooks, END, segments } = await buildTimeline({ timing, world, scenesRoot, fxRoot, project, brand, size });

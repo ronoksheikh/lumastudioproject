@@ -44,6 +44,10 @@ export async function createWorld(canvas, { W = 1920, H = 1080, brand, features 
     uNight: { value: 0 }, // 0 = Lumademy blue gradient, 1 = deep night (use sparingly)
     uWhite: { value: 0 }, // 1 = white stage
     uWarm: { value: 0 }, // brighter blue-white bloom for big moments
+    uFlat: { value: 0 }, // 1 = a flat colour background (cFlat) — any colour, e.g. a near-black product stage
+    cFlat: { value: new THREE.Color('#000000') },
+    uLines: { value: 1 }, // the three animated wave lines (0 = off)
+    uVig: { value: 1 }, // the shader vignette (0 = off)
     uGlow: { value: new THREE.Vector2(0.5, 0.62) },
     uAsp: { value: new THREE.Vector2(aspect, 1.0) },
     cSky: { value: new THREE.Color(C.sky) },
@@ -65,7 +69,8 @@ export async function createWorld(canvas, { W = 1920, H = 1080, brand, features 
         void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.9999, 1.0); }`,
       fragmentShader: /* glsl */ `
         varying vec2 vUv;
-        uniform float uTime, uNight, uWhite, uWarm;
+        uniform float uTime, uNight, uWhite, uWarm, uFlat, uLines, uVig;
+        uniform vec3 cFlat;
         uniform vec2 uGlow, uAsp;
         uniform vec3 cSky, cBlue, cRoyal, cDeep, cNightA, cNightB, cOff;
         float line(float d, float w){ return smoothstep(w, 0.0, abs(d)); }
@@ -90,9 +95,10 @@ export async function createWorld(canvas, { W = 1920, H = 1080, brand, features 
                       + 0.05 * sin(uv.x * 6.0 - uTime * 0.4 + fi);
             l += line(uv.y - y, 0.0022) * (0.10 - fi * 0.02);
           }
-          col += vec3(l) * (1.0 - uWhite);
+          col += vec3(l) * (1.0 - uWhite) * uLines;
           float v = smoothstep(1.25, 0.35, length((uv - 0.5) * asp * 0.9));
-          col *= mix(0.78, 1.0, v);
+          col *= mix(1.0, mix(0.78, 1.0, v), uVig);
+          col = mix(col, cFlat, uFlat);
           gl_FragColor = vec4(col, 1.0);
         }`,
     }),
@@ -103,7 +109,12 @@ export async function createWorld(canvas, { W = 1920, H = 1080, brand, features 
 
   // ---------- Particles + 3D logo share the brand icon ----------
   const needIcon = feat.particles || feat.logo3d;
-  const lumaSvg = needIcon ? await (await fetch(brand.logo.icon)).text() : '';
+  let lumaSvg = '';
+  if (needIcon) {
+    const r = await fetch(brand.logo.icon).catch(() => null);
+    if (!r?.ok) throw new Error(`brand.json logo.icon "${brand.logo.icon}" could not be loaded (${r ? r.status : 'network error'}) — fix the path, or turn off features.particles/logo3d in project.json`);
+    lumaSvg = await r.text();
+  }
 
   const rnd = mulberry32(5);
   const pU = {
@@ -236,7 +247,7 @@ export async function createWorld(canvas, { W = 1920, H = 1080, brand, features 
     composer.render();
   }
 
-  return { renderer, scene, camera, composer, bloom, state, bg: bgU, particles: pU, render, resize, setTextTarget, size: { W, H }, fit };
+  return { renderer, scene, camera, composer, bloom, state, bg: bgU, particles: pU, render, resize, setTextTarget, size: { W, H }, fit, THREE };
 }
 
 // ---------------------------------------------------------------------------

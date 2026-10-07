@@ -22,7 +22,8 @@ deterministic (noise from `rand(i, k)`, never `Math.random`), schedule everythin
 (`o.stop(t + len)`), keep gain ≤ 1. Worth making: a soft brand chime (3 sines in a major chord, staggered
 60–90 ms), a sub "boom" (sine 60 → 35 Hz pitch drop, 0.6 s), a riser (filtered noise with the cutoff sweeping up),
 a UI tick (8 ms square blip at 2 kHz), a glassy shimmer (high sines with vibrato).
-Built-ins `impact whoosh pop tick click riser shimmer glitch` cover most beats — combine them before inventing.
+Built-ins `impact whoosh pop tick click riser shimmer glitch` are a fallback, not a style: design each video's
+own sound palette to match its concept, so videos don't all sound the same.
 
 ## Another voice provider (OpenAI TTS, Google, Azure, PlayHT, a local model…)
 The terminal has internet access. If the student gives you another TTS API (and its key) — not ElevenLabs: an

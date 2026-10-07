@@ -15,7 +15,8 @@ export function useMe() {
   return q;
 }
 
-export const useProjects = () => useQuery({ queryKey: ['projects'], queryFn: () => api.projects().then((r) => r.projects) });
+// polls so the home page shows which projects Luma is working on / rendering right now
+export const useProjects = () => useQuery({ queryKey: ['projects'], queryFn: () => api.projects().then((r) => r.projects), refetchInterval: 5000 });
 export const useProject = (id: string) => useQuery({ queryKey: ['project', id], queryFn: () => api.project(id).then((r) => r.project) });
 export const useModels = () => useQuery({ queryKey: ['models'], queryFn: () => api.models().then((r) => r.models) });
 export const useVoice = () => useQuery({ queryKey: ['voice'], queryFn: () => api.voice() });

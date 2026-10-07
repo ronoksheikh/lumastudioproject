@@ -93,6 +93,7 @@ export const api = {
   authConfig: () => get<{ signupEnabled: boolean; captchaSiteKey: string | null }>('/api/auth/config'),
   signup: (email: string, password: string, captcha?: string) => post<{ user: User; csrfToken: string }>('/api/auth/signup', { email, password, captcha }),
   usage: () => get<{ usage: { diskBytes: number; diskLimitBytes: number | null } & RenderQuotas }>('/api/usage'),
+  previewReport: (id: string, b: { status: 'ready' | 'error' | 'empty'; message?: string; duration?: number }) => post<{ ok: true }>(`/api/projects/${id}/preview-report`, b),
   // ---- add-ons, API keys, improvements ----
   addons: () => get<{ addons: Addon[] }>('/api/billing/addons'),
   buyAddon: (id: string, b: { phone: string; returnTo: string }) => post<{ paymentUrl: string }>(`/api/billing/addons/${id}`, b),
@@ -148,10 +149,10 @@ export const api = {
   // ---- uploads ----
   uploads: (id: string, pending = false) => get<{ uploads: Array<UploadRecord & { projectId: string }> }>(`/api/projects/${id}/uploads${pending ? '?pending=1' : ''}`),
   deleteFile: (id: string, path: string) => del<{ ok: true; path: string }>(`/api/projects/${id}/file${qs({ path })}`),
-  upload: (id: string, files: File[]) => {
+  upload: (id: string, files: File[], direct = false) => {
     const fd = new FormData();
     for (const f of files) fd.append('file', f, f.name);
-    return request<{ uploads: UploadRecord[] }>('POST', `/api/projects/${id}/uploads`, undefined, fd);
+    return request<{ uploads: UploadRecord[] }>('POST', `/api/projects/${id}/uploads${direct ? '?direct=1' : ''}`, undefined, fd);
   },
   deleteUpload: (id: string, uploadId: string) => del<{ ok: true }>(`/api/projects/${id}/uploads/${uploadId}`),
 

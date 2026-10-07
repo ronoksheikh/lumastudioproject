@@ -19,6 +19,7 @@ import { attachmentsSummary, brandSummary, projectFacts } from './facts.js';
 import { forgetRun, lessonsForPrompt } from './lessons.js';
 import { describeUsage } from '../quota/service.js';
 import { libraryForPrompt } from './library.js';
+import { previewReportLine } from './preview-report.js';
 
 /** What the student chose in Settings → Agent → Frame checks, said to the model (full = the normal workflow). */
 const FRAME_CHECKS: Record<AgentPrefs['frameChecks'], string> = {
@@ -130,7 +131,7 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
     const lessons = lessonsForPrompt(db);
     const library = libraryForPrompt(db);
     const checks = FRAME_CHECKS[prefs.frameChecks];
-    return { role: 'system', content: `${base}${checks ? `\n\n${checks}` : ''}${lessons ? `\n\n${lessons}` : ''}${library ? `\n\n${library}` : ''}\n\n## Current project state\n${projectFacts(db, project)}${voiceLine}\n\n## The student's account (when they ask about limits, answer from this; call account_usage for fresh numbers)\n${describeUsage(db, input.userId)}${mem ? `\n\n## Project memory (summary of earlier work)\n${mem}` : ''}` };
+    return { role: 'system', content: `${base}${checks ? `\n\n${checks}` : ''}${lessons ? `\n\n${lessons}` : ''}${library ? `\n\n${library}` : ''}\n\n## Current project state\n${projectFacts(db, project)}${previewReportLine(input.projectId) ? `\n${previewReportLine(input.projectId)}` : ''}${voiceLine}\n\n## The student's account (when they ask about limits, answer from this; call account_usage for fresh numbers)\n${describeUsage(db, input.userId)}${mem ? `\n\n## Project memory (summary of earlier work)\n${mem}` : ''}` };
   };
   let system = systemFor(memory?.summary ?? null);
   const messages = () => [system, ...rows.map((r) => live.get(r.rowid) ?? r.msg)];

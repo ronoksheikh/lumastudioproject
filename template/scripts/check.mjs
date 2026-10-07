@@ -185,6 +185,7 @@ if (opts.page && errors.length === 0) {
       const d = await page.evaluate(() => window.ad.duration);
       if (timing && d < timing.duration) warn(`timeline is ${d.toFixed(2)}s but the audio is ${timing.duration}s`);
       else ok.push(`page builds: ${d.toFixed(2)}s timeline`);
+      for (const m of await page.evaluate(() => window.adWarnings ?? [])) warn(m);
     }
     for (const l of logs) warn(l);
   } finally {

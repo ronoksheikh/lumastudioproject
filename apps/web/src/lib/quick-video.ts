@@ -67,3 +67,27 @@ export function download(blob: Blob, name: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
+
+/** One frame of `stage` as a PNG, captured by the browser itself (tab capture → canvas). Called from a click. */
+export async function grabStagePng(stage: HTMLElement): Promise<Blob> {
+  const stream = await captureStage(stage);
+  try {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.srcObject = stream;
+    await video.play();
+    // wait for a real frame of the cropped capture
+    await new Promise<void>((r) => {
+      const v = video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => void };
+      if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(() => r());
+      else setTimeout(r, 300);
+    });
+    const c = document.createElement('canvas');
+    c.width = video.videoWidth;
+    c.height = video.videoHeight;
+    c.getContext('2d')!.drawImage(video, 0, 0);
+    return await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('Could not encode the PNG'))), 'image/png'));
+  } finally {
+    stream.getTracks().forEach((t) => t.stop());
+  }
+}

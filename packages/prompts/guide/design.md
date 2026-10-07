@@ -1,69 +1,47 @@
-# Design — what makes a Luma video look premium
+# Design — how to make a video look intentional
 
-These are the rules the student's course teaches. Apply them by default; the student's explicit wishes win.
+This guide teaches a process, not a house style. The student's brief, brand, files and references decide the
+look. Nothing here is a fixed colour, size or sound to reuse in every video.
 
-## Stage, colour, contrast
-- Stage = Lumademy-blue gradient (default world background) or white (`ctx.setStage(t, 'white')`, back with `'blue'`).
-  Never navy/near-black stages or black text; deep blue only as the gradient's dark end.
-- Palette: blue `#2970EC`, sky `#5DAEFF`, royal `#1557D1`, deep `#07358F`, off-white `#EFF5FF`, ice `#BFE2FF`,
-  white. Use the CSS vars (`var(--blue)` …). **One accent per moment** (e.g. one word in sky, everything else white).
-- White text on the blue stage; blue (`--royal`/`--deep`) text on white cards/stages. Body text on white may be
-  dark grey `#1f2937`. Don't put light-blue text on the blue stage (low contrast).
-- Third-party logos keep their own colours but never tint the stage (no coloured glows — orange on blue = purple).
+## 1. Decide the look first (write it in your plan)
+- **Palette:** from the student's brand/logo/reference (sample colours from their files), or derive one for the
+  subject: a base (background), a text colour with strong contrast, and ONE accent. Put them in brand.json /
+  CSS variables so every scene shares them. If the student gives nothing and it's a Lumademy video, the Lumademy
+  palette is one good option (`--blue --sky --royal --deep --off --ice`).
+- **Background:** any treatment — a flat colour (`ctx.setBackground(t, '#0E0E0E')`, or `initWorld({ background:
+  '#F4F1EA', lines: false, vignette: false })`), the engine's animated gradient (`initWorld({ night })`, with or
+  without its wave lines/vignette), white (`ctx.setStage(t, 'white')`), an image or video still in a scene, or
+  your own DOM/canvas/SVG layer. Pick what fits the concept; change it between sections if that tells the story.
+- **Type:** one display face + one text face at most (plus mono for code/labels). Any font works: download it
+  (Google Fonts / Fontsource with curl), add an `@font-face` in scenes.css with a relative url, `share_asset` it.
+  `.bn` for Bengali needs a Bengali font (Anek Bangla is bundled).
+- **Sound palette:** decide the character (warm/organic, glitchy/tech, cinematic, playful, minimal) and design
+  the sounds for it — your own `ctx.sound` synths or files — instead of reusing the same set every time.
 
-## Type scale (stage pixels)
-| | 16:9 (1920×1080) | 9:16 (1080×1920) |
-|---|---|---|
-| Hero line / hook | 110–160px, weight 800, letter-spacing -0.03em | 120–170px, weight 800 |
-| Headline | 72–96px, 700–800 | 84–110px |
-| Supporting line | 40–56px, 500–600 | 48–64px |
-| Labels / chips | 22–30px, 600, letter-spacing .12–.2em, uppercase Latin | 28–36px |
-| Minimum anything | 22px (the layout check flags smaller) | 28px |
-- Line-height 1.05–1.15 for big type; `text-wrap: balance` on headlines; Bengali (`.bn`) needs ~1.25 line-height.
-- **Max ~7 words on screen at once** for hooks/ads, ~12 for explainers. One idea per frame.
+## 2. Readability (measurable — the layout check reports these)
+- Contrast: text must stand out from what is behind it at every moment (check over gradients and images).
+- Size: on a 1920×1080 stage, body text below ~24px is hard to read on phones; headlines carry the message.
+- Space: keep important content away from the edges (social UIs cover the top/bottom of 9:16).
+- Density: few words on screen at a time; one focal point per moment.
 
-## Layout and spacing
-- Safe margins: 16:9 → 96px left/right, 80px top/bottom (never < 64px). 9:16 → 72px left/right, 220px top,
-  300px bottom (social UI covers the bottom and top).
-- Centre big statements; build layouts on a simple grid (halves/thirds). Generous empty space; nothing touches edges.
-- Cards: white, radius 28–40px, soft blue shadow `0 40px 90px rgba(3,20,70,.35)`, padding 40–60px.
-- Never overlap text with text; keep captions away from key visuals.
+## 3. Motion with intent
+- Every change starts on its beat (a word with `w()`, or `at()` without a voice). Start ~0.03–0.05 s early so it
+  reads on the syllable.
+- Enter, land, settle. Fast-out-slow-in eases for entrances, quick accelerating exits that finish before the cut.
+  Choose durations by energy: snappy for ads/reels, calmer for explainers.
+- Transitions are motivated by the content (a shape that becomes the next scene, a camera move, a mask, a match
+  cut). Avoid generic dissolves/slides unless the style calls for it.
+- Vary rhythm: not every element should pop the same way.
 
-## Motion
-- Entrances: `expo.out` / `power3.out`, 0.35–0.6 s. Masked word reveals (slide up through a mask + fade).
-- Emphasis: `back.out(1.7–3)` 0.3–0.4 s for pops/stamps; scale 1.3 → 1 punch-ins for hooks.
-- Exits: `power2.in` / `power3.in`, 0.2–0.3 s, ending at or just before the scene end (`end - 0.3`).
-- Camera moves: `power3.inOut` / `expo.inOut`, 0.7–1.2 s. Linear (`none`) only for slow continuous drifts.
-- Things settle — no endless wobble; at most one continuous drift per scene.
+## 4. Structure by video type (starting points, not formulas)
+| Type | Typical shape |
+|---|---|
+| Ad | hook in the first seconds → value → proof → clear call to action |
+| Explainer | question → steps, one visual idea each → recap |
+| Reel (9:16) | text-led, fast cuts, loopable end |
+| Logo sting / intro | one strong idea, a hit, a confident hold (`read_guide("logo")`) |
+| Announcement | the news first → details → call to action |
 
-## Beats land on words
-- Every visible change starts on a word: `w('seg', i)` (start 0.03–0.05 s early so it reads on the syllable),
-  `wEnd` to hold until a word finishes, `range` for scene in/out. Counters roll on the number word, pins drop on
-  "zoom/here", stamps slam on the key phrase, the CTA button appears on "enrol/join/buy".
-- Plan beats from the real `generate_voice` word list; never hard-code seconds for content.
-- Rapid-cut hooks: change the visual on (almost) every word of the first segment.
-
-## Transitions
-- Designed, motivated cuts: push-in out of the old scene + scale-in of the new; iris into an element; a whole frame
-  flying into a screen (match cut); grid snap; a shape that becomes the next scene's background.
-- The cut happens on a segment boundary (`range`), ideally on an impact cue. No cross-dissolves, no stripe wipes,
-  no "slide the whole scene sideways" PowerPoint moves.
-
-## Sound
-- `cue(t, …)` on beats: `impact` (hook frame 0, stamps, big reveals), `whoosh` (transitions, camera moves),
-  `pop`/`tick` (items appearing, counters), `shimmer` (positive reveal, logo), `riser` (0.8–1.5 s before a big moment),
-  `click` (UI), `glitch` (tech only). Gain 0.3–0.9; at most ~1 cue per second on average.
-
-## Pacing by video type
-| Type | Length | Words/s | Shape |
-|---|---|---|---|
-| Product ad / course ad | 25–40 s | 2.3–2.6 | hook (claim or wow) → examples → problem → solution → proof → CTA |
-| Explainer | 30–60 s | 2.0–2.3 | question hook → 3–5 steps, one visual metaphor each → recap → CTA |
-| Reel / short (9:16) | 10–25 s | 2.4–2.8 | text-led, a cut on every 1–3 words, numbered structure, loopable end |
-| Announcement | 15–25 s | 2.0 | the news in 3 s → what/when/where → CTA; calm, confident |
-
-## Avoid
-Clutter, rainbow palettes, gradients in random colours, navy/black stages, cartoon props (padlocks, coins, emoji
-piles), drop shadows on text over blue, more than one font family per scene (besides mono labels), per-frame
-randomness, CSS animations/transitions, `setTimeout`, fading in from black, slow logo stings at the start, chains of
-rhetorical questions, confetti in serious moments, invented numbers presented as real.
+## 5. Before you say "done"
+Look at the frames as a designer: hierarchy, alignment, contrast, consistency of the palette and type, nothing
+clipped, nothing that looks like a template. Invented numbers/prices/names are flagged as placeholders.
