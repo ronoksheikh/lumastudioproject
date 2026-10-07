@@ -121,8 +121,15 @@ export interface AgentPrefs {
   frameChecks: 'full' | 'light' | 'off';
   /** compact the conversation once it passes this many tokens (null = automatic, ~70% of the model's window) */
   compactAtTokens: number | null;
+  /**
+   * How far Luma goes beyond the request. 'exact' = only what was asked, then stop; 'balanced' = what was asked plus
+   * fixing problems it caused or found on the way; 'thorough' = also polishes and checks everything.
+   */
+  scope: 'exact' | 'balanced' | 'thorough';
+  /** tool rounds per message before Luma must wrap up (null = the server's limit) */
+  maxSteps: number | null;
 }
-export const DEFAULT_AGENT_PREFS: AgentPrefs = { frameChecks: 'full', compactAtTokens: null };
+export const DEFAULT_AGENT_PREFS: AgentPrefs = { frameChecks: 'full', compactAtTokens: null, scope: 'balanced', maxSteps: null };
 
 export function getAgentPrefs(db: DB, userId: string): AgentPrefs {
   const s = getSecret(db, userId, 'agent_prefs');
@@ -132,6 +139,8 @@ export function getAgentPrefs(db: DB, userId: string): AgentPrefs {
     return {
       frameChecks: p.frameChecks === 'light' || p.frameChecks === 'off' ? p.frameChecks : 'full',
       compactAtTokens: typeof p.compactAtTokens === 'number' && p.compactAtTokens >= 8000 ? p.compactAtTokens : null,
+      scope: p.scope === 'exact' || p.scope === 'thorough' ? p.scope : 'balanced',
+      maxSteps: typeof p.maxSteps === 'number' && p.maxSteps >= 3 ? Math.floor(p.maxSteps) : null,
     };
   } catch {
     return DEFAULT_AGENT_PREFS;
