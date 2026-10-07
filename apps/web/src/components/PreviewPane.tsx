@@ -27,6 +27,7 @@ export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'
   const [state, setState] = useState<{ t: number; playing: boolean; duration: number; segment?: string | null }>({ t: 0, playing: false, duration: 0 });
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error' | 'empty'>('loading');
   const [error, setError] = useState('');
+  const [consoleLines, setConsoleLines] = useState<string[]>([]);
   const [scrub, setScrub] = useState<number | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [recording, setRecording] = useState<null | 'starting' | 'recording'>(null);
@@ -42,6 +43,7 @@ export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'
   useEffect(() => {
     setPhase('loading');
     setError('');
+    setConsoleLines([]);
   }, [base, reloadKey]);
 
   useEffect(() => {
@@ -61,6 +63,8 @@ export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'
         setPhase('error');
         setError(String(m.message));
         report({ status: 'error', message: String(m.message).slice(0, 4000) });
+      } else if (m.type === 'log') {
+        if (m.level === 'error' || m.level === 'warn') setConsoleLines((c) => [...c, `${m.level}: ${String(m.text)}`].slice(-20));
       } else if (m.type === 'state') setState({ t: m.t, playing: m.playing, duration: m.duration, segment: m.segment ?? null });
     };
     window.addEventListener('message', onMsg);
@@ -165,6 +169,11 @@ export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'
     }
   };
 
+  const errorText = () => [`The preview shows: "The video can't be played yet." ${error}`, ...(consoleLines.length ? ['Console:', ...consoleLines.slice(-10)] : [])].join('\n');
+  const copyError = () => navigator.clipboard?.writeText(errorText()).then(() => toast.success('Error copied'), () => toast.danger('Could not copy'));
+  /** Puts the error into the chat box (not sent) so the student can send it to Luma in one click. */
+  const askLuma = () => window.dispatchEvent(new CustomEvent('luma:prompt', { detail: `${errorText()}\n\nPlease find the cause with check_preview and fix it.` }));
+
   const shown = scrub ?? state.t;
   const attach = () => {
     if (!attachFrame) return;
@@ -206,9 +215,15 @@ export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'
           {phase === 'loading' && base && !empty && <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#2970ec]/70"><Spinner color="current" /></div>}
         </div>
         {phase === 'error' && (
-          <div role="alert" className="absolute inset-x-3 bottom-3 max-h-40 overflow-auto rounded-lg border border-[#f3c5c5] bg-[#fdf2f2] p-3 text-sm text-[#7f1d1d]">
+          <div role="alert" className="absolute inset-x-3 bottom-3 max-h-56 overflow-auto rounded-lg border border-[#f3c5c5] bg-[#fdf2f2] p-3 text-sm text-[#7f1d1d]">
             <b>The video can’t be played yet.</b> {error ? <span className="mono block whitespace-pre-wrap text-xs">{error.slice(0, 600)}</span> : null}
-            <span className="mt-1 block text-xs">Ask Luma to fix it — it can see this error.</span>
+            {consoleLines.length > 0 && <span className="mono mt-1 block whitespace-pre-wrap text-[11px] text-[#7f1d1d]/80">{consoleLines.slice(-6).join('\n')}</span>}
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="sm" variant="primary" onPress={askLuma}><Icon name="spark" size={13} /> Ask Luma to fix it</Button>
+              <Button size="sm" variant="secondary" onPress={copyError}>Copy error</Button>
+              {base && <a href={`${base}?v=${reloadKey}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 self-center text-xs font-medium text-[#1557d1] underline">Open in new tab</a>}
+            </div>
+            <span className="mt-1 block text-xs">Luma sees this error and the page’s console (check_preview).</span>
           </div>
         )}
       </div>
@@ -231,6 +246,9 @@ export function PreviewPane({ aspect, empty = false }: { aspect: '16:9' | '9:16'
           <Button size="sm" variant="secondary" className="flex-none" onPress={attach} isDisabled={phase !== 'ready'} aria-label="Attach this frame to the chat">
             <Icon name="target" size={14} /><span className="hidden sm:inline">Attach this frame</span>
           </Button>
+        )}
+        {base && (
+          <Tooltip><Tooltip.Trigger><a href={`${base}?v=${reloadKey}`} target="_blank" rel="noreferrer" aria-label="Open the preview in a new tab" className="grid h-8 w-8 flex-none place-items-center rounded-lg text-[#5b6b8f] hover:bg-[#eff5ff] hover:text-[#2970ec]"><Icon name="external" size={15} /></a></Tooltip.Trigger><Tooltip.Content>Open in new tab</Tooltip.Content></Tooltip>
         )}
         <Tooltip><Tooltip.Trigger><Button isIconOnly size="sm" variant="tertiary" className="flex-none" onPress={reload} aria-label="Reload preview"><Icon name="refresh" size={15} /></Button></Tooltip.Trigger><Tooltip.Content>Reload</Tooltip.Content></Tooltip>
         <Tooltip><Tooltip.Trigger><Button isIconOnly size="sm" variant="tertiary" className="flex-none" onPress={() => void quickVideo()} isDisabled={phase !== 'ready' || !!recording} aria-label="Quick video: record the preview in your browser">{recording ? <Spinner size="sm" /> : <Icon name="film" size={15} />}</Button></Tooltip.Trigger><Tooltip.Content>Quick video — record in your browser (free, no render time)</Tooltip.Content></Tooltip>

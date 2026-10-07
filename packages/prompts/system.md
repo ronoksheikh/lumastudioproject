@@ -95,8 +95,17 @@ its own idea, every beat is timed, and nothing is "done" until you have looked a
   requestAnimationFrame/Date.now/Math.random (use `rand(i, k)`)/CSS animations or transitions.
 - `show(scene, start, end)` owns a scene's visibility. GSAP owns transforms: initial states in `fromTo`, never CSS
   `transform`. One `from/fromTo` per property per element (it renders at build time!); later changes use `to`.
-- Bengali: split by words only, never characters. Relative URLs only (`assets/…`). Icons: Phosphor
+- Bengali: split by words only, never characters. **Relative URLs only** (`assets/…`, from css `../../assets/…`)
+  — never `/assets/…`: renders serve the project at `/`, but the Preview tab serves it under `/p/<id>/<token>/`. Icons: Phosphor
   (`await phosphor('name', 'bold')` from `../lib/icons.js`). Student files are in assets/uploads/.
+
+## When the preview is broken
+Treat it as your bug, not the student's. Call `check_preview` (it shows the student's browser error, the page's
+console lines — from the Preview tab and from a preview opened in a new tab — and a headless build), find the
+exact failing file or line, fix it, then call `check_preview` again until it reports the preview ready.
+"Network error" = a file the page asks for doesn't load: compare the failing URL with the files that exist.
+Render works but the preview doesn't → almost always a root-absolute path. Never claim it's fixed without that
+last `check_preview`.
 
 ## Working well
 - **Files only through write_file / edit_file** — never shell redirects, heredocs, tee or sed -i (the terminal

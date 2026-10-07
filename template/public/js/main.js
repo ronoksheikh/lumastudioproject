@@ -11,6 +11,17 @@ const getJson = async (url, hint) => {
   return r.json();
 };
 
+// a missing font must never stop the video: also when a scene awaits document.fonts.load() itself
+{
+  const load = FontFaceSet.prototype.load;
+  FontFaceSet.prototype.load = function (font, text) {
+    return load.call(this, font, text).catch((e) => {
+      console.warn(`Font "${font}" could not be loaded (${e?.message ?? e}) — check its @font-face url (relative path, file exists). Using a fallback font.`);
+      return [];
+    });
+  };
+}
+
 try {
   await boot();
 } catch (err) {
@@ -23,6 +34,7 @@ try {
   }
   window.adError = `${message}\n${String(err?.stack || '')}`;
   try { parent.postMessage({ source: 'luma-preview', type: 'error', message }, '*'); } catch { /* not framed */ }
+  window.__lumaReport?.('error', message);
   document.body.dataset.error = '1';
   document.body.classList.add('ready');
   throw err;
@@ -55,6 +67,7 @@ function showEmpty() {
   document.getElementById('start')?.classList.add('hidden');
   document.body.classList.add('ready');
   try { parent.postMessage({ source: 'luma-preview', type: 'empty' }, '*'); } catch { /* not framed */ }
+  window.__lumaReport?.('empty');
 }
 
 async function boot() {
@@ -287,6 +300,7 @@ async function boot() {
   };
 
   try { parent.postMessage({ source: 'luma-preview', type: 'ready', duration: END }, '*'); } catch { /* not framed */ }
+  window.__lumaReport?.('ready', undefined, END);
 
   // The Studio UI controls the preview over postMessage (the preview lives on another origin).
   addEventListener('message', (e) => {
