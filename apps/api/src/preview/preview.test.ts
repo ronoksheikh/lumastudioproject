@@ -62,7 +62,7 @@ describe('preview origin', () => {
     expect(index.statusCode).toBe(200);
     expect(index.headers['content-type']).toContain('text/html');
     expect(index.body).toContain('id="stage"');
-    expect(index.headers['referrer-policy']).toBe('no-referrer');
+    expect(index.headers['referrer-policy']).toBe('same-origin'); // never to third parties; lets /assets/… be mapped back
     expect(index.headers['content-security-policy']).toBe('frame-ancestors http://app.test');
     expect((await get(`${base}js/main.js`)).statusCode).toBe(200);
     expect((await get(`${base}css/base.css`)).statusCode).toBe(200);

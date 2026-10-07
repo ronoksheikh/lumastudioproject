@@ -113,9 +113,19 @@ const FORBIDDEN = [
   [/\.splitText|SplitText/, 'SplitText (not available) — use splitWords()'],
 ];
 
+// root-absolute URLs ("/assets/x.png") work in a render (served at "/") but not in the Preview tab, which lives under
+// /p/<id>/<token>/ — always use relative paths ("assets/x.png", "../assets/…" from css)
+const ABS_URL = /(?:url\(\s*['"]?|\b(?:src|href)\s*=\s*["']|\bfetch\(\s*['"`]|\bcueFile\([^,]+,\s*['"`]|\bimport\s*\(?\s*['"])\/(?![/*])/g;
+async function checkAbsoluteUrls(file) {
+  const src = await readFile(file, 'utf8').catch(() => '');
+  for (const m of src.matchAll(ABS_URL)) warn(`${rel(file)}:${lineOf(src, m.index)}: root-absolute path (starts with "/") — use a relative path (e.g. "assets/…"); absolute paths break the Preview tab`);
+}
+await checkAbsoluteUrls(path.join(root, 'public/css/scenes.css'));
+
 for (const f of sceneFiles) {
   const file = path.join(scenesDir, f);
   const src = await readFile(file, 'utf8');
+  await checkAbsoluteUrls(file);
   // static w('id', n) / wEnd / reveal-style references
   for (const m of src.matchAll(/\b(?:w|wEnd)\(\s*['"]([\w-]+)['"]\s*(?:,\s*(-?\d+)\s*)?\)/g)) {
     const [, id, n] = m;

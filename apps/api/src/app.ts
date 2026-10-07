@@ -13,7 +13,7 @@ import { config } from './config.js';
 import type { DB } from './db/index.js';
 import { registerErrorHandler } from './http/error-handler.js';
 import { logger } from './logger.js';
-import { previewRoutes } from './preview/routes.js';
+import { previewRoutes, serveByReferer } from './preview/routes.js';
 import { projectRoutes } from './projects/routes.js';
 import { providerRoutes } from './providers/routes.js';
 import { healthRoutes } from './routes/health.js';
@@ -70,6 +70,8 @@ export async function buildApp(ctx: AppContext) {
     const isPreviewPath = req.url.startsWith('/p/');
     const isPreviewHost = appHost !== previewHost && requestHost(req) === previewHost;
     if (req.url === '/api/health') return; // container healthcheck, any host
+    // a root-absolute path requested by a preview page ("/assets/font.woff2"): serve it from that page's project
+    if (!isPreviewPath && !req.url.startsWith('/api/') && (isPreviewHost || appHost === previewHost) && serveByReferer(ctx, req, reply)) return reply;
     if (isPreviewHost !== isPreviewPath) return reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
   });
   registerAuth(app, ctx.db);

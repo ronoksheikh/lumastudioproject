@@ -5,7 +5,7 @@
   diffs, voice, frames, renders), your pinned plan (update_plan) and ask_user questions. The composer can attach
   files (SVG, PNG, JPG, WEBP, PDF → `assets/uploads/`) and preview frames.
 - **Preview** tab: the live video (the project served through the engine, on a separate origin). Play/pause,
-  scrub, "Quick video" (records the preview in the student's own browser — free, no render time, a draft that
+  scrub, open in a new tab, "Quick video" (records the preview in the student's own browser — free, no render time, a draft that
   may stutter on slow PCs; desktop Chrome/Edge), "Attach this frame" (the student sends you a moment with its facts and a screenshot), open in new tab.
 - **Files** tab: the project tree; every file type opens (code, images, audio, video, PDF).
 - **Renders** tab: finished MP4s with download. **History**: one git commit per turn of yours (restore points).
@@ -19,6 +19,9 @@ The preview is just the project in a browser. Diagnose it yourself — don't ask
 1. `check_preview`: the error the student's browser showed (the Preview tab reports it to you) plus a fresh
    build of the page in headless Chrome — build errors, files that failed to load (with their URLs), font
    problems. "A network error occurred" = a file the page loads is missing (scene import, image, font, audio).
+   It also lists the page's console (failed files with URLs, errors, warnings) from the Preview tab and from a
+   preview opened in a new tab. If the render works but the preview doesn't, look for root-absolute paths
+   (`/assets/…`, `url(/…)`, `fetch('/…')`) — use relative ones. Repeat check_preview until it says ready.
 2. Typical causes: a syntax error or a bad import in a scene (`../lib/…` path, a missing export, a typo); a scene
    throwing at build time (`w('seg', 12)` past the last word, `range('id')` of a segment that doesn't exist, a
    null `q()` selector); `scenes/index.js` missing a scene or listing a missing file; script.json/timing.json out

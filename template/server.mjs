@@ -37,6 +37,18 @@ const TYPES = {
   '.wav': 'audio/wav',
   '.mp4': 'video/mp4',
   '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.webm': 'video/webm',
+  '.txt': 'text/plain; charset=utf-8',
+  '.md': 'text/markdown; charset=utf-8',
+  '.csv': 'text/csv; charset=utf-8',
+  '.glb': 'model/gltf-binary',
+  '.gltf': 'model/gltf+json',
+  '.wasm': 'application/wasm',
   '.map': 'application/json',
 };
 
@@ -83,7 +95,7 @@ export function createServer(root = defaultRoot) {
     }
     const { file, info } = hit;
     const headers = {
-      'Content-Type': TYPES[path.extname(file)] ?? 'application/octet-stream',
+      'Content-Type': TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream',
       'Accept-Ranges': 'bytes',
       'Cache-Control': 'no-cache',
     };

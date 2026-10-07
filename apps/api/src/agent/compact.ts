@@ -51,6 +51,8 @@ export interface CompactDeps {
   store: ConvoStore;
   project: ProjectRef;
   signal?: AbortSignal;
+  /** the student's limit (Settings → Agent): compact once the conversation passes this many tokens */
+  limitTokens?: number | null;
   /** compact now regardless of size (the compact_context tool); `keep` = the agent's note on what matters */
   force?: { keep?: string };
 }
@@ -66,7 +68,8 @@ export async function compactIfNeeded(
   deps: CompactDeps,
 ): Promise<{ memory: string; rows: StoredMessage[] } | null> {
   const tokens = estimateTokens([system, ...rows.map((r) => r.msg)]) + (memory ? Math.ceil(memory.length / 3.2) : 0);
-  if (!deps.force && tokens < deps.contextWindow * COMPACT_AT) return null;
+  const threshold = Math.min(deps.contextWindow * COMPACT_AT, deps.limitTokens ?? Infinity);
+  if (!deps.force && tokens < threshold) return null;
   const cut = chooseCut(rows, deps.force ? 4 : KEEP_RECENT);
   if (cut <= 0) return null; // nothing old enough to fold away
   const old = rows.slice(0, cut);

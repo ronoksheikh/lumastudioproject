@@ -119,15 +119,20 @@ export function setAgentPrompt(db: DB, userId: string, p: AgentPrompt | null) {
  */
 export interface AgentPrefs {
   frameChecks: 'full' | 'light' | 'off';
+  /** compact the conversation once it passes this many tokens (null = automatic, ~70% of the model's window) */
+  compactAtTokens: number | null;
 }
-export const DEFAULT_AGENT_PREFS: AgentPrefs = { frameChecks: 'full' };
+export const DEFAULT_AGENT_PREFS: AgentPrefs = { frameChecks: 'full', compactAtTokens: null };
 
 export function getAgentPrefs(db: DB, userId: string): AgentPrefs {
   const s = getSecret(db, userId, 'agent_prefs');
   if (!s) return DEFAULT_AGENT_PREFS;
   try {
     const p = JSON.parse(s.value) as Partial<AgentPrefs>;
-    return { frameChecks: p.frameChecks === 'light' || p.frameChecks === 'off' ? p.frameChecks : 'full' };
+    return {
+      frameChecks: p.frameChecks === 'light' || p.frameChecks === 'off' ? p.frameChecks : 'full',
+      compactAtTokens: typeof p.compactAtTokens === 'number' && p.compactAtTokens >= 8000 ? p.compactAtTokens : null,
+    };
   } catch {
     return DEFAULT_AGENT_PREFS;
   }

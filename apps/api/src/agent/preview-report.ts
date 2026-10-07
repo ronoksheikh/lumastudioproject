@@ -19,3 +19,15 @@ export function previewReportLine(projectId: string): string | null {
   const mins = Math.round((Date.now() - r.at) / 60000);
   return `The student's Preview tab is showing an ERROR (${mins <= 0 ? 'just now' : `${mins} min ago`}): ${(r.message ?? '').slice(0, 800)}\nCall check_preview to see the full details and fix it.`;
 }
+
+/** Console lines from the preview page (Preview tab or a new tab): newest last, at most 80 per project. */
+export interface PreviewLog { at: number; level: string; text: string; where: 'preview' | 'tab' }
+const logs = new Map<string, PreviewLog[]>();
+
+export function addPreviewLogs(projectId: string, items: Array<Omit<PreviewLog, 'at'>>) {
+  const list = logs.get(projectId) ?? [];
+  for (const i of items) list.push({ ...i, at: Date.now() });
+  logs.set(projectId, list.slice(-80));
+}
+export const getPreviewLogs = (projectId: string) => logs.get(projectId) ?? [];
+export const clearPreviewLogs = (projectId: string) => logs.delete(projectId);

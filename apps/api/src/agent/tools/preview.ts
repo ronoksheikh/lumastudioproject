@@ -1,7 +1,7 @@
 // check_preview: why the preview is (not) working — what the student's browser reported, plus a fresh build of
 // the page in headless Chrome (check.mjs --page: build errors, failed requests with their URLs, font warnings).
 import type { ToolArgs } from '@luma/shared';
-import { getPreviewReport } from '../preview-report.js';
+import { getPreviewLogs, getPreviewReport } from '../preview-report.js';
 import { runPristineScript } from './scripts.js';
 import { notPlayableReason } from '../../projects/content.js';
 import { fail, ok, type ToolContext, type ToolResult } from './types.js';
@@ -13,6 +13,12 @@ export async function checkPreview(ctx: ToolContext, a: ToolArgs<'check_preview'
     const ago = Math.round((Date.now() - r.at) / 1000);
     lines.push(`Student's browser (${ago}s ago): ${r.status === 'error' ? `ERROR — ${r.message}` : r.status === 'empty' ? 'no scenes yet ("Nothing here yet")' : `playing fine (${r.duration?.toFixed(1) ?? '?'}s)`}`);
   } else lines.push("Student's browser: no report yet (the Preview tab hasn't loaded this project since the server started).");
+  // the page's own console (Preview tab or a new tab): failed files, errors, warnings — newest last
+  const logs = getPreviewLogs(ctx.projectId).filter((l) => Date.now() - l.at < 30 * 60_000).slice(-30);
+  if (logs.length) {
+    lines.push(`Browser console (last ${logs.length}):`);
+    for (const l of logs) lines.push(`  [${l.where}${l.level === 'log' ? '' : ` ${l.level}`}] ${l.text}`);
+  }
 
   const empty = notPlayableReason(ctx.project.dir);
   if (empty) {
@@ -29,6 +35,9 @@ export async function checkPreview(ctx: ToolContext, a: ToolArgs<'check_preview'
     for (const e of j.errors) lines.push(`ERROR: ${e}`);
     for (const w of j.warnings) lines.push(`warning: ${w}`);
     for (const i of j.info) lines.push(`ok: ${i}`);
+    if (j.ok && r?.status === 'error') {
+      lines.push('NOTE: the page builds in the headless check (served at "/") but fails in the student\'s Preview (served under /p/<id>/<token>/). The usual cause is a root-absolute path ("/assets/…", url(/…), fetch("/…")) — make every path relative. Also compare the failing URL in the console lines with the files that exist.');
+    }
     return j.ok ? ok(lines.join('\n'), r?.status === 'error' ? 'Builds here, but the student\'s browser reported an error' : 'Preview builds') : fail(lines.join('\n'));
   } catch {
     if (res.timedOut) return fail(`${lines.join('\n')}\nThe headless build timed out (150 s).`);

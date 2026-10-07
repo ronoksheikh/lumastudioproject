@@ -160,7 +160,7 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
       }
 
       // ---- keep the context inside the model's window ----
-      const compacted = await compactIfNeeded(system, rows, memory?.summary ?? null, { client, model: input.provider.model, contextWindow: input.provider.contextWindow, store, project, signal, ...(forceCompact ? { force: forceCompact } : {}) });
+      const compacted = await compactIfNeeded(system, rows, memory?.summary ?? null, { client, model: input.provider.model, contextWindow: input.provider.contextWindow, store, project, signal, limitTokens: prefs.compactAtTokens, ...(forceCompact ? { force: forceCompact } : {}) });
       forceCompact = null;
       if (compacted) {
         rows = compacted.rows;

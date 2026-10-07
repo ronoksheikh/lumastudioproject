@@ -342,7 +342,7 @@ function AgentTab() {
     onError: (e) => toast.danger(msg(e)),
   });
   const savePrefs = useMutation({
-    mutationFn: (frameChecks: 'full' | 'light' | 'off') => api.saveAgentPrefs({ frameChecks }),
+    mutationFn: (p: Partial<{ frameChecks: 'full' | 'light' | 'off'; compactAtTokens: number | null }>) => api.saveAgentPrefs(p),
     onSuccess: (r) => { qc.setQueryData(['agent-prompt'], r); toast.success('Saved — used from the next message on'); },
     onError: (e) => toast.danger(msg(e)),
   });
@@ -366,10 +366,30 @@ function AgentTab() {
             ['off', 'Off', 'No screenshots. Luma runs quick code checks, then asks you to watch the preview.'],
           ] as const).map(([v, label, hint]) => (
             <label key={v} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${q.data.prefs.frameChecks === v ? 'border-[#2970EC] bg-[#eff5ff]' : 'border-[#d6e2f5]'}`}>
-              <input type="radio" name="frame-checks" className="mt-1 accent-[#2970EC]" checked={q.data.prefs.frameChecks === v} disabled={savePrefs.isPending} onChange={() => savePrefs.mutate(v)} />
+              <input type="radio" name="frame-checks" className="mt-1 accent-[#2970EC]" checked={q.data.prefs.frameChecks === v} disabled={savePrefs.isPending} onChange={() => savePrefs.mutate({ frameChecks: v })} />
               <span><span className="font-semibold">{label}</span><span className="block text-sm text-[#5b6b8f]">{hint}</span></span>
             </label>
           ))}
+        </Card.Content>
+      </Card>
+      <Card className="max-w-2xl p-2">
+        <Card.Header>
+          <Card.Title className="flex items-center gap-2"><Icon name="brain" /> Memory</Card.Title>
+          <Card.Description>Long conversations get expensive: every message re-sends everything before it. When the conversation passes this size, Luma folds the older part into a short project memory (it keeps the files and decisions).</Card.Description>
+        </Card.Header>
+        <Card.Content>
+          <label className="text-sm font-medium" htmlFor="compact-at">Compact the context when it passes</label>
+          <select
+            id="compact-at"
+            className="mt-1 h-10 w-full rounded-xl border border-[#d6e2f5] bg-white px-3 text-sm outline-none focus:border-[#2970EC] sm:w-72"
+            value={q.data.prefs.compactAtTokens ?? ''}
+            disabled={savePrefs.isPending}
+            onChange={(e) => savePrefs.mutate({ compactAtTokens: e.target.value ? Number(e.target.value) : null })}
+          >
+            <option value="">Automatic (about 70% of the model’s limit)</option>
+            {[32_000, 50_000, 80_000, 100_000, 150_000, 200_000, 300_000].map((n) => <option key={n} value={n}>{n / 1000}k tokens</option>)}
+          </select>
+          <p className="mt-1 text-xs text-[#5b6b8f]">Lower = cheaper and faster per message; higher = Luma remembers more word for word.</p>
         </Card.Content>
       </Card>
       <Card className="max-w-2xl p-2">
