@@ -57,7 +57,7 @@ export async function settingsRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.put('/settings/agent/prefs', auth, async (req) => {
     const u = authUser(req);
-    const patch = parse(z.object({ frameChecks: z.enum(['full', 'light', 'off']).optional(), compactAtTokens: z.number().int().min(8000).max(2_000_000).nullable().optional() }), req.body);
+    const patch = parse(z.object({ frameChecks: z.enum(['full', 'light', 'off']).optional(), compactAtTokens: z.number().int().min(8000).max(2_000_000).nullable().optional(), scope: z.enum(['exact', 'balanced', 'thorough']).optional(), maxSteps: z.number().int().min(3).max(500).nullable().optional() }), req.body);
     setAgentPrefs(db, u.id, { ...getAgentPrefs(db, u.id), ...patch });
     return agentView(u.id);
   });

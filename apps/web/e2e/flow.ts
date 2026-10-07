@@ -107,15 +107,15 @@ async function main() {
     // ---------- settings: model + voice ----------
     log('add a model');
     await page.goto(`${stack.appUrl}/settings/models`, { waitUntil: 'networkidle0' });
-    await clickText(page, 'button', 'Add model');
-    await type(page, 'input[placeholder="https://openrouter.ai/api/v1"]', stack.llm.url);
-    await type(page, 'input[placeholder="sk-…"]', stack.llm.apiKey);
-    await type(page, 'input[placeholder="anthropic/claude-sonnet-4.5"]', 'mock-1');
+    await clickText(page, 'button', 'Other');
+    await type(page, 'input[placeholder="https://my-server.example.com/v1"]', stack.llm.url);
+    await type(page, 'input[placeholder="Paste your key"]', stack.llm.apiKey);
+    await type(page, 'input[placeholder="Search or type a model id"], input[placeholder="e.g. anthropic/claude-sonnet-4.5"]', 'mock-1');
     await clickText(page, 'button', 'Test connection');
-    await text(page, 'Works — answered in');
+    await text(page, 'Connected — answered in');
     await shot(page, 'model-tested');
-    await clickText(page, 'button', 'Save model');
-    await text(page, 'Tool calling');
+    await clickText(page, 'button', 'Save and connect');
+    await text(page, 'Live thinking');
     await text(page, 'Default');
     if ((await page.evaluate(() => document.body.innerText)).includes(stack.llm.apiKey)) fail('API key leaked into the page');
     await shot(page, 'models');

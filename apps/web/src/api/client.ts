@@ -34,9 +34,15 @@ async function request<T>(method: string, url: string, body?: unknown, form?: Fo
   return (text ? JSON.parse(text) : undefined) as T;
 }
 const get = <T>(url: string) => request<T>('GET', url);
+export interface AgentPrefs {
+  frameChecks: 'full' | 'light' | 'off';
+  compactAtTokens: number | null;
+  scope: 'exact' | 'balanced' | 'thorough';
+  maxSteps: number | null;
+}
 export interface AgentPromptSettings {
   prompt: { mode: 'append' | 'replace'; text: string } | null;
-  prefs: { frameChecks: 'full' | 'light' | 'off'; compactAtTokens: number | null };
+  prefs: AgentPrefs;
   defaultPrompt: string;
 }
 
@@ -172,7 +178,7 @@ export const api = {
   saveVoice: (v: { apiKey?: string; prefs?: Partial<VoicePrefs> }) => put<VoiceSettings>('/api/settings/voice', v),
   deleteVoiceKey: () => del<{ ok: true }>('/api/settings/voice/key'),
   agentPrompt: () => get<AgentPromptSettings>('/api/settings/agent'),
-  saveAgentPrefs: (p: Partial<{ frameChecks: 'full' | 'light' | 'off'; compactAtTokens: number | null }>) => put<AgentPromptSettings>('/api/settings/agent/prefs', p),
+  saveAgentPrefs: (p: Partial<AgentPrefs>) => put<AgentPromptSettings>('/api/settings/agent/prefs', p),
   saveAgentPrompt: (p: { mode: 'append' | 'replace'; text: string } | null) => put<AgentPromptSettings>('/api/settings/agent', p),
   testVoice: () => post<{ ok: boolean; error?: string; tier?: string | null; charactersUsed?: number | null; characterLimit?: number | null; note?: string }>('/api/settings/voice/test'),
 };

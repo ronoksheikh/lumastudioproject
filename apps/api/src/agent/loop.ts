@@ -27,6 +27,12 @@ const FRAME_CHECKS: Record<AgentPrefs['frameChecks'], string> = {
   light: '## Frame checks: LIGHT (the student\'s setting, to save tokens)\nYou may call preview_frames ONCE per message: pick the ≤ 8 most important moments. Rely on `npm run check -- --page` for the rest.',
   off: '## Frame checks: OFF (the student\'s setting, to save tokens)\npreview_frames is not available. Verify with `npm run check -- --page` (cheap: build errors, console errors, static checks), then ask the student to watch the Preview tab and tell you what looks wrong — they can use "Attach this frame" to point at a moment. List the 2–4 moments most worth watching (times + what should happen there).',
 };
+/** Settings → Agent → How far Luma goes, said to the model. */
+const SCOPE: Record<AgentPrefs['scope'], string> = {
+  exact: '## Scope: EXACT (the student\'s setting)\nDo exactly what the message asks — nothing more. No extra polish, no unrequested scenes, sounds, renders or refactors, no "while I\'m here" fixes (mention them in one line instead). Verify only what you changed, once. Then stop and report.',
+  balanced: '## Scope: BALANCED (the student\'s setting)\nDo what the message asks, fix problems you caused or that block it, verify the changed moments, then stop and report. Suggest further improvements in one line instead of doing them.',
+  thorough: '## Scope: THOROUGH (the student\'s setting)\nDo what the message asks, then polish: check every scene, fix design and timing issues you find, tighten sound and transitions. Still stop as soon as the video is clean — no endless re-checking.',
+};
 import { reasoningParams, rejectsReasoning, type ReasoningEffort } from '../providers/reasoning.js';
 import { buildSystemPrompt, fillPromptVars } from './prompts.js';
 import { describeOverrides, getVoicePrefs, getAgentPrefs, getAgentPrompt, type AgentPrefs } from '../settings/service.js';
@@ -117,6 +123,8 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
   if (input.userMessage.parts) live.set(input.userMessage.rowid, { role: 'user', content: input.userMessage.parts });
 
   const prefs = getAgentPrefs(db, input.userId);
+  // the student's limit (Settings → Agent) can only lower the server's
+  const maxSteps = Math.min(input.maxSteps ?? config.agentMaxSteps, prefs.maxSteps ?? Infinity);
   const systemFor = (mem: string | null): ChatMessage => {
     const custom = getAgentPrompt(db, input.userId);
     const vars = { aspect: input.aspect, brandSummary: brandSummary(project), attachmentsSummary: attachmentsSummary(db, input.projectId) };
@@ -131,14 +139,16 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
     const lessons = lessonsForPrompt(db);
     const library = libraryForPrompt(db);
     const checks = FRAME_CHECKS[prefs.frameChecks];
-    return { role: 'system', content: `${base}${checks ? `\n\n${checks}` : ''}${lessons ? `\n\n${lessons}` : ''}${library ? `\n\n${library}` : ''}\n\n## Current project state\n${projectFacts(db, project)}${previewReportLine(input.projectId) ? `\n${previewReportLine(input.projectId)}` : ''}${voiceLine}\n\n## The student's account (when they ask about limits, answer from this; call account_usage for fresh numbers)\n${describeUsage(db, input.userId)}${mem ? `\n\n## Project memory (summary of earlier work)\n${mem}` : ''}` };
+    const scope = `${SCOPE[prefs.scope]}\nTool rounds for each message: at most ${maxSteps}. Plan the work to fit; a small change should take a few rounds.`;
+    return { role: 'system', content: `${base}\n\n${scope}${checks ? `\n\n${checks}` : ''}${lessons ? `\n\n${lessons}` : ''}${library ? `\n\n${library}` : ''}\n\n## Current project state\n${projectFacts(db, project)}${previewReportLine(input.projectId) ? `\n${previewReportLine(input.projectId)}` : ''}${voiceLine}\n\n## The student's account (when they ask about limits, answer from this; call account_usage for fresh numbers)\n${describeUsage(db, input.userId)}${mem ? `\n\n## Project memory (summary of earlier work)\n${mem}` : ''}` };
   };
   let system = systemFor(memory?.summary ?? null);
   const messages = () => [system, ...rows.map((r) => live.get(r.rowid) ?? r.msg)];
 
   const tools = toolDefinitions(prefs.frameChecks === 'off' ? TOOL_NAMES.filter((n) => n !== 'preview_frames') : TOOL_NAMES);
   let frameCalls = 0;
-  const maxSteps = input.maxSteps ?? config.agentMaxSteps;
+  /** identical tool calls in this message (name + arguments) → how often */
+  const repeats = new Map<string, number>();
   const delays = deps.retryDelaysMs ?? [1000, 4000, 12000];
   let stopReason: StopReason = 'completed';
   let finalText = '';
@@ -153,10 +163,17 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
   };
 
   try {
-    for (let step = 1; step <= maxSteps; step++) {
+    // one extra, tool-less round after the last one: the model must stop and report instead of being cut off
+    for (let step = 1; step <= maxSteps + 1; step++) {
       if (signal.aborted) {
         stopReason = 'stopped';
         break;
+      }
+      const wrapUp = step > maxSteps;
+      if (wrapUp) {
+        persist({ role: 'user', content: `You have used all ${maxSteps} tool rounds for this message${prefs.maxSteps ? ' (the student\'s limit in Settings → Agent)' : ''}. Stop now — no more tools. Reply with a short report: what is done, what is not done yet, and what the student can say to continue.` }, undefined, true);
+      } else if (maxSteps >= 6 && step === maxSteps - 1) {
+        persist({ role: 'user', content: '2 tool rounds left for this message. Finish the current step, make sure nothing is left broken, then give your final report.' }, undefined, true);
       }
 
       // ---- keep the context inside the model's window ----
@@ -178,7 +195,7 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
             model: input.provider.model,
             messages: messages(),
             tools: tools as OpenAI.Chat.Completions.ChatCompletionTool[],
-            tool_choice: 'auto',
+            tool_choice: wrapUp ? 'none' : 'auto',
             stream: true,
             ...(flags.noStreamOptions ? {} : { stream_options: { include_usage: true } }),
             ...(flags.noMaxTokens ? {} : { max_tokens: Math.min(32000, Math.max(4096, Math.floor(input.provider.contextWindow * 0.15))) }),
@@ -233,6 +250,11 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
       persistTurn(turn);
       if (turn.content) finalText = turn.content;
 
+      if (wrapUp) {
+        stopReason = 'max_steps';
+        break;
+      }
+
       // ---- no tool calls: the model is done (or needs a nudge) ----
       if (!turn.toolCalls.length) {
         if (!turn.content.trim() && nudges < 2) {
@@ -276,7 +298,12 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
         });
         bus.flushDeltas();
         inc('luma_tool_calls_total', { tool: call.name, ok: result.ok ? 'true' : 'false' }, 1, 'Agent tool calls');
-        const content = truncateMiddle(redactSecrets(result.content, input.secrets), 30_000);
+        const sig = `${call.name}\u0000${call.arguments.trim()}`;
+        const seen = (repeats.get(sig) ?? 0) + 1;
+        repeats.set(sig, seen);
+        // going in circles: the same call again and again rarely finds anything new
+        const loopNote = seen >= 3 ? `\n\n[Luma Studio] You made this exact call ${seen} times in this message. If nothing changed, stop repeating it: change approach, or finish and report what is done.` : '';
+        const content = truncateMiddle(redactSecrets(result.content, input.secrets) + loopNote, 30_000);
         bus.emit('tool.result', { callId: call.id, ok: result.ok, summary: redactSecrets(result.summary, input.secrets), truncated: !!result.truncated || content.truncated });
         persist({ role: 'tool', tool_call_id: call.id, content: content.text });
         if (result.images) images.push(...result.images);
@@ -296,7 +323,6 @@ export async function runAgent(deps: AgentDeps, input: RunInput): Promise<RunOut
         stopReason = 'max_tokens';
         break;
       }
-      if (step === maxSteps) stopReason = 'max_steps';
     }
   } catch (e) {
     if (signal.aborted) stopReason = 'stopped';

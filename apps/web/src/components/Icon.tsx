@@ -5,6 +5,7 @@ import {
   CornersOut, DotsThree, DownloadSimple, Eye, File, FilmStrip, Folder, GearSix, GitBranch, Globe, Image, ImageSquare,
   ListBullets, Microphone, PaperPlaneRight, Paperclip, Pause, PencilSimple, Play, Plus, Question, SignOut, Sparkle,
   Stop, TerminalWindow, Trash, UserCircle, Warning, X, House, Crosshair, BookOpenText, Lightning, Robot,
+  PlugsConnected, Key, SlidersHorizontal, Star, Package, CheckCircle, Waveform,
   type Icon as PhosphorIcon, type IconProps,
 } from '@phosphor-icons/react';
 
@@ -52,6 +53,13 @@ const GLYPHS = {
   home: House,
   target: Crosshair,
   guide: BookOpenText,
+  plug: PlugsConnected,
+  key: Key,
+  sliders: SlidersHorizontal,
+  star: Star,
+  package: Package,
+  ok: CheckCircle,
+  wave: Waveform,
 } satisfies Record<string, PhosphorIcon>;
 
 export type IconName = keyof typeof GLYPHS;
