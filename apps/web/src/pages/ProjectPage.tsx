@@ -15,6 +15,7 @@ import { RendersPane } from '../components/RendersPane';
 const TerminalPane = lazy(() => import('../components/TerminalPane').then((m) => ({ default: m.TerminalPane })));
 import { useModels, useProject } from '../lib/hooks';
 import { currentPlan, useLive } from '../stores/live';
+import { usePageTitle } from '../lib/page-title';
 
 const RIGHT_TABS = [
   ['preview', 'Preview', 'play'],
@@ -54,6 +55,7 @@ export function ProjectPage() {
   const { id = '' } = useParams();
   const qc = useQueryClient();
   const project = useProject(id);
+  usePageTitle(project.data?.title);
   const models = useModels();
   const live = useLive();
   const [tab, setTab] = useState<string>('preview');

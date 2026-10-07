@@ -3,7 +3,7 @@ import path from 'node:path';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
-import Fastify, { type FastifyBaseLogger, type FastifyInstance, type FastifyRequest } from 'fastify';
+import Fastify, { type FastifyBaseLogger, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { agentRoutes } from './agent/routes.js';
 import type { RunRegistry } from './agent/registry.js';
 import { authRoutes } from './auth/routes.js';
@@ -26,6 +26,7 @@ import { apiKeyRoutes } from './auth/api-keys.js';
 import { feedbackRoutes } from './feedback/routes.js';
 import { renderRoutes } from './render/routes.js';
 import { workerRoutes } from './render/workers.js';
+import { pageMeta, renderIndex, robotsTxt, sitemapXml } from './seo/meta.js';
 
 export interface AppContext {
   db: DB;
@@ -100,10 +101,21 @@ export async function buildApp(ctx: AppContext) {
 
   // Built React SPA (apps/web/dist). Unknown non-API GETs fall back to index.html.
   const hasSpa = fs.existsSync(path.join(config.webDist, 'index.html'));
-  if (hasSpa) await app.register(fastifyStatic, { root: config.webDist, wildcard: false });
+  if (hasSpa) await app.register(fastifyStatic, { root: config.webDist, wildcard: false, index: false });
   else logger.warn({ webDist: config.webDist }, 'SPA build not found — serving API only');
+  // the SPA's <head> is filled per page (title, description, canonical, robots, Open Graph): seo/meta.ts
+  let indexHtml: string | null = null;
+  const sendIndex = (req: FastifyRequest, reply: FastifyReply) => {
+    indexHtml ??= fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
+    const meta = pageMeta(req.url);
+    if (!meta.index) reply.header('X-Robots-Tag', 'noindex, nofollow');
+    return reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-cache').send(renderIndex(indexHtml, req.url));
+  };
+  app.get('/robots.txt', async (_req, reply) => reply.type('text/plain; charset=utf-8').header('Cache-Control', 'public, max-age=3600').send(robotsTxt()));
+  app.get('/sitemap.xml', async (_req, reply) => reply.type('application/xml; charset=utf-8').header('Cache-Control', 'public, max-age=3600').send(sitemapXml()));
+  if (hasSpa) app.get('/', sendIndex);
   app.setNotFoundHandler((req, reply) => {
-    if (hasSpa && req.method === 'GET' && !req.url.startsWith('/api/') && !req.url.startsWith('/p/')) return reply.sendFile('index.html');
+    if (hasSpa && req.method === 'GET' && !req.url.startsWith('/api/') && !req.url.startsWith('/p/')) return sendIndex(req, reply);
     return reply.code(404).send({ error: { code: 'not_found', message: 'Not found' } });
   });
   return app;

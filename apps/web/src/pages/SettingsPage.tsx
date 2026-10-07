@@ -10,6 +10,7 @@ import { ModelPicker, ThinkingFields } from '../components/ModelFields';
 import { AddonsTab } from '../components/Addons';
 import { BuyRenderHours, fmtRenderTime } from '../components/BuyRenderHours';
 import { useMe, useModels, useVoice } from '../lib/hooks';
+import { usePageTitle } from '../lib/page-title';
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Something went wrong');
 
@@ -615,6 +616,7 @@ const SECTIONS: Array<{ id: string; label: string; hint: string; icon: IconName;
 export function SettingsPage() {
   const { tab = 'models' } = useParams();
   const active = SECTIONS.find((s) => s.id === tab) ?? SECTIONS[0]!;
+  usePageTitle(`${active.title} settings`);
   return (
     <div className="scroll-y h-full bg-[#f7faff]">
       <div className="mx-auto max-w-5xl px-4 py-6 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-8">

@@ -30,6 +30,7 @@ const previewHeaders = (reply: import('fastify').FastifyReply) => {
   // the token lives in the URL: send the Referer only to the preview origin itself (never to third parties) —
   // it lets a stray root-absolute path ("/assets/font.woff2") be mapped back to its project, see serveByReferer
   reply.header('Referrer-Policy', 'same-origin');
+  reply.header('X-Robots-Tag', 'noindex, nofollow'); // student previews never belong in search results
   reply.header('Content-Security-Policy', `frame-ancestors ${new URL(config.appOrigin).origin}`);
 };
 

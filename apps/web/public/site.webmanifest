@@ -1,0 +1,14 @@
+{
+  "name": "Luma Studio by Lumademy",
+  "short_name": "Luma Studio",
+  "description": "AI motion-graphics agent: describe a video, get a finished MP4.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#2970EC",
+  "icons": [
+    { "src": "/Lumademy_Icon_Blue.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

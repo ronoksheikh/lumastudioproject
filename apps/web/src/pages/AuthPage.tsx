@@ -6,8 +6,10 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { ApiError, api, setCsrf } from '../api/client';
 import { Captcha } from '../components/Captcha';
 import { Logo } from '../components/Logo';
+import { usePageTitle } from '../lib/page-title';
 
 export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
+  usePageTitle(mode === 'signup' ? 'Create your account' : null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -74,7 +76,10 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
           )}
         </p>
       </main>
-      <footer className="mx-auto w-full max-w-[360px] pt-10 text-xs text-[#8a97b5]">Luma Studio · for Lumademy AI Motion Graphics Crash Course students</footer>
+      <footer className="mx-auto w-full max-w-[360px] pt-10 text-xs leading-relaxed text-[#8a97b5]">
+        <p><b className="font-semibold text-[#5b6b8f]">Luma Studio</b> is an AI motion-graphics agent by <a href="https://lumademy.com" className="text-[#2970ec]">Lumademy</a>: describe a video and it writes the script, records the voiceover, animates every scene and renders a 1080p MP4.</p>
+        <p className="mt-2">For Lumademy AI Motion Graphics Crash Course students · <Link to="/docs/api" className="text-[#2970ec]">API docs</Link></p>
+      </footer>
     </div>
   );
 }
