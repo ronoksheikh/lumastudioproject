@@ -9,6 +9,7 @@ import { FeedbackCard, STATUS } from './ImprovementsPage';
 import { Button } from '../components/Button';
 import { fmtRenderTime } from '../components/BuyRenderHours';
 import { Icon } from '../components/Icon';
+import { usePageTitle } from '../lib/page-title';
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Something went wrong');
 const bdt = (n: number) => `৳${Math.round(n).toLocaleString('en-US')}`;
@@ -251,6 +252,7 @@ function Users() {
 }
 
 export function AdminPage() {
+  usePageTitle('Admin');
   const q = useQuery({ queryKey: ['admin', 'overview'], queryFn: () => api.adminOverview(), refetchInterval: 5000 });
   const [tab, setTab] = useState('overview');
   return (

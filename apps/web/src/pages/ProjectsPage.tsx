@@ -7,6 +7,7 @@ import { api, ApiError } from '../api/client';
 import type { Project } from '../api/types';
 import { Icon } from '../components/Icon';
 import { timeAgo, useModels, useProjects, useVoice } from '../lib/hooks';
+import { usePageTitle } from '../lib/page-title';
 
 function NewProjectModal({ isOpen, onOpenChange }: { isOpen: boolean; onOpenChange: (o: boolean) => void }) {
   const [title, setTitle] = useState('');
@@ -154,6 +155,7 @@ function GettingStarted() {
 }
 
 export function ProjectsPage() {
+  usePageTitle('Your videos');
   const projects = useProjects();
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<Project | null>(null);

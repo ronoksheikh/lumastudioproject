@@ -4,8 +4,10 @@ import remarkGfm from 'remark-gfm';
 import { Link } from 'react-router-dom';
 import docs from '../content/api-docs.md?raw';
 import { Logo } from '../components/Logo';
+import { usePageTitle } from '../lib/page-title';
 
 export function DocsPage({ signedIn }: { signedIn: boolean }) {
+  usePageTitle('API docs');
   const text = docs.replaceAll('{BASE}', window.location.origin);
   return (
     <div className="scroll-y h-full bg-white">

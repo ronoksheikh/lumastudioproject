@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { ApiError, api, type FeedbackItem, type FeedbackStatus } from '../api/client';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
+import { usePageTitle } from '../lib/page-title';
 
 export const STATUS: Record<FeedbackStatus, { label: string; color: 'default' | 'accent' | 'warning' | 'success' | 'danger'; hint: string }> = {
   new: { label: 'Sent', color: 'default', hint: 'Waiting for the team to look at it' },
@@ -116,6 +117,7 @@ function NewReport({ onSent }: { onSent: () => void }) {
 }
 
 export function ImprovementsPage() {
+  usePageTitle('Improvements');
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['feedback'], queryFn: () => api.myFeedback().then((r) => r.items) });
   return (
