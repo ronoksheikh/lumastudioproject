@@ -37,10 +37,6 @@ export async function createCheckout(a: {
       name: a.customer.name,
       email: a.customer.email,
       phone: a.customer.phone,
-      // the API wants a billing address; digital goods have none, so the configured defaults are sent
-      address: pay.address,
-      city: pay.city,
-      postcode: pay.postcode,
       amount: a.amountBdt,
       returnUrl: a.returnUrl,
       paymentMethod: a.method === 'bkash' ? 'bkash' : 'eps',

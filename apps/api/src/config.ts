@@ -72,10 +72,6 @@ const schema = z.object({
   /** Lumademy's payment API (bKash, cards, Nagad…; docs/payments.md). PAYMENTS_ENABLED=0 turns buying off. */
   PAYMENTS_ENABLED: z.enum(['0', '1']).default('1'),
   PAYMENT_API_BASE: z.string().url().default('https://p.lumademy.com'),
-  /** the billing address the payment API requires (digital goods: one fixed address) */
-  PAYMENT_ADDRESS: z.string().default('Online purchase'),
-  PAYMENT_CITY: z.string().default('Dhaka'),
-  PAYMENT_POSTCODE: z.string().default('1000'),
   /** A remote worker's claim on a job expires without a progress report for this long (it goes back to the queue). */
   WORKER_LEASE_S: num(120),
   /** A worker counts as online if it called in within this many seconds; with none online, paid renders run here. */
@@ -146,7 +142,7 @@ export const config = {
   sourceCodeWhatsapp: env.SOURCE_CODE_WHATSAPP,
   renderHoursMaxPerOrder: env.RENDER_HOURS_MAX_PER_ORDER,
   payments: env.PAYMENTS_ENABLED === '1'
-    ? { base: env.PAYMENT_API_BASE.replace(/\/+$/, ''), address: env.PAYMENT_ADDRESS, city: env.PAYMENT_CITY, postcode: env.PAYMENT_POSTCODE }
+    ? { base: env.PAYMENT_API_BASE.replace(/\/+$/, '') }
     : null,
   workerLeaseS: env.WORKER_LEASE_S,
   workerOnlineS: env.WORKER_ONLINE_S,

@@ -22,8 +22,8 @@ banking on the hosted checkout). The UI never names the payment company.
 
 1. `POST /api/billing/render-hours` `{ hours, phone, method: "bkash" | "other", returnTo? }` (or
    `POST /api/billing/addons/:addon` `{ phone, method, returnTo? }`) inserts a **pending** row, then calls
-   `POST {PAYMENT_API_BASE}/api/checkout` (`billing/gateway.ts`) with the student's name/email/phone, the fixed
-   billing address (`PAYMENT_ADDRESS/CITY/POSTCODE`), the amount, `paymentMethod: bkash | eps` and
+   `POST {PAYMENT_API_BASE}/api/checkout` (`billing/gateway.ts`) with only the student's name, email and phone (no
+   address — the payment API fills that in), the amount, `paymentMethod: bkash | eps` and
    `returnUrl = {APP_ORIGIN}/api/billing/return`. The returned `merchantTransactionId` is stored as the row's
    `invoice_number` (a `tmp-…` placeholder until then); the browser goes to `redirectUrl`.
 2. After paying, the browser comes back to `GET /api/billing/return?merchantTransactionId=…&paymentStatus=…`.
