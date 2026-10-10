@@ -8,8 +8,8 @@
 //   workers                    list render workers (last seen, disabled)
 //   worker-disable|worker-enable|worker-remove <id|name>
 //   boosts [pending|paid]      list fast-render-hour purchases
-//   boost-paid <id> [ref]      mark a pending purchase paid by hand (e.g. paid outside PayStation)
-//   payment-check <invoice>    re-check a PayStation invoice now and credit it if paid (a missed IPN)
+//   boost-paid <id> [ref]      mark a pending purchase paid by hand (e.g. paid by hand)
+//   payment-check <invoice>    re-check a payment (its merchantTransactionId) now and credit it if paid
 //   boost-grant <email> [min]  give someone fast render minutes (default 60)
 //   lessons [active|pending|archived]   the agent's shared lessons
 //   lesson-approve <id> | lesson-archive <id> | lesson-add <topic> <text>

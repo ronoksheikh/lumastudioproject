@@ -1,10 +1,10 @@
-// Fast render hours, paid through PayStation (docs/payments.md).
+// Fast render hours and add-ons, paid through Lumademy's payment API (billing/gateway.ts, docs/payments.md).
 //   GET  /api/billing/render-hours              quotas + recent purchases
-//   POST /api/billing/render-hours              { hours, phone, returnTo? } → { paymentUrl }  (browser goes there)
-//   GET  /api/billing/paystation/callback       PayStation sends the browser back here → verify → redirect into the app
-//   POST /api/billing/paystation/ipn            PayStation's server-to-server notification (successes) → verify → credit
-// Crediting is idempotent (pending → paid happens once) and always re-checked with PayStation's status API.
-import crypto from 'node:crypto';
+//   POST /api/billing/render-hours              { hours, phone, method, returnTo? } → { paymentUrl }  (browser goes there)
+//   POST /api/billing/addons/:addon             { phone, method, returnTo? } → { paymentUrl }
+//   GET  /api/billing/return                    the browser comes back here after paying → verify → redirect into the app
+// There is no server-to-server notification: the return page, a background re-check (reconcile.ts) and the admin
+// "re-check" all settle a purchase with settleInvoice, which asks the payment API for the verified status.
 import { and, desc, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -18,8 +18,12 @@ import { parse } from '../http/validate.js';
 import { logger } from '../logger.js';
 import { usageFor } from '../quota/service.js';
 import { newId } from '../util/id.js';
-import { initiatePayment, PayStationError, transactionStatus } from './paystation.js';
+import { createCheckout, methodLabel, PaymentError, paymentStatus, type PayMethod } from './gateway.js';
 import { ADDONS, addonsFor, hasAddon, type AddonId } from './addons.js';
+import { settlePendingFor } from './reconcile.js';
+
+/** provider value of purchases made through the payment API */
+export const GATEWAY = 'gateway';
 
 /** BD mobile number → 01XXXXXXXXX, or null. */
 export function normalizeBdPhone(input: string): string | null {
@@ -30,12 +34,15 @@ export function normalizeBdPhone(input: string): string | null {
 /** Only paths inside the app (never another site). */
 const safeReturn = (p?: string | null) => (p && /^\/(projects\/[A-Za-z0-9_-]+|settings(\/[a-z]+)?)$/.test(p) ? p : '/settings/account');
 
-/** Unique, numeric-looking invoice number (PayStation rejects duplicates with 1008). */
-const newInvoice = () => `${Date.now()}${crypto.randomInt(100, 999)}`;
+/** A unique placeholder until the payment API gives us its transaction id. */
+const tempInvoice = () => `tmp-${newId()}`;
 
 type Settled = 'paid' | 'pending' | 'failed';
 
-/** Re-checks an invoice with PayStation and credits it once (render hours or an add-on). Safe to call any number of times. */
+/**
+ * Asks the payment API for the verified status of a purchase (by its merchantTransactionId, stored as invoiceNumber)
+ * and credits it once (render hours or an add-on). Safe to call any number of times.
+ */
 export async function settleInvoice(db: DB, invoiceNumber: string): Promise<{ status: Settled; returnTo: string | null; kind: 'hours' | 'addon' } | null> {
   const boost = db.select().from(renderBoosts).where(eq(renderBoosts.invoiceNumber, invoiceNumber)).get();
   const addon = boost ? null : db.select().from(addonPurchases).where(eq(addonPurchases.invoiceNumber, invoiceNumber)).get();
@@ -43,27 +50,39 @@ export async function settleInvoice(db: DB, invoiceNumber: string): Promise<{ st
   if (!row) return null;
   const done = (status: Settled) => ({ status, returnTo: row.returnTo, kind: boost ? 'hours' as const : 'addon' as const });
   if (row.status === 'paid') return done('paid');
-  if (row.status !== 'pending') return done('failed');
-  const trx = await transactionStatus(invoiceNumber);
-  if (trx.status === 'success') {
-    if (trx.amount == null || Math.round(trx.amount) < row.priceBdt) {
-      logger.error({ invoiceNumber, expected: row.priceBdt, got: trx.amount }, 'paystation amount mismatch — not credited');
-      return done('failed');
-    }
-    // pending → paid exactly once, even if the callback and the IPN arrive together
-    const set = { status: 'paid', paidAt: Date.now(), paymentRef: trx.trxId, paymentMethod: trx.method };
-    if (boost) db.update(renderBoosts).set(set).where(and(eq(renderBoosts.id, boost.id), eq(renderBoosts.status, 'pending'))).run();
-    else db.update(addonPurchases).set(set).where(and(eq(addonPurchases.id, addon!.id), eq(addonPurchases.status, 'pending'))).run();
-    logger.info({ invoiceNumber, item: boost ? `${boost.seconds / 3600}h fast render` : `addon ${addon!.addon}`, method: trx.method }, 'paystation payment credited');
-    return done('paid');
-  }
-  if (trx.status === 'failed' || trx.status === 'refund') {
+  if (row.status !== 'pending' || invoiceNumber.startsWith('tmp-')) return done(row.status === 'pending' ? 'pending' : 'failed');
+  const pay = await paymentStatus(invoiceNumber);
+  const markFailed = () => {
     if (boost) db.update(renderBoosts).set({ status: 'failed' }).where(and(eq(renderBoosts.id, boost.id), eq(renderBoosts.status, 'pending'))).run();
     else db.update(addonPurchases).set({ status: 'failed' }).where(and(eq(addonPurchases.id, addon!.id), eq(addonPurchases.status, 'pending'))).run();
+  };
+  if (pay.status === 'success') {
+    if (pay.amount == null || Math.round(pay.amount) < row.priceBdt) {
+      logger.error({ invoiceNumber, expected: row.priceBdt, got: pay.amount }, 'payment amount mismatch — not credited');
+      markFailed();
+      return done('failed');
+    }
+    // pending → paid exactly once, even if the return page and the background check arrive together
+    const set = { status: 'paid', paidAt: Date.now(), paymentRef: pay.orderId ?? invoiceNumber };
+    if (boost) db.update(renderBoosts).set(set).where(and(eq(renderBoosts.id, boost.id), eq(renderBoosts.status, 'pending'))).run();
+    else db.update(addonPurchases).set(set).where(and(eq(addonPurchases.id, addon!.id), eq(addonPurchases.status, 'pending'))).run();
+    logger.info({ invoiceNumber, item: boost ? `${boost.seconds / 3600}h fast render` : `addon ${addon!.addon}`, method: row.paymentMethod }, 'payment credited');
+    return done('paid');
+  }
+  if (pay.status === 'failed' || pay.status === 'not_found') {
+    logger.info({ invoiceNumber, status: pay.raw }, 'payment not completed');
+    markFailed();
     return done('failed');
   }
-  return done('pending'); // processing / not visible yet
+  return done('pending'); // not finished yet, or the check is unavailable right now
 }
+
+const startBody = (extra: z.ZodRawShape = {}) => z.object({
+  ...extra,
+  phone: z.string().trim().min(6).max(20),
+  method: z.enum(['bkash', 'other']).default('bkash'),
+  returnTo: z.string().max(200).optional(),
+});
 
 export async function billingRoutes(app: FastifyInstance, ctx: AppContext) {
   const { db } = ctx;
@@ -71,6 +90,7 @@ export async function billingRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.get('/billing/render-hours', auth, async (req) => {
     const user = authUser(req);
+    await settlePendingFor(db, user.id);
     const packs = db.select().from(renderBoosts).where(eq(renderBoosts.userId, user.id)).orderBy(desc(renderBoosts.createdAt)).limit(10).all();
     return {
       ...usageFor(db, user.id),
@@ -78,37 +98,48 @@ export async function billingRoutes(app: FastifyInstance, ctx: AppContext) {
     };
   });
 
+  /** Creates the purchase row, starts the checkout and stores the payment API's transaction id on the row. */
+  async function startPayment(req: import('fastify').FastifyRequest, opts: {
+    table: typeof renderBoosts | typeof addonPurchases;
+    id: string;
+    priceBdt: number;
+    method: PayMethod;
+    phone: string;
+  }) {
+    const user = authUser(req);
+    try {
+      const c = await createCheckout({
+        amountBdt: opts.priceBdt,
+        method: opts.method,
+        customer: { name: user.email.split('@')[0]!.slice(0, 60) || 'Luma Studio student', email: user.email, phone: opts.phone },
+        returnUrl: `${config.appOrigin.replace(/\/+$/, '')}/api/billing/return`,
+      });
+      db.update(opts.table).set({ invoiceNumber: c.merchantTransactionId }).where(eq(opts.table.id, opts.id)).run();
+      return { paymentUrl: c.redirectUrl, invoiceNumber: c.merchantTransactionId, priceBdt: opts.priceBdt };
+    } catch (e) {
+      db.update(opts.table).set({ status: 'cancelled' }).where(eq(opts.table.id, opts.id)).run();
+      if (e instanceof PaymentError) throw new HttpError(502, 'payment_gateway', e.message);
+      throw e;
+    }
+  }
+
+  const checkPhone = (raw: string) => {
+    const phone = normalizeBdPhone(raw);
+    if (!phone) throw badRequest('Enter a Bangladeshi mobile number, e.g. 01712345678');
+    if (!config.payments) throw new HttpError(503, 'payments_off', 'Online payment is not set up yet. Please contact Lumademy support.');
+    return phone;
+  };
+
   app.post('/billing/render-hours', { ...auth, config: config.rateLimitDisabled ? {} : { rateLimit: { max: 10, timeWindow: '10 minutes' } } }, async (req) => {
     const user = authUser(req);
-    const body = parse(z.object({
-      hours: z.number().int().min(1).max(config.renderHoursMaxPerOrder),
-      phone: z.string().trim().min(6).max(20),
-      returnTo: z.string().max(200).optional(),
-    }), req.body);
-    const phone = normalizeBdPhone(body.phone);
-    if (!phone) throw badRequest('Enter a Bangladeshi mobile number, e.g. 01712345678');
-    if (!config.paystation) throw new HttpError(503, 'payments_off', 'Online payment is not set up yet. Please contact Lumademy support.');
-    const invoiceNumber = newInvoice();
+    const body = parse(startBody({ hours: z.number().int().min(1).max(config.renderHoursMaxPerOrder) }), req.body) as { hours: number; phone: string; method: PayMethod; returnTo?: string };
+    const phone = checkPhone(body.phone);
     const priceBdt = body.hours * config.renderHourPriceBdt;
     const id = newId();
     db.insert(renderBoosts).values({
-      id, userId: user.id, seconds: body.hours * 3600, priceBdt, status: 'pending', provider: 'paystation', invoiceNumber, returnTo: safeReturn(body.returnTo),
+      id, userId: user.id, seconds: body.hours * 3600, priceBdt, status: 'pending', provider: GATEWAY, invoiceNumber: tempInvoice(), paymentMethod: methodLabel(body.method), returnTo: safeReturn(body.returnTo),
     }).run();
-    try {
-      const paymentUrl = await initiatePayment({
-        invoiceNumber,
-        amountBdt: priceBdt,
-        customer: { name: user.email.split('@')[0]!.slice(0, 60), email: user.email, phone },
-        callbackUrl: `${config.appOrigin}/api/billing/paystation/callback?invoice=${invoiceNumber}`,
-        reference: `Luma Studio fast render ${body.hours}h`,
-        items: [{ name: 'Fast render hour', quantity: body.hours, unitPriceBdt: config.renderHourPriceBdt }],
-      });
-      return { paymentUrl, invoiceNumber, priceBdt };
-    } catch (e) {
-      db.update(renderBoosts).set({ status: 'cancelled' }).where(eq(renderBoosts.id, id)).run();
-      if (e instanceof PayStationError) throw new HttpError(502, 'payment_gateway', e.message);
-      throw e;
-    }
+    return startPayment(req, { table: renderBoosts, id, priceBdt, method: body.method, phone });
   });
 
   // ---------------- add-ons (one-time) ----------------
@@ -120,58 +151,33 @@ export async function billingRoutes(app: FastifyInstance, ctx: AppContext) {
     const info = ADDONS[addon as AddonId];
     if (!info) throw badRequest('Unknown add-on');
     if (hasAddon(db, user.id, addon as AddonId)) throw new HttpError(409, 'owned', 'You already have this add-on.');
-    const body = parse(z.object({ phone: z.string().trim().min(6).max(20), returnTo: z.string().max(200).optional() }), req.body);
-    const phone = normalizeBdPhone(body.phone);
-    if (!phone) throw badRequest('Enter a Bangladeshi mobile number, e.g. 01712345678');
-    if (!config.paystation) throw new HttpError(503, 'payments_off', 'Online payment is not set up yet. Please contact Lumademy support.');
-    const invoiceNumber = newInvoice();
+    const body = parse(startBody(), req.body) as { phone: string; method: PayMethod; returnTo?: string };
+    const phone = checkPhone(body.phone);
     const priceBdt = info.priceBdt();
     const id = newId();
-    db.insert(addonPurchases).values({ id, userId: user.id, addon, priceBdt, invoiceNumber, returnTo: safeReturn(body.returnTo) }).run();
-    try {
-      const paymentUrl = await initiatePayment({
-        invoiceNumber,
-        amountBdt: priceBdt,
-        customer: { name: user.email.split('@')[0]!.slice(0, 60), email: user.email, phone },
-        callbackUrl: `${config.appOrigin}/api/billing/paystation/callback?invoice=${invoiceNumber}`,
-        reference: `Luma Studio add-on: ${info.name}`,
-        items: [{ name: info.name, quantity: 1, unitPriceBdt: priceBdt }],
-      });
-      return { paymentUrl, invoiceNumber, priceBdt };
-    } catch (e) {
-      db.update(addonPurchases).set({ status: 'cancelled' }).where(eq(addonPurchases.id, id)).run();
-      if (e instanceof PayStationError) throw new HttpError(502, 'payment_gateway', e.message);
-      throw e;
-    }
+    db.insert(addonPurchases).values({ id, userId: user.id, addon, priceBdt, provider: GATEWAY, invoiceNumber: tempInvoice(), paymentMethod: methodLabel(body.method), returnTo: safeReturn(body.returnTo) }).run();
+    return startPayment(req, { table: addonPurchases, id, priceBdt, method: body.method, phone });
   });
 
-  /** The browser comes back from PayStation. Never trusted: the invoice is re-checked server to server. */
-  app.get('/billing/paystation/callback', async (req, reply) => {
+  /**
+   * The browser comes back after paying (?merchantTransactionId=…&paymentStatus=…). The query is editable, so it only
+   * says WHICH purchase to check: the status comes from the payment API. Then back into the app.
+   */
+  app.get('/billing/return', async (req, reply) => {
     const q = req.query as Record<string, string | undefined>;
-    const invoice = q.invoice ?? q.invoice_number ?? '';
-    let status: Settled = 'failed';
+    const invoice = String(q.merchantTransactionId ?? '').slice(0, 80);
+    let status: Settled = 'pending';
     let returnTo = '/settings/account';
     try {
       const r = invoice ? await settleInvoice(db, invoice) : null;
       if (r) {
         status = r.status;
         returnTo = safeReturn(r.returnTo);
-      }
+      } else status = 'failed';
     } catch (e) {
-      logger.warn({ err: e, invoice }, 'paystation callback check failed');
-      status = 'pending'; // the IPN will settle it
+      logger.warn({ err: e, invoice }, 'payment return check failed');
+      status = 'pending'; // the background check settles it
     }
     return reply.redirect(`${returnTo}?payment=${status}`);
-  });
-
-  /** PayStation IPN (successes only, may be retried). 200 = acknowledged. */
-  app.post('/billing/paystation/ipn', async (req, reply) => {
-    const body = (req.body ?? {}) as { invoice_number?: string; trx_status?: string };
-    const invoice = String(body.invoice_number ?? '');
-    if (!invoice) return reply.code(400).send({ status: 'error' });
-    const r = await settleInvoice(db, invoice);
-    if (!r) return reply.code(404).send({ status: 'error' });
-    if (r.status === 'pending') return reply.code(503).send({ status: 'retry' }); // not visible yet: let them retry
-    return { status: 'success' };
   });
 }

@@ -50,7 +50,7 @@ export function AccountMenu({ user }: { user: User }) {
  * Home and Settings get a slim top bar (logo + account). Inside a project there is no global header at all:
  * the project page shows only project-level UI (back, title, tabs, run status).
  */
-/** Back from PayStation: ?payment=paid|pending|failed → a toast, then the parameter is removed. */
+/** Back from paying: ?payment=paid|pending|failed → a toast, then the parameter is removed. */
 function usePaymentReturn() {
   const { search, pathname } = useLocation();
   const nav = useNavigate();
@@ -59,8 +59,8 @@ function usePaymentReturn() {
     const p = new URLSearchParams(search).get('payment');
     if (!p) return;
     if (p === 'paid') toast.success(pathname.endsWith('/addons') ? 'Payment received — your add-on is active.' : 'Payment received — your fast render hours are ready.');
-    else if (p === 'pending') toast.info?.('Payment is being confirmed. Your hours appear as soon as PayStation confirms it.');
-    else toast.danger('The payment did not go through. Nothing was charged for render hours — try again.');
+    else if (p === 'pending') toast.info?.('Payment is being confirmed. It usually takes a minute — your purchase appears as soon as it is confirmed.');
+    else toast.danger('The payment did not go through. Try again, or pick another payment method.');
     void qc.invalidateQueries({ queryKey: ['usage'] });
     void qc.invalidateQueries({ queryKey: ['addons'] });
     nav(pathname, { replace: true });

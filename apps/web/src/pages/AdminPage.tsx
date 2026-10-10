@@ -1,4 +1,4 @@
-// Admin panel (ADMIN_EMAILS): what's rendering right now, agent runs, workers, sales through PayStation, users.
+// Admin panel (ADMIN_EMAILS): what's rendering right now, agent runs, workers, online sales, users.
 // Refreshes every 5 seconds.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, Chip, Input, ProgressBar, Skeleton, Tabs, TextField, toast } from '@heroui/react';
@@ -73,7 +73,7 @@ function Overview({ d }: { d: AdminOverview }) {
         <Stat label="Server" value={d.cpu ? `${Math.round(d.cpu.usage * 100)}% CPU` : '—'} sub={d.disk ? `${gb(d.disk.freeBytes)} disk free of ${gb(d.disk.totalBytes)}` : undefined} />
       </div>
 
-      {!d.sales.paymentsEnabled && <p className="rounded-xl bg-[#eff5ff] px-4 py-3 text-sm text-[#1557d1]">PayStation is not configured (PAYSTATION_MERCHANT_ID / PAYSTATION_PASSWORD) — students can't buy fast hours yet.</p>}
+      {!d.sales.paymentsEnabled && <p className="rounded-xl bg-[#eff5ff] px-4 py-3 text-sm text-[#1557d1]">Online payments are turned off (PAYMENTS_ENABLED=0) — students can't buy fast hours or add-ons.</p>}
 
       <Section title="Rendering now">
         {d.renders.active.length === 0 ? <Empty>Nothing is rendering.</Empty> : (

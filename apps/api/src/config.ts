@@ -69,10 +69,9 @@ const schema = z.object({
   ADDON_API_PRICE_BDT: num(500),
   ADDON_SOURCE_PRICE_BDT: num(2000),
   SOURCE_CODE_WHATSAPP: z.string().default('+8801744136934'),
-  /** PayStation (payment gateway): live/sandbox, merchant id + password; unset = buying is off */
-  PAYSTATION_ENV: z.enum(['sandbox', 'live']).default('sandbox'),
-  PAYSTATION_MERCHANT_ID: z.string().optional(),
-  PAYSTATION_PASSWORD: z.string().optional(),
+  /** Lumademy's payment API (bKash, cards, Nagad…; docs/payments.md). PAYMENTS_ENABLED=0 turns buying off. */
+  PAYMENTS_ENABLED: z.enum(['0', '1']).default('1'),
+  PAYMENT_API_BASE: z.string().url().default('https://p.lumademy.com'),
   /** A remote worker's claim on a job expires without a progress report for this long (it goes back to the queue). */
   WORKER_LEASE_S: num(120),
   /** A worker counts as online if it called in within this many seconds; with none online, paid renders run here. */
@@ -142,8 +141,8 @@ export const config = {
   addonSourcePriceBdt: env.ADDON_SOURCE_PRICE_BDT,
   sourceCodeWhatsapp: env.SOURCE_CODE_WHATSAPP,
   renderHoursMaxPerOrder: env.RENDER_HOURS_MAX_PER_ORDER,
-  paystation: env.PAYSTATION_MERCHANT_ID && env.PAYSTATION_PASSWORD
-    ? { merchantId: env.PAYSTATION_MERCHANT_ID, password: env.PAYSTATION_PASSWORD, base: env.PAYSTATION_ENV === 'live' ? 'https://api.paystation.com.bd' : 'https://sandbox.paystation.com.bd' }
+  payments: env.PAYMENTS_ENABLED === '1'
+    ? { base: env.PAYMENT_API_BASE.replace(/\/+$/, '') }
     : null,
   workerLeaseS: env.WORKER_LEASE_S,
   workerOnlineS: env.WORKER_ONLINE_S,

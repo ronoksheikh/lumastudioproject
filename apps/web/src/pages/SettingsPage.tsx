@@ -449,7 +449,7 @@ function UsageCard() {
   );
 }
 
-/** Free daily render time + paid fast render hours (PayStation). */
+/** Free daily render time + paid fast render hours. */
 function FastRenderCard() {
   const q = useQuery({ queryKey: ['usage'], queryFn: () => api.usage().then((r) => r.usage), staleTime: 30_000 });
   const u = q.data;

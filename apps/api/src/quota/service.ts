@@ -41,7 +41,7 @@ export function assertDiskAvailable(db: DB, userId: string) {
 
 // ---------------- render time: two quotas ----------------
 // FREE: RENDER_MINUTES_PER_DAY (default 5 h) of rendering on this server in any rolling 24 hours.
-// FAST: paid hours on the fast remote render workers (RENDER_HOUR_PRICE_BDT per hour, bought through PayStation),
+// FAST: paid hours on the fast remote render workers (RENDER_HOUR_PRICE_BDT per hour, bought online),
 // kept until used. When a student has both, the agent asks which one to use (render_video `mode`).
 
 /** Paid packs with time left, oldest first (time is used from the oldest pack). */
@@ -135,7 +135,7 @@ export function usageFor(db: DB, userId: string) {
       pricePerHourBdt: config.renderHourPriceBdt,
       maxHours: config.renderHoursMaxPerOrder,
       secondsLeft: fastSecondsLeft(db, userId),
-      paymentsEnabled: !!config.paystation,
+      paymentsEnabled: !!config.payments,
     },
   };
 }

@@ -1,5 +1,5 @@
 // Admin panel API (/admin in the app). Admins = ADMIN_EMAILS. Read-mostly: live renders and agent runs, workers,
-// sales (PayStation), users, and a few actions (grant fast hours, re-check a payment, suspend/restore a user).
+// sales (online payments), users, and a few actions (grant fast hours, re-check a payment, suspend/restore a user).
 import fs from 'node:fs';
 import { and, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -45,8 +45,8 @@ export async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
     const failedRecent = db.select().from(renderJobs).where(and(eq(renderJobs.status, 'error'), gte(renderJobs.finishedAt, now - 7 * DAY))).orderBy(desc(renderJobs.finishedAt)).limit(10).all();
 
     // ---- sales ----
-    const paidHours = db.select().from(renderBoosts).where(and(eq(renderBoosts.status, 'paid'), eq(renderBoosts.provider, 'paystation'))).all();
-    const paidAddons = db.select().from(addonPurchases).where(and(eq(addonPurchases.status, 'paid'), eq(addonPurchases.provider, 'paystation'))).all();
+    const paidHours = db.select().from(renderBoosts).where(and(eq(renderBoosts.status, 'paid'), inArray(renderBoosts.provider, ['paystation', 'gateway']))).all();
+    const paidAddons = db.select().from(addonPurchases).where(and(eq(addonPurchases.status, 'paid'), inArray(addonPurchases.provider, ['paystation', 'gateway']))).all();
     const paid = [
       ...paidHours.map((p) => ({ priceBdt: p.priceBdt, paidAt: p.paidAt, seconds: p.seconds })),
       ...paidAddons.map((p) => ({ priceBdt: p.priceBdt, paidAt: p.paidAt, seconds: 0 })),
@@ -101,7 +101,7 @@ export async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
         today: sum(now - DAY), last7d: sum(now - 7 * DAY), last30d: sum(now - 30 * DAY), allTime: sum(0),
         pending: count('pending'), failed: count('failed'),
         fastHoursOutstanding: allPaid.reduce((s, p) => s + (p.seconds - p.usedSeconds), 0) / 3600,
-        paymentsEnabled: !!config.paystation,
+        paymentsEnabled: !!config.payments,
         addonsSold: addonCounts,
         pricePerHourBdt: config.renderHourPriceBdt,
         recent: recentPurchases.map((p) => ({

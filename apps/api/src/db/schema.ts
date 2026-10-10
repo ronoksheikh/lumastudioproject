@@ -162,12 +162,12 @@ export const renderBoosts = sqliteTable(
     usedSeconds: integer('used_seconds').notNull().default(0),
     priceBdt: integer('price_bdt').notNull(),
     status: text('status').notNull().default('pending'), // pending | paid | failed | cancelled
-    /** PayStation trx_id (or "granted"/"manual") */
+    /** the payment API's order id (or "granted"/"manual") */
     paymentRef: text('payment_ref'),
-    provider: text('provider').notNull().default('manual'), // paystation | manual | grant
-    /** our invoice number sent to PayStation (unique) */
+    provider: text('provider').notNull().default('manual'), // gateway | manual | grant (paystation = older purchases)
+    /** the payment API's merchantTransactionId (unique; tmp-… until checkout starts) */
     invoiceNumber: text('invoice_number'),
-    paymentMethod: text('payment_method'), // bKash, Nagad, Visa… as reported by PayStation
+    paymentMethod: text('payment_method'), // bKash | Card / Nagad / other — what the student chose
     /** where the student goes back to after paying (a path inside the app) */
     returnTo: text('return_to'),
     createdAt: createdAt(),
@@ -268,7 +268,7 @@ export const sharedAssets = sqliteTable(
   (t) => [index('shared_assets_status_idx').on(t.status), index('shared_assets_sha_idx').on(t.sha256)],
 );
 
-/** One-time add-ons bought through PayStation: 'api' (Luma Studio API access) and 'source' (the source code). */
+/** One-time add-ons bought online: 'api' (Luma Studio API access) and 'source' (the source code). */
 export const addonPurchases = sqliteTable(
   'addon_purchases',
   {
@@ -277,7 +277,7 @@ export const addonPurchases = sqliteTable(
     addon: text('addon').notNull(), // api | source
     priceBdt: integer('price_bdt').notNull(),
     status: text('status').notNull().default('pending'), // pending | paid | failed | cancelled
-    provider: text('provider').notNull().default('paystation'), // paystation | grant
+    provider: text('provider').notNull().default('paystation'), // gateway | grant (paystation = older purchases)
     invoiceNumber: text('invoice_number'),
     paymentRef: text('payment_ref'),
     paymentMethod: text('payment_method'),

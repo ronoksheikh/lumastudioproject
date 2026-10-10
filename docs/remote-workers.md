@@ -4,7 +4,7 @@ Students have two render quotas (details and the payment flow: `docs/payments.md
 
 - **Free:** `RENDER_MINUTES_PER_DAY` (default 300 = 5 hours) of rendering on the Studio server in any rolling
   24 hours.
-- **Fast:** paid hours (`RENDER_HOUR_PRICE_BDT`, default 100 BDT per hour, bought through PayStation, any number of
+- **Fast:** paid hours (`RENDER_HOUR_PRICE_BDT`, default 100 BDT per hour, bought online, any number of
   hours per order up to `RENDER_HOURS_MAX_PER_ORDER`). They never expire. Jobs using them render on the **remote
   render workers** and are billed by wall-clock render time, oldest pack first. If no worker is online, a fast job
   renders here instead (still billed to the fast hours) so nobody waits on a missing machine.
@@ -12,7 +12,7 @@ Students have two render quotas (details and the payment flow: `docs/payments.md
 When a student has both, the agent asks which one to use (`render_video` `mode: "free" | "fast"`).
 
 Operators can still hand out hours: `boost-grant <email> [minutes]`, or `boost-paid <id>` for a purchase paid
-outside PayStation; `payment-check <invoice>` re-checks a PayStation invoice whose IPN never arrived.
+by hand; `payment-check <invoice>` re-checks a payment by its merchantTransactionId.
 
 ## Running a worker
 

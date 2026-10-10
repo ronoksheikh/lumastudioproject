@@ -1,4 +1,4 @@
-// One-time add-ons (Settings → Add-ons), paid through PayStation like render hours:
+// One-time add-ons (Settings → Add-ons), paid online like render hours:
 //   api    — Luma Studio API access: API keys to make videos from code (docs at /docs/api, readable by anyone)
 //   source — the Luma Studio source code: after paying, the student messages the WhatsApp number to receive it
 import { and, eq } from 'drizzle-orm';
@@ -34,7 +34,7 @@ export function addonsFor(db: DB, userId: string) {
       description: ADDONS[id].description,
       priceBdt: ADDONS[id].priceBdt(),
       owned,
-      paymentsEnabled: !!config.paystation,
+      paymentsEnabled: !!config.payments,
       // the source code is handed over personally: shown only after paying
       ...(id === 'source' && owned ? { whatsapp: config.sourceCodeWhatsapp } : {}),
     };

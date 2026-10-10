@@ -102,7 +102,7 @@ export const api = {
   previewReport: (id: string, b: { status: 'ready' | 'error' | 'empty'; message?: string; duration?: number }) => post<{ ok: true }>(`/api/projects/${id}/preview-report`, b),
   // ---- add-ons, API keys, improvements ----
   addons: () => get<{ addons: Addon[] }>('/api/billing/addons'),
-  buyAddon: (id: string, b: { phone: string; returnTo: string }) => post<{ paymentUrl: string }>(`/api/billing/addons/${id}`, b),
+  buyAddon: (id: string, b: { phone: string; method: 'bkash' | 'other'; returnTo: string }) => post<{ paymentUrl: string }>(`/api/billing/addons/${id}`, b),
   apiKeys: () => get<{ hasAddon: boolean; keys: ApiKeyInfo[] }>('/api/settings/api-keys'),
   createApiKey: (name: string) => post<ApiKeyInfo & { key: string }>('/api/settings/api-keys', { name }),
   revokeApiKey: (id: string) => del<{ ok: true }>(`/api/settings/api-keys/${id}`),
@@ -117,7 +117,7 @@ export const api = {
   adminGrantHours: (id: string, hours: number) => post<{ ok: true }>(`/api/admin/users/${id}/grant-hours`, { hours }),
   adminBan: (id: string, banned: boolean) => post<{ ok: true }>(`/api/admin/users/${id}/ban`, { banned }),
   adminCheckPayment: (invoice: string) => post<{ status: string }>(`/api/admin/payments/${invoice}/check`),
-  buyRenderHours: (b: { hours: number; phone: string; returnTo: string }) => post<{ paymentUrl: string; invoiceNumber: string; priceBdt: number }>('/api/billing/render-hours', b),
+  buyRenderHours: (b: { hours: number; phone: string; method: 'bkash' | 'other'; returnTo: string }) => post<{ paymentUrl: string; invoiceNumber: string; priceBdt: number }>('/api/billing/render-hours', b),
   login: (email: string, password: string) => post<{ user: User; csrfToken: string }>('/api/auth/login', { email, password }),
   logout: () => post<{ ok: true }>('/api/auth/logout'),
   changePassword: (currentPassword: string, newPassword: string) => post<{ ok: true }>('/api/auth/password', { currentPassword, newPassword }),

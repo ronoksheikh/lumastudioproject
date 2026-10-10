@@ -7,6 +7,7 @@ import { createCpuBudget } from './cpu/index.js';
 import { createDb, runMigrations } from './db/index.js';
 import { logger } from './logger.js';
 import { startMaintenance } from './maintenance/scheduler.js';
+import { startPaymentReconcile } from './billing/reconcile.js';
 import { installProcessHandlers } from './observability/errors.js';
 import { RenderQueue } from './render/service.js';
 import { effectiveSandbox } from './runner/sandbox.js';
@@ -40,6 +41,7 @@ async function main() {
   agent.resetStaleRuns();
   render.start();
   const stopMaintenance = startMaintenance(db, sqlite);
+  const stopPayments = startPaymentReconcile(db);
   const app = await buildApp({ db, sqlite, cpu, agent, render });
   await app.listen({ port: config.port, host: '0.0.0.0' });
   const previewServer = await listenPreviewPort(app);
@@ -48,6 +50,7 @@ async function main() {
     logger.info({ signal }, 'shutting down');
     previewServer?.close();
     stopMaintenance();
+    stopPayments();
     await render.stop();
     await agent.stopAll();
     await app.close();

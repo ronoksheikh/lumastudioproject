@@ -67,7 +67,7 @@ export async function renderVideo(ctx: ToolContext, a: ToolArgs<'render_video'>)
   return ctx.render.render({ projectId: ctx.projectId, userId: ctx.userId, runId: ctx.runId, preset: a.preset, mode: a.mode, signal: ctx.signal, bus: ctx.bus });
 }
 
-/** A buy card for fast render hours in the chat (the student pays on PayStation and comes back to the project). */
+/** A buy card for fast render hours in the chat (the student pays online (bKash, card, Nagad…) and comes back to the project). */
 export function offerRenderHours(ctx: ToolContext, a: ToolArgs<'offer_render_hours'>): ToolResult {
   const u = usageFor(ctx.db, ctx.userId);
   const hours = Math.min(a.hours ?? 1, u.fastRender.maxHours);
