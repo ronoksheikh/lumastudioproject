@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40" viewBox="0 0 120 40" role="img" aria-label="bKash">
+  <title>bKash</title>
+  <polygon points="3,9 21,14.5 15,33" fill="#E2136E"/>
+  <polygon points="21,14.5 34,5 26.5,24" fill="#9E1F63"/>
+  <polygon points="15,33 21,14.5 26.5,24" fill="#D12053"/>
+  <polygon points="26.5,24 34,5 36.5,31" fill="#E2136E"/>
+  <text x="41" y="28.5" font-family="Inter, Arial, Helvetica, sans-serif" font-size="23" font-weight="800" letter-spacing="-0.5" fill="#E2136E">bKash</text>
+</svg>

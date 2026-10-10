@@ -1,4 +1,4 @@
-// Settings → Add-ons: one-time purchases through PayStation (Luma Studio API, source code) and the API keys.
+// Settings → Add-ons: one-time purchases (bKash, card, Nagad…) (Luma Studio API, source code) and the API keys.
 import { Card, Chip, Input, Label, Skeleton, Spinner, TextField, toast } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { ApiError, api, type Addon } from '../api/client';
 import { Button } from './Button';
 import { Icon } from './Icon';
+import { PayMethodPicker, rememberMethod, savedMethod, type PayMethod } from './PayMethod';
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Something went wrong');
 const PHONE_KEY = 'luma.payPhone';
@@ -15,24 +16,29 @@ const savedPhone = () => {
 
 function BuyAddon({ a }: { a: Addon }) {
   const [phone, setPhone] = useState(savedPhone);
+  const [method, setMethod] = useState<PayMethod>(savedMethod);
   const buy = useMutation({
-    mutationFn: () => api.buyAddon(a.id, { phone, returnTo: '/settings/addons' }),
+    mutationFn: () => api.buyAddon(a.id, { phone, method, returnTo: '/settings/addons' }),
     onSuccess: (r) => {
       try { localStorage.setItem(PHONE_KEY, phone); } catch { /* fine */ }
+      rememberMethod(method);
       window.location.href = r.paymentUrl;
     },
     onError: (e) => toast.danger(msg(e)),
   });
   if (!a.paymentsEnabled) return <p className="text-sm text-[#5b6b8f]">Online payment isn’t set up yet — contact Lumademy support.</p>;
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+    <div className="flex flex-col gap-3">
+      <PayMethodPicker value={method} onChange={setMethod} />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
       <TextField value={phone} onChange={setPhone} type="tel" className="sm:flex-1">
-        <Label>Mobile number (bKash / Nagad / Rocket)</Label>
+        <Label>{method === 'bkash' ? 'bKash number' : 'Mobile number'}</Label>
         <Input placeholder="01XXXXXXXXX" inputMode="tel" autoComplete="tel" />
       </TextField>
       <Button variant="primary" isDisabled={buy.isPending || phone.replace(/\D/g, '').length < 11} onPress={() => buy.mutate()}>
         {buy.isPending ? <Spinner size="sm" color="current" /> : `Buy · ৳${a.priceBdt}`}
       </Button>
+      </div>
     </div>
   );
 }

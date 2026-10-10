@@ -1,4 +1,4 @@
-# Render time and payments (PayStation)
+# Render time and payments
 
 ## Two quotas
 | Quota | What | Where it renders | Setting |
@@ -12,48 +12,40 @@ Render time = wall-clock time of the render job. Fast time is taken from the old
 - only one quota has time left → that one;
 - both → the agent asks the student ("Free render (slower)" / "Fast render") and renders with `mode`;
 - none → the render is refused; the agent tells the student and calls `offer_render_hours`, which puts a
-  **"Buy fast render hours"** card in the chat (hours picker, price, phone, Pay button).
+  **"Buy fast render hours"** card in the chat (hours picker, price, bKash or card/Nagad, phone, Pay button).
 
 Students see both balances, and can buy hours, in Settings → Account → Render time.
 
-## Buying fast hours (PayStation hosted checkout)
+## Paying (Lumademy's payment API at `https://p.lumademy.com`)
+Students choose **bKash** (first, the default) or **Card, Nagad & more** (Visa, Mastercard, Nagad, Rocket, Upay, net
+banking on the hosted checkout). The UI never names the payment company.
 
-```
-Student (chat card or Settings)            Luma Studio                         PayStation
-  hours + phone ──POST /api/billing/render-hours──▶ render_boosts row (pending, invoice_number)
-                                           initiate-payment (merchantId, password, invoice,
-                                           amount = hours × price, callback_url) ─────────▶
-                    ◀──────────── { paymentUrl } ◀─────────────────────────── payment_url
-  browser ─────────────────────────────────────────────────────────────────▶ checkout (bKash, Nagad,
-                                                                               Rocket, Upay, cards)
-  browser ◀── redirect to callback_url ── GET /api/billing/paystation/callback?invoice=…
-                                           transaction-status(invoice) ──────────────────▶
-                                           success + amount matches → paid (once)
-  back in the project chat / Settings with ?payment=paid|pending|failed (a toast)
-                                           POST /api/billing/paystation/ipn  ◀── IPN (successes, retried)
-                                           same check → paid (no-op if already paid) → 200
-```
-
-- **Never trusted blindly:** the callback and the IPN both re-check the invoice with PayStation's
-  `transaction-status` API (merchantId header) and compare the paid amount with the order before crediting.
-- **Idempotent:** `pending → paid` happens once (`settleInvoice`), whichever of callback/IPN comes first.
-- **Gateway fees:** `pay_with_charge=0`, so the merchant bears the gateway charge and the student pays exactly the
-  listed price. Set it to 1 in `billing/paystation.ts` to pass the fee on.
-- **After paying,** the student returns to where they were: the project chat or Settings.
+1. `POST /api/billing/render-hours` `{ hours, phone, method: "bkash" | "other", returnTo? }` (or
+   `POST /api/billing/addons/:addon` `{ phone, method, returnTo? }`) inserts a **pending** row, then calls
+   `POST {PAYMENT_API_BASE}/api/checkout` (`billing/gateway.ts`) with the student's name/email/phone, the fixed
+   billing address (`PAYMENT_ADDRESS/CITY/POSTCODE`), the amount, `paymentMethod: bkash | eps` and
+   `returnUrl = {APP_ORIGIN}/api/billing/return`. The returned `merchantTransactionId` is stored as the row's
+   `invoice_number` (a `tmp-…` placeholder until then); the browser goes to `redirectUrl`.
+2. After paying, the browser comes back to `GET /api/billing/return?merchantTransactionId=…&paymentStatus=…`.
+   The query is editable, so it only picks the row; `settleInvoice` asks `GET /api/payment-status` and credits
+   the purchase only on `status: "Success"` with `amount ≥` the price we stored. pending → paid happens once
+   (conditional UPDATE). Then the browser goes to `returnTo?payment=paid|pending|failed` (a toast).
+3. **No server-to-server notification exists**, so `billing/reconcile.ts` re-checks pending purchases (started in the
+   last 48 h) every 3 minutes, and again whenever a student opens Settings → Account. `Pending` /
+   `VerificationUnavailable` stay pending; `AmountMismatch`, other failure statuses and unknown references are failed.
 
 ## Setup
-1. `.env`: `PAYSTATION_ENV=sandbox`, `PAYSTATION_MERCHANT_ID=104-1653730183`, `PAYSTATION_PASSWORD=gamecoderstorepass`
-   (the public sandbox account) → test the whole flow.
-2. Give PayStation your IPN URL: `https://<your studio domain>/api/billing/paystation/ipn`.
-3. Live: `PAYSTATION_ENV=live` plus your own merchant ID and password. Keep them only in `.env`.
-
-Without `PAYSTATION_MERCHANT_ID`/`PASSWORD` the buy buttons say payment isn't set up yet.
+- Nothing to register: the API needs no key. `PAYMENT_API_BASE` (default `https://p.lumademy.com`), `PAYMENTS_ENABLED=0`
+  turns buying off (admin grants still work). `APP_ORIGIN` must be the public HTTPS address (it is the return URL).
+- Calls are server-to-server, so the API's browser CORS list (`ALLOWED_WEB_ORIGINS`) does not matter.
+- Purchases made through it have `provider = 'gateway'`; older PayStation purchases keep `provider = 'paystation'`
+  and still count in the admin sales totals.
 
 ## Operator commands
 ```
 node dist/admin.js boosts [pending|paid|failed]     # purchases
-node dist/admin.js payment-check <invoice>          # re-check with PayStation now (missed IPN) and credit
-node dist/admin.js boost-paid <id> [ref]            # mark a purchase paid by hand (paid outside PayStation)
+node dist/admin.js payment-check <invoice>          # re-check a payment (merchantTransactionId) now and credit
+node dist/admin.js boost-paid <id> [ref]            # mark a purchase paid by hand (paid some other way)
 node dist/admin.js boost-grant <email> [minutes]    # give fast minutes for free
 ```
 
@@ -63,5 +55,5 @@ node dist/admin.js boost-grant <email> [minutes]    # give fast minutes for free
 | **Luma Studio API** | `ADDON_API_PRICE_BDT` (500) | API keys (Settings → Add-ons) for the documented API at `/docs/api` (readable by anyone) |
 | **Source code** | `ADDON_SOURCE_PRICE_BDT` (2000) | After paying, the WhatsApp number `SOURCE_CODE_WHATSAPP` (+8801744136934) to message for the code |
 
-Bought the same way as render hours (`POST /api/billing/addons/:addon` → PayStation → callback/IPN → `settleInvoice`,
+Bought the same way as render hours (`POST /api/billing/addons/:addon` → checkout → return page / background re-check → `settleInvoice`,
 which now settles both `render_boosts` and `addon_purchases`). Admins can grant one in /admin → Students.
